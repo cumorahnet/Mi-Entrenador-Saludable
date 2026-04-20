@@ -78,9 +78,16 @@
             estiramientos: { action: 30, change: 5, rounds: 17, cycles: 1, rest: 0 }
         };
 
-        const speak = (text) => {
+        // --- SISTEMA DE VOZ SIN EMPALMES ---
+        // Cola simple: solo habla si speechSynthesis está libre, nunca interrumpe
+        // salvo cuando se pasa interrupt=true (solo para el inicio de sesión)
+        const speak = (text, interrupt = false) => {
             if (!window.speechSynthesis) return;
-            window.speechSynthesis.cancel();
+            if (interrupt) {
+                window.speechSynthesis.cancel();
+            } else if (window.speechSynthesis.speaking) {
+                return; // ya hay voz activa, descartar esta para no empalmar
+            }
             const msg = new SpeechSynthesisUtterance(text);
             msg.lang = 'es-ES'; msg.rate = 1.1;
             window.speechSynthesis.speak(msg);
@@ -209,7 +216,7 @@
                     if(r < c3.rounds) s.push({ label: 'CAMBIO', seconds: c3.change, color: 'bg-yellow-300', phaseId: 'estiramientos' });
                 }
                 setSteps(s); setTimeLeft(s[0].seconds); stepDurationRef.current = s[0].seconds;
-                speak("Prepárate");
+                speak("Prepárate", true);
             }, [workout]);
 
             useEffect(() => {
@@ -227,10 +234,22 @@
                             const current = steps[idx]; const next = steps[idx + 1];
                             const vKey = `${idx}_${remaining}`;
                             if (lastSpokenKey.current !== vKey) {
-                                if (remaining === stepDurationRef.current && idx > 0) speak(current.label === 'CAMBIO' ? "Cambio" : "Comienza " + current.label.toLowerCase());
-                                if (remaining === 5 && next && next.label !== 'CAMBIO') speak("Sigue " + next.label.toLowerCase());
-                                if (remaining <= 3) speak(remaining.toString());
                                 lastSpokenKey.current = vKey;
+                                // Al inicio del paso: anuncia qué es (solo pasos de acción, no CAMBIO)
+                                if (remaining === stepDurationRef.current && idx > 0) {
+                                    if (current.label === 'CAMBIO') speak("Cambio");
+                                    else if (current.label === 'DESCANSO') speak("Descansa");
+                                    else speak(current.label.toLowerCase());
+                                }
+                                // A los 3 segundos: avisa el siguiente paso (en lugar de cuenta regresiva)
+                                // Solo si el paso actual dura más de 5s para no empalmar con el anuncio inicial
+                                else if (remaining === 3 && stepDurationRef.current > 5 && next && next.label !== 'CAMBIO' && next.label !== 'DESCANSO') {
+                                    speak("Sigue " + next.label.toLowerCase());
+                                }
+                                // Cuenta regresiva solo en pasos cortos (CAMBIO / DESCANSO / PREPÁRATE)
+                                else if (remaining <= 3 && (current.label === 'CAMBIO' || current.label === 'DESCANSO' || current.label === 'PREPÁRATE')) {
+                                    speak(remaining.toString());
+                                }
                             }
                         } else {
                             if (idx < steps.length - 1) {
