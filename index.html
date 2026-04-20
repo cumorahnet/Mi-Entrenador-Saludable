@@ -9,7 +9,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#020617">
     
-    <title>Mi Entrenador | Fuerte y  Saludable para Abish </title>
+    <title>Mi Entrenador | Fuerte y Saludable</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -74,7 +74,6 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // --- ICONOS SVG ---
         const IconPlay = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>;
         const IconPause = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>;
         const IconTrash = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>;
@@ -96,7 +95,7 @@
         const db = firebase.firestore();
         const appId = "mientrenador-v3"; 
         const APP_TITLE = "Mi Entrenador";
-        const APP_VERSION = "27.0.0"; 
+        const APP_VERSION = "27.0.1"; // Actualizado con WakeLock
 
         const WARMUP_STEPS = [
             'tobillo derecho', 'tobillo izquierdo', 
@@ -110,7 +109,6 @@
             estiramientos: { action: 30, change: 5, rounds: 17, cycles: 1, rest: 0 }
         };
 
-        // --- SISTEMA DE VOZ ---
         const speak = (text) => {
             if (!window.speechSynthesis) return;
             window.speechSynthesis.cancel();
@@ -220,7 +218,7 @@
                     <h1 className="text-4xl font-black italic uppercase mb-1 tracking-tighter text-white">{APP_TITLE}</h1>
                     <p className="text-[8px] font-black text-slate-600 tracking-widest mb-8 uppercase">V {APP_VERSION}</p>
                     <form onSubmit={handleAuth} className="space-y-4 w-full max-w-sm">
-                        <input type="email" placeholder="EMAIL" className="w-full bg-slate-900 border border-white/5 rounded-[1.5rem] font-bold text-center text-white outline-none focus:border-orange-500 shadow-inner" value={email} onChange={e => setEmail(e.target.value)} required />
+                        <input type="email" placeholder="EMAIL" className="w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] font-bold text-center text-white outline-none focus:border-orange-500 shadow-inner" value={email} onChange={e => setEmail(e.target.value)} required />
                         <input type="password" placeholder="CLAVE" className="w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] font-bold text-center text-white outline-none focus:border-orange-500 shadow-inner" value={password} onChange={e => setPassword(e.target.value)} required />
                         <button type="submit" className="w-full bg-orange-500 py-6 rounded-full font-black uppercase shadow-xl text-white active:scale-95 italic">Entrar</button>
                     </form>
@@ -264,10 +262,35 @@
             const [steps, setSteps] = useState([]);
             const lastSpokenKey = useRef(""); 
             const savedRef = useRef(false);
+            const wakeLockRef = useRef(null);
             
             const startTimeRef = useRef(null);
             const stepStartTimeRef = useRef(null);
             const stepDurationRef = useRef(0);
+
+            // --- FUNCIÓN WAKE LOCK ---
+            const requestWakeLock = async () => {
+                try {
+                    if ('wakeLock' in navigator) {
+                        wakeLockRef.current = await navigator.wakeLock.request('screen');
+                    }
+                } catch (err) {
+                    console.error(`${err.name}, ${err.message}`);
+                }
+            };
+
+            useEffect(() => {
+                if (status === 'running') {
+                    requestWakeLock();
+                } else {
+                    if (wakeLockRef.current !== null) {
+                        wakeLockRef.current.release().then(() => wakeLockRef.current = null);
+                    }
+                }
+                return () => {
+                    if (wakeLockRef.current !== null) wakeLockRef.current.release();
+                };
+            }, [status]);
 
             // --- CONSTRUCCIÓN MODULAR ---
             useEffect(() => {
@@ -309,7 +332,7 @@
                 speak("Prepárate");
             }, [workout]);
 
-            // --- MOTOR DE VOZ Y TIEMPO ---
+            // --- MOTOR DE TIEMPO ---
             useEffect(() => {
                 let interval = null;
                 if (status === 'running') {
@@ -325,14 +348,11 @@
 
                         if (remaining > 0) {
                             setTimeLeft(remaining);
-                            
-                            // LÓGICA DE VOZ INTEGRADA
                             const current = steps[idx];
                             const next = steps[idx + 1];
                             const vKey = `${idx}_${remaining}`;
                             
                             if (lastSpokenKey.current !== vKey) {
-                                // 1. INICIO DE LAPSO
                                 if (remaining === stepDurationRef.current && idx > 0) {
                                     if (current.phaseId === 'entrenamiento-rest') speak("Descanso");
                                     else if (['CAMBIO', 'PREPÁRATE'].includes(current.label)) speak("Cambio");
@@ -341,8 +361,6 @@
                                         else speak("Comienza");
                                     }
                                 }
-                                
-                                // 2. ANTICIPACIÓN (5s ANTES DE CAMBIAR)
                                 if (remaining === 5 && ['PREPÁRATE', 'CAMBIO', 'DESCANSO'].includes(current.label) && next) {
                                     if (next.phaseId === 'calentamiento') speak("Calienta " + next.label.toLowerCase());
                                     else if (next.phaseId === 'trans-warmup') speak("Vamos a ejercitar piernas");
@@ -352,10 +370,7 @@
                                     } else if (current.phaseId === 'entrenamiento-rest') speak("Vamos a ejercitar piernas");
                                     else if (next.phaseId === 'trans-workout') speak("Vamos a estirarnos");
                                 }
-
-                                // 3. CONTEO REGRESIVO FINAL
                                 if (remaining <= 3 && remaining > 0) speak(remaining.toString());
-
                                 lastSpokenKey.current = vKey;
                             }
                         } else {
