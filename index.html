@@ -69,32 +69,69 @@
 
         const APP_ID      = "mientrenador-v3";
         const APP_TITLE   = "Mi Entrenador";
-        const APP_VERSION = "29.0.0";
+        const APP_VERSION = "30.0.0";
 
-        // ── CALENTAMIENTO FIJO (11 movimientos) ──────────────────────────────────
+        // ── CALENTAMIENTO FIJO (10 movimientos) ──────────────────────────────────
         const WARMUP_STEPS = [
-            { label: 'TOBILLO DERECHO',        voice: 'Tobillo derecho'         },
-            { label: 'TOBILLO IZQUIERDO',       voice: 'Tobillo izquierdo'        },
-            { label: 'RODILLAS DERECHA',        voice: 'Rodillas a la derecha'    },
-            { label: 'RODILLAS IZQUIERDA',      voice: 'Rodillas a la izquierda'  },
-            { label: 'CINTURA DERECHA',         voice: 'Cintura a la derecha'     },
-            { label: 'CINTURA IZQUIERDA',       voice: 'Cintura a la izquierda'   },
-            { label: 'BRAZO DERECHO',           voice: 'Brazo derecho'            },
-            { label: 'BRAZO IZQUIERDO',         voice: 'Brazo izquierdo'          },
-            { label: 'CUELLO DERECHA',          voice: 'Cuello a la derecha'      },
-            { label: 'CUELLO IZQUIERDA',        voice: 'Cuello a la izquierda'    },
-            { label: 'CUELLO FRENTE Y ATRÁS',   voice: 'Cuello al frente y atrás' },
+            { label: 'TOBILLO DERECHO',          voice: 'Tobillo derecho'              },
+            { label: 'TOBILLO IZQUIERDO',         voice: 'Tobillo izquierdo'             },
+            { label: 'RODILLAS DERECHA',          voice: 'Rodillas a la derecha'         },
+            { label: 'RODILLAS IZQUIERDA',        voice: 'Rodillas a la izquierda'       },
+            { label: 'CINTURA DERECHA',           voice: 'Cintura a la derecha'          },
+            { label: 'CINTURA IZQUIERDA',         voice: 'Cintura a la izquierda'        },
+            { label: 'BRAZO DERECHO',             voice: 'Brazo derecho'                 },
+            { label: 'BRAZO IZQUIERDO',           voice: 'Brazo izquierdo'               },
+            { label: 'CUELLO ADELANTE Y ATRÁS',   voice: 'Cuello adelante y atrás'       },
+            { label: 'CUELLO DER. E IZQ.',        voice: 'Cuello derecha e izquierda'    },
+        ];
+
+        // ── ESTIRAMIENTOS FIJOS (16 posturas) ────────────────────────────────────
+        const STRETCH_STEPS = [
+            { label: 'CUELLO LATERAL',            voice: 'Cuello lateral'                },
+            { label: 'HOMBRO CRUZADO',            voice: 'Hombro cruzado'                },
+            { label: 'TRÍCEPS ARRIBA',            voice: 'Tríceps arriba'                },
+            { label: 'PECHO ABIERTO',             voice: 'Pecho abierto'                 },
+            { label: 'ESPALDA ALTA',              voice: 'Espalda alta'                  },
+            { label: 'LUMBAR SENTADO',            voice: 'Lumbar sentado'                },
+            { label: 'ROTACIÓN TORÁCICA',         voice: 'Rotación torácica'             },
+            { label: 'CADERA LATERAL',            voice: 'Cadera lateral'                },
+            { label: 'FLEXOR CADERA',             voice: 'Flexor de cadera'              },
+            { label: 'ISQUIOTIBIAL',              voice: 'Isquiotibial'                  },
+            { label: 'CUÁDRICEPS PIE',            voice: 'Cuádriceps de pie'             },
+            { label: 'PANTORRILLA',               voice: 'Pantorrilla'                   },
+            { label: 'ADUCTOR SENTADO',           voice: 'Aductor sentado'               },
+            { label: 'GLÚTEO CRUZADO',            voice: 'Glúteo cruzado'                },
+            { label: 'PALOMA EN SUELO',           voice: 'Paloma en suelo'               },
+            { label: 'POSTURA DEL NIÑO',          voice: 'Postura del niño'              },
         ];
 
         const TRAINING_ZONES = ['PIERNAS', 'BRAZOS', 'TRONCO'];
 
-        // ── PARÁMETROS POR DEFECTO (sin calentamiento — es fijo) ─────────────────
+        // ── PARÁMETROS POR DEFECTO (calentamiento y estiramientos son fijos) ──────
         const DEFAULT_PARAMS = {
             entrenamiento: { action: 30, change: 5, rounds: 3, cycles: 4, rest: 60, zoneRest: 30 },
-            estiramientos: { action: 30, change: 5, rounds: 17, cycles: 1 }
         };
 
         const formatTime = (s) => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`;
+
+        // ── SILBATAZO (AudioContext) ──────────────────────────────────────────────
+        const whistle = () => {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                // Tono corto estilo silbato: sweep de 1200→900 Hz, 0.18 s
+                const osc  = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(1200, ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(900, ctx.currentTime + 0.18);
+                gain.gain.setValueAtTime(0.7, ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.18);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.18);
+                osc.onended = () => ctx.close();
+            } catch(e) {}
+        };
 
         // ── SISTEMA DE VOZ (cola FIFO, sin empalmes) ─────────────────────────────
         const voiceQueue = [];
@@ -284,12 +321,6 @@
                 { f:'rest',     label:'Descanso entre ciclos (s)' },
                 { f:'zoneRest', label:'Descanso entre zonas (s)'  },
             ];
-            const EST_FIELDS = [
-                { f:'action', label:'Acción (s)'  },
-                { f:'change', label:'Cambio (s)'  },
-                { f:'rounds', label:'Rondas'       },
-            ];
-
             return (
                 <div className="flex-1 flex flex-col bg-slate-950 overflow-hidden text-center italic">
                     <header className="p-6 flex items-center border-b border-white/5 shrink-0">
@@ -298,9 +329,12 @@
                     </header>
 
                     <div className="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-6 pb-28">
-                        {/* Aviso calentamiento fijo */}
+                        {/* Avisos fases fijas */}
                         <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-2xl text-[10px] text-yellow-400 font-black uppercase leading-relaxed">
-                            🔥 Calentamiento fijo · 11 movimientos articulares · 30 s c/u
+                            🔥 Calentamiento fijo · 10 movimientos · 30 s c/u
+                        </div>
+                        <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl text-[10px] text-blue-400 font-black uppercase leading-relaxed">
+                            🧘 Estiramientos fijos · 16 posturas · 30 s c/u · cambio 10 s
                         </div>
 
                         <input type="text" placeholder="NOMBRE DE RUTINA"
@@ -320,17 +354,6 @@
                             </div>
                         </div>
 
-                        {/* ESTIRAMIENTOS */}
-                        <div className="glass-card p-6 space-y-4">
-                            <span className="font-black uppercase text-xs text-orange-500 border-b border-white/5 block pb-2">Estiramientos</span>
-                            <div className="grid grid-cols-2 gap-4">
-                                {EST_FIELDS.map(({f,label}) => (
-                                    <InputField key={f} label={label}
-                                        val={(phases.estiramientos?.[f] ?? DEFAULT_PARAMS.estiramientos[f])}
-                                        set={v=>update('estiramientos',f,v)} />
-                                ))}
-                            </div>
-                        </div>
                     </div>
 
                     <div className="p-6 bg-slate-950 border-t border-white/5 shrink-0">
@@ -385,8 +408,7 @@
             // ── Construir secuencia de pasos ───────────────────────────────────
             useEffect(() => {
                 if (!workout) return;
-                const ent = { ...DEFAULT_PARAMS.entrenamiento, ...(workout.phases?.entrenamiento || {}) };
-                const est = { ...DEFAULT_PARAMS.estiramientos, ...(workout.phases?.estiramientos || {}) };
+                const ent      = { ...DEFAULT_PARAMS.entrenamiento, ...(workout.phases?.entrenamiento || {}) };
                 const zoneRest = ent.zoneRest > 0 ? ent.zoneRest : 30;
                 const s = [];
 
@@ -469,21 +491,27 @@
                     }
                 }
 
-                // ── 3. ESTIRAMIENTOS ───────────────────────────────────────────
-                for (let r = 1; r <= est.rounds; r++) {
+                // ── 3. ESTIRAMIENTOS FIJOS (16 posturas × 30 s, cambio 10 s) ─────────
+                STRETCH_STEPS.forEach((ss, i) => {
                     s.push({
-                        label: 'ESTIRAMIENTO',
-                        voice: 'Estiramiento',
-                        seconds: est.action,
-                        color: 'bg-blue-400',
-                        phase: 'estiramientos',
-                        r, tr: est.rounds,
-                        isFirst: r === 1
+                        label:   ss.label,
+                        voice:   ss.voice,
+                        seconds: 30,
+                        color:   'bg-blue-400',
+                        phase:   'estiramientos',
+                        r: i + 1, tr: STRETCH_STEPS.length,
+                        isFirst: i === 0
                     });
-                    if (r < est.rounds) {
-                        s.push({ label:'CAMBIO', seconds: est.change, color:'bg-yellow-300', phase:'cambio-est' });
+                    if (i < STRETCH_STEPS.length - 1) {
+                        s.push({
+                            label:     'CAMBIO',
+                            seconds:   10,
+                            color:     'bg-blue-200',
+                            phase:     'cambio-est',
+                            nextVoice: STRETCH_STEPS[i+1].voice
+                        });
                     }
-                }
+                });
 
                 setSteps(s);
                 setTimeLeft(s[0].seconds);
@@ -494,72 +522,88 @@
             }, [workout]);
 
             // ── Lógica de voz por paso ─────────────────────────────────────────
-            const announceStep = (step, nextStep) => {
+            // announceStep: llamado cuando EMPIEZA el paso nuevo.
+            // Regla general:
+            //   - Pasos de ACCIÓN  → solo silbatazo (el nombre ya se dijo en el descanso/cambio anterior)
+            //   - Pasos de DESCANSO/CAMBIO → anunciar voz (nombre del siguiente) + la cuenta 3,2,1
+            //     ocurre en el timer; el silbatazo se dispara cuando llega el paso de acción.
+            // Excepción: primer paso de cada fase anuncia el nombre de la fase.
+            const announceStep = (step) => {
                 const ph = step.phase;
 
-                if (ph === 'inicio') {
-                    // Ya se dijo "Prepárate" al cargar
+                // ── Pasos de ACCIÓN: solo silbatazo ────────────────────────────
+                if (ph === 'calentamiento' || ph === 'entrenamiento' || ph === 'estiramientos') {
+                    whistle();
                     return;
                 }
 
-                if (ph === 'calentamiento') {
-                    if (step.isFirst) {
-                        speak('Calentamiento');
-                        speak(step.voice);
-                        speak('Comienza');
-                    } else {
-                        // Solo nombre — "Comienza" sería redundante en cada movimiento
-                        speak(step.voice);
-                    }
-                    return;
-                }
+                // ── inicio (PREPÁRATE): ya se dijo al cargar ───────────────────
+                if (ph === 'inicio') return;
 
+                // ── CAMBIO entre movimientos de calentamiento ──────────────────
+                // Anuncia el nombre del siguiente movimiento (se ejecutará al inicio del cambio)
                 if (ph === 'cambio-warmup') {
                     speak('Cambio');
                     if (step.nextVoice) speak(step.nextVoice);
                     return;
                 }
 
+                // ── Descanso post-calentamiento ────────────────────────────────
                 if (ph === 'post-warmup') {
-                    speak(step.voice);
+                    speak(step.voice);                      // "Descansamos veinte segundos"
+                    speak('Seguimos ejercitando');
+                    speak('Piernas');
                     return;
                 }
 
-                if (ph === 'entrenamiento') {
-                    if (step.isFirstZone && step.isFirstCycle) {
-                        speak('Seguimos ejercitando');
-                    }
-                    if (step.isFirstRound) {
-                        speak(step.voice);
-                        speak('Comienza');
-                    }
-                    return;
-                }
-
+                // ── CAMBIO entre rondas de entrenamiento ───────────────────────
                 if (ph === 'cambio-ent') {
                     speak('Cambio');
                     return;
                 }
 
+                // ── Descanso entre zonas ───────────────────────────────────────
                 if (ph === 'zone-rest') {
-                    speak(step.voice);
-                    if (step.nextZone) speak('Seguimos con ' + step.nextZone);
+                    speak(step.voice);                      // "Descansamos X segundos"
+                    if (step.nextZone) speak(step.nextZone);
                     return;
                 }
 
+                // ── Descanso entre ciclos ──────────────────────────────────────
                 if (ph === 'ciclo-rest') {
-                    speak(step.voice);
+                    speak(step.voice);                      // "Descanso de X segundos"
+                    // Anunciar zona que viene (siempre reinicia en Piernas)
+                    speak('Piernas');
                     return;
                 }
 
-                if (ph === 'estiramientos') {
-                    if (step.isFirst) speak('Estiramientos');
-                    speak('Estiramiento');
-                    return;
-                }
-
+                // ── CAMBIO entre estiramientos ─────────────────────────────────
                 if (ph === 'cambio-est') {
                     speak('Cambio');
+                    if (step.nextVoice) speak(step.nextVoice);
+                    return;
+                }
+            };
+
+            // announcePhaseStart: llamado UNA VEZ al entrar en cada fase nueva
+            // para decir el nombre de la fase (calentamiento, zona, estiramientos)
+            const announcePhaseStart = (step, prevStep) => {
+                const ph  = step.phase;
+                const pph = prevStep?.phase;
+
+                if (ph === 'calentamiento' && step.isFirst) {
+                    speak('Calentamiento');
+                    speak(step.voice);   // nombre del primer movimiento
+                    return;
+                }
+                if (ph === 'entrenamiento' && step.isFirstRound) {
+                    if (step.isFirstZone && step.isFirstCycle) speak('Seguimos ejercitando');
+                    speak(step.voice);   // nombre de la zona
+                    return;
+                }
+                if (ph === 'estiramientos' && step.isFirst) {
+                    speak('Estiramientos');
+                    speak(step.voice);   // nombre de la primera postura
                     return;
                 }
             };
@@ -594,7 +638,8 @@
                             // Avanzar paso — voz se dispara AQUÍ, sincronizada con setIdx
                             if (idx < steps.length - 1) {
                                 const n = idx + 1;
-                                announceStep(steps[n], steps[n + 1]);
+                                announcePhaseStart(steps[n], steps[idx]);
+                                announceStep(steps[n]);
                                 setIdx(n);
                                 setTimeLeft(steps[n].seconds);
                                 stepDurRef.current   = steps[n].seconds;
