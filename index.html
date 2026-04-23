@@ -65,7 +65,7 @@
 
         const APP_ID = "mientrenador-v3";
         const APP_TITLE = "Mi Entrenador";
-        const APP_VERSION = "43.0.0";
+        const APP_VERSION = "44.0.0";
 
         const WARMUP_STEPS = [
             { label: 'TOBILLO DERECHO', voice: 'Tobillo derecho' },
@@ -274,12 +274,16 @@
                 if (!workout) return;
                 const ent = { ...DEFAULT_PARAMS.entrenamiento, ...(workout.phases?.entrenamiento || {}) };
                 const s = [];
+
                 s.push({ label:'PREPÁRATE', seconds:15, color:'bg-yellow-400', phase:'inicio' });
+
                 WARMUP_STEPS.forEach((ws, i) => {
                     s.push({ label: ws.label, seconds: 30, color: 'bg-yellow-400', phase: 'calentamiento' });
                     if (i < WARMUP_STEPS.length - 1) s.push({ label: 'CAMBIO', seconds: 5, color: 'bg-yellow-300', phase: 'cambio-warmup', nextVoice: WARMUP_STEPS[i+1].voice });
                 });
+
                 s.push({ label:'DESCANSO', seconds:20, color:'bg-rose-400', phase:'post-warmup' });
+
                 for (let cy = 1; cy <= ent.cycles; cy++) {
                     TRAINING_ZONES.forEach((zone, zi) => {
                         for (let r = 1; r <= ent.rounds; r++) {
@@ -290,11 +294,14 @@
                     });
                     if (cy < ent.cycles) s.push({ label: 'DESCANSO', seconds: ent.rest, color: 'bg-rose-500', phase: 'ciclo-rest', nextZone: TRAINING_ZONES[0] });
                 }
+
                 s.push({ label:'DESCANSO', seconds:30, color:'bg-blue-200', phase:'pre-stretches' });
+
                 for (let i = 0; i < 16; i++) {
                     s.push({ label: '', seconds: 30, color: 'bg-blue-400', phase: 'estiramientos' });
                     if (i < 15) s.push({ label: 'CAMBIO', seconds: 10, color: 'bg-blue-200', phase: 'cambio-est' });
                 }
+
                 setSteps(s); setTimeLeft(s[0].seconds); stepDurRef.current = s[0].seconds;
                 speak('Prepárate', true);
             }, [workout]);
@@ -314,11 +321,14 @@
                 if (status === 'running') {
                     if (!startRef.current) startRef.current = Date.now() - (elapsed * 1000);
                     if (!stepStartRef.current) stepStartRef.current = Date.now() - ((stepDurRef.current - timeLeft) * 1000);
+                    
                     interval = setInterval(() => {
                         const now = Date.now();
-                        const totalSec = Math.floor((now - startRef.current) / 1000); setElapsed(totalSec);
+                        const totalSec = Math.floor((now - startRef.current) / 1000);
+                        setElapsed(totalSec);
                         const stepPassed = Math.floor((now - stepStartRef.current) / 1000);
                         const remaining = stepDurRef.current - stepPassed;
+                        
                         if (remaining > 0) {
                             setTimeLeft(remaining);
                             const vKey = `${idx}_${remaining}`;
@@ -357,15 +367,21 @@
                 <div className={`h-screen flex flex-col transition-colors duration-700 ${curr?.color || 'bg-slate-950'} text-white`}>
                     <video ref={videoRef} loop muted playsInline style={{position:'absolute',width:'1px',height:'1px',opacity:0.01}}><source src="https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/one-second-loop.mp4" type="video/mp4"/></video>
                     
-                    <div className="bg-black/10 p-4 pt-10 flex justify-between items-center shrink-0">
-                        <div className="leading-none"><span className="text-[10px] font-black text-orange-500 uppercase">Tiempo</span><p className="text-xl font-black italic">{formatTime(elapsed)}</p></div>
-                        <h2 className="text-[10px] font-black uppercase italic truncate max-w-[150px] tracking-tight">{workout.name}</h2>
+                    {/* Header Restaurado y Asegurado */}
+                    <div className="bg-black/10 p-4 pt-10 flex justify-between items-center shrink-0 z-10">
+                        <div className="leading-none text-left">
+                            <span className="text-[10px] font-black text-orange-500 uppercase">Tiempo</span>
+                            <p className="text-xl font-black italic">{formatTime(elapsed)}</p>
+                        </div>
+                        <div className="text-center">
+                            <h2 className="text-[10px] font-black uppercase italic truncate max-w-[120px] tracking-tight">{workout?.name || 'Rutina'}</h2>
+                        </div>
                         <button onClick={onExit} className="opacity-40 text-xl font-black px-2">✕</button>
                     </div>
 
                     <div className="flex-1 flex flex-col items-center justify-center text-center px-4 min-h-0 relative">
                         {status === 'paused' && (
-                            <div className="absolute inset-0 z-30 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center">
+                            <div className="absolute inset-0 z-40 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center">
                                 <button onClick={() => setStatus('running')} className="bg-orange-500 p-10 rounded-full shadow-2xl active:scale-90"><IconPlay/></button>
                             </div>
                         )}
@@ -385,8 +401,8 @@
                         </div>
                         <div className="flex gap-4">
                             <button onClick={() => { setIdx(0); setElapsed(0); setStatus('paused'); lastSpokenKey.current=''; }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconRotate/></button>
-                            <button onClick={() => { if (idx>0) { const pi=idx-1; setIdx(pi); setTimeLeft(steps[pi].seconds); stepDurRef.current=steps[pi].seconds; stepStartRef.current=Date.now() - ((stepDurRef.current - timeLeft) * 1000); lastSpokenKey.current=''; } }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconBack/></button>
-                            <button onClick={() => { if (idx<steps.length-1) { const ni=idx+1; setIdx(ni); setTimeLeft(steps[ni].seconds); stepDurRef.current=steps[ni].seconds; stepStartRef.current=Date.now() - ((stepDurRef.current - timeLeft) * 1000); lastSpokenKey.current=''; } }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconForward/></button>
+                            <button onClick={() => { if (idx>0) { const pi=idx-1; setIdx(pi); setTimeLeft(steps[pi].seconds); stepDurRef.current=steps[pi].seconds; stepStartRef.current=null; lastSpokenKey.current=''; } }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconBack/></button>
+                            <button onClick={() => { if (idx<steps.length-1) { const ni=idx+1; setIdx(ni); setTimeLeft(steps[ni].seconds); stepDurRef.current=steps[ni].seconds; stepStartRef.current=null; lastSpokenKey.current=''; } }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconForward/></button>
                         </div>
                     </div>
                 </div>
