@@ -65,7 +65,7 @@
 
         const APP_ID = "mientrenador-v3";
         const APP_TITLE = "Mi Entrenador";
-        const APP_VERSION = "45.0.0";
+        const APP_VERSION = "46.0.0";
 
         const WARMUP_STEPS = [
             { label: 'TOBILLO DERECHO', voice: 'Tobillo derecho' },
@@ -155,7 +155,6 @@
 
             return (
                 <div className="h-full w-full flex flex-col bg-slate-950 text-white overflow-hidden">
-                    {/* Bug 1 Solucionado: Header Global Restaurado */}
                     {view !== 'play' && (
                         <header className="p-5 flex justify-between items-center bg-slate-900 border-b border-white/5 shrink-0">
                             <div onClick={() => setView('workouts')} className="cursor-pointer">
@@ -168,7 +167,7 @@
 
                     <main className="flex-1 relative flex flex-col min-h-0">
                         {view === 'workouts' && <WorkoutsView workouts={workouts} user={user} onStart={w => { setSelectedWorkout(w); setView('play'); }} onEdit={w => { setSelectedWorkout(w); setView('create'); }} onCreate={() => { setSelectedWorkout(null); setView('create'); }} />}
-                        {view === 'avance' && <div className="p-10 text-center uppercase font-black italic">Sección de Avance</div>}
+                        {view === 'avance' && <AvanceView history={history} />}
                         {view === 'create' && <CreateView user={user} workoutToEdit={selectedWorkout} onCancel={() => setView('workouts')} />}
                         {view === 'play' && <PlayerView workout={selectedWorkout} onExit={() => setView('workouts')} onComplete={(name, time) => { db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid).collection('history').add({ workoutName:name, totalTime:time, date: new Date().toISOString() }); setView('workouts'); }} />}
                     </main>
@@ -331,11 +330,7 @@
             };
 
             const togglePlay = () => {
-                // Bug 2 Solucionado: Lanzar Prepárate solo al dar primer Play
-                if (!firstPlayDone.current) {
-                    speak('Prepárate', true);
-                    firstPlayDone.current = true;
-                }
+                if (!firstPlayDone.current) { speak('Prepárate', true); firstPlayDone.current = true; }
                 setStatus(s => s === 'running' ? 'paused' : 'running');
             };
 
@@ -424,6 +419,124 @@
                             <button onClick={() => { if (idx<steps.length-1) { const ni=idx+1; setIdx(ni); setTimeLeft(steps[ni].seconds); stepDurRef.current=steps[ni].seconds; stepStartRef.current=null; lastSpokenKey.current=''; } }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconForward/></button>
                         </div>
                     </div>
+                </div>
+            );
+        }
+
+        // ── AVANCE ───────────────────────────────────────────────────────────────
+        function AvanceView({ history }) {
+            const [period, setPeriod] = useState('semana');
+            const chartRef = useRef(null);
+            const chartInst = useRef(null);
+            const totalSec = history.reduce((a, h) => a + (h.totalTime || 0), 0);
+
+            const getChartData = () => {
+                const now = new Date();
+                if (period === 'semana') {
+                    const labels = Array.from({ length: 7 }, (_, i) => {
+                        const d = new Date(); d.setDate(d.getDate() - 6 + i);
+                        return d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' });
+                    });
+                    const map = {};
+                    history.forEach(h => {
+                        const k = new Date(h.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' });
+                        map[k] = (map[k] || 0) + (h.totalTime || 0);
+                    });
+                    return { labels, data: labels.map(l => Math.floor((map[l] || 0) / 60)) };
+                }
+                if (period === 'mes') {
+                    const weeks = Array.from({ length: 4 }, (_, i) => {
+                        const start = new Date(); start.setDate(start.getDate() - 27 + i * 7);
+                        start.setHours(0, 0, 0, 0);
+                        const end = new Date(start); end.setDate(end.getDate() + 6);
+                        end.setHours(23, 59, 59, 999);
+                        return { label: `${start.getDate()}/${start.getMonth() + 1}`, start, end };
+                    });
+                    return {
+                        labels: weeks.map(w => w.label),
+                        data: weeks.map(w => Math.floor(history.filter(h => {
+                            const d = new Date(h.date);
+                            return d >= w.start && d <= w.end;
+                        }).reduce((a, h) => a + (h.totalTime || 0), 0) / 60))
+                    };
+                }
+                const labels = Array.from({ length: 12 }, (_, i) => new Date(now.getFullYear(), i, 1).toLocaleDateString('es-ES', { month: 'short' }));
+                const data = Array.from({ length: 12 }, (_, i) => Math.floor(history.filter(h => {
+                    const d = new Date(h.date);
+                    return d.getMonth() === i && d.getFullYear() === now.getFullYear();
+                }).reduce((a, h) => a + (h.totalTime || 0), 0) / 60));
+                return { labels, data };
+            };
+
+            useEffect(() => {
+                const ctx = chartRef.current?.getContext('2d');
+                if (!ctx) return;
+                if (chartInst.current) chartInst.current.destroy();
+                const { labels, data } = getChartData();
+                chartInst.current = new Chart(ctx, {
+                    type: 'bar',
+                    data: { labels, datasets: [{ label: 'Minutos', data, backgroundColor: '#f97316', borderRadius: 8 }] },
+                    options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b' } }, x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } } } }
+                });
+                return () => chartInst.current?.destroy();
+            }, [history, period]);
+
+            const periodSessions = (() => {
+                const from = new Date();
+                if (period === 'semana') from.setDate(from.getDate() - 6);
+                else if (period === 'mes') from.setDate(from.getDate() - 27);
+                else from.setMonth(0, 1);
+                from.setHours(0, 0, 0, 0);
+                return history.filter(h => new Date(h.date) >= from);
+            })();
+            const periodSec = periodSessions.reduce((a, h) => a + (h.totalTime || 0), 0);
+
+            return (
+                <div className="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4 pb-28">
+                    <div className="glass-card p-6 text-center">
+                        <span className="text-[9px] opacity-40 block mb-1 uppercase">Tiempo Total Acumulado</span>
+                        <span className="text-3xl font-black text-orange-500">{Math.floor(totalSec / 3600)}h {Math.floor((totalSec % 3600) / 60)}m</span>
+                    </div>
+
+                    <div className="flex gap-2">
+                        {['semana', 'mes', 'año'].map(p => (
+                            <button key={p} onClick={() => setPeriod(p)} className={`flex-1 py-3 rounded-xl font-black uppercase text-[10px] transition-all ${period === p ? 'bg-orange-500 text-white' : 'bg-white/5 text-slate-400'}`}>
+                                {p}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="glass-card p-5 flex justify-between items-center">
+                        <div className="text-left">
+                            <span className="text-[9px] opacity-40 uppercase block">Esta {period}</span>
+                            <span className="text-2xl font-black text-sky-400">{Math.floor(periodSec / 3600)}h {Math.floor((periodSec % 3600) / 60)}m</span>
+                        </div>
+                        <div className="text-right">
+                            <span className="text-[9px] opacity-40 uppercase block">Sesiones</span>
+                            <span className="text-2xl font-black text-emerald-400">{periodSessions.length}</span>
+                        </div>
+                    </div>
+
+                    <div className="glass-card p-4">
+                        <div style={{ height: '200px' }}>
+                            <canvas ref={chartRef} />
+                        </div>
+                    </div>
+
+                    {periodSessions.length > 0 && (
+                        <div className="glass-card p-4 space-y-3">
+                            <span className="text-[9px] opacity-40 uppercase text-center block mb-1">Sesiones recientes</span>
+                            {[...periodSessions].reverse().slice(0, 10).map((h, i) => (
+                                <div key={i} className="flex justify-between items-center border-b border-white/5 pb-2 last:border-0 last:pb-0">
+                                    <div>
+                                        <p className="text-xs font-black uppercase italic">{h.workoutName || 'Sesión'}</p>
+                                        <p className="text-[9px] text-slate-500">{new Date(h.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
+                                    </div>
+                                    <span className="text-orange-500 font-black text-xs">{formatTime(h.totalTime || 0)}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             );
         }
