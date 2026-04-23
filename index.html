@@ -65,7 +65,7 @@
 
         const APP_ID = "mientrenador-v3";
         const APP_TITLE = "Mi Entrenador Saludable";
-        const APP_VERSION = "49.0.0";
+        const APP_VERSION = "50.0.0";
 
         const WARMUP_STEPS = [
             { label: 'TOBILLO DERECHO', voice: 'Tobillo derecho' },
@@ -334,14 +334,21 @@
 
             const togglePlay = () => {
                 if (!firstPlayDone.current) {
-                    window.speechSynthesis.cancel(); // Limpia colas previas
-                    const warm = new SpeechSynthesisUtterance('');
-                    window.speechSynthesis.speak(warm);
-                    speak('Prepárate', true);
+                    // Hablar DIRECTAMENTE en el handler del click (interacción de usuario).
+                    // Esto desbloquea speechSynthesis en todos los navegadores sin necesidad
+                    // de un utterance vacío que compite con la cola.
+                    voiceQueue.length = 0;
+                    voiceBusy = false;
+                    window.speechSynthesis.cancel();
+                    const msg = new SpeechSynthesisUtterance('Prepárate');
+                    msg.lang = 'es-ES'; msg.rate = 1.05;
+                    msg.onend = () => { voiceBusy = false; flushVoice(); };
+                    voiceBusy = true;
+                    window.speechSynthesis.speak(msg);
                     firstPlayDone.current = true;
                 }
                 setStatus(s => s === 'running' ? 'paused' : 'running');
-                setWasPausedByHide(false); // Limpiamos el estado del botón gigante al interactuar
+                setWasPausedByHide(false);
             };
 
             useEffect(() => {
