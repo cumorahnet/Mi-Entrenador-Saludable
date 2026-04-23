@@ -262,7 +262,6 @@
             const startRef = useRef(null);
             const stepStartRef = useRef(null);
             const stepDurRef = useRef(0);
-            const firstPlayDone = useRef(false);
 
             const requestStayAwake = async () => {
                 if (videoRef.current && status === 'running') videoRef.current.play().catch(()=>{});
@@ -320,6 +319,17 @@
                     if (i < 15) s.push({ label: 'CAMBIO', seconds: 10, color: 'bg-blue-200', phase: 'cambio-est' });
                 }
                 setSteps(s); setTimeLeft(s[0].seconds); stepDurRef.current = s[0].seconds;
+
+                // Pre-calentar el motor de voz con un utterance de espacio en blanco.
+                // Esto ocurre al montar el componente (antes del primer Play), así cuando
+                // el usuario toque Play el motor ya está desbloqueado y "Prepárate" sale inmediato.
+                if (window.speechSynthesis) {
+                    window.speechSynthesis.cancel();
+                    const primer = new SpeechSynthesisUtterance(' '); // espacio no-break
+                    primer.volume = 0;
+                    primer.lang = 'es-ES';
+                    window.speechSynthesis.speak(primer);
+                }
             }, [workout]);
 
             const announceStep = (step) => {
@@ -334,25 +344,12 @@
 
             const togglePlay = () => {
                 setWasPausedByHide(false);
-                if (!firstPlayDone.current) {
-                    firstPlayDone.current = true;
-                    // Hablar "Prepárate" directamente en el evento de usuario (desbloquea el motor).
-                    // El timer NO arranca hasta que onend dispara setStatus('running').
-                    window.speechSynthesis.cancel();
-                    voiceQueue.length = 0; voiceBusy = false;
-                    const msg = new SpeechSynthesisUtterance('Prepárate');
-                    msg.lang = 'es-ES'; msg.rate = 1.05;
-                    msg.onend = () => {
-                        voiceBusy = false;
-                        setStatus('running'); // arranca el timer DESPUÉS de que termina la voz
-                    };
-                    msg.onerror = () => {
-                        voiceBusy = false;
-                        setStatus('running'); // arranca igual si falla la voz
-                    };
-                    voiceBusy = true;
-                    window.speechSynthesis.speak(msg);
-                    // No llamamos setStatus aquí — lo hace onend
+                if (status === 'ready') {
+                    // Primer arranque: hablar "Prepárate" y arrancar el timer al mismo tiempo.
+                    // El motor ya está desbloqueado por el pre-calentamiento del useEffect,
+                    // así que la voz sale inmediata sin desfase.
+                    speak('Prepárate', true);
+                    setStatus('running');
                     return;
                 }
                 setStatus(s => s === 'running' ? 'paused' : 'running');
@@ -434,7 +431,7 @@
                             <div className="flex flex-col"><span className="text-[14vw] font-black text-yellow-400 leading-none">{curr?.tc ? curr.tc - (curr.cy||0) + 1 : '-'}</span><span className="text-[8px] opacity-40">Ciclos</span></div>
                         </div>
                         <div className="flex gap-4">
-                            <button onClick={() => { setIdx(0); setElapsed(0); setStatus('ready'); lastSpokenKey.current=''; firstPlayDone.current=false; }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconRotate/></button>
+                            <button onClick={() => { setIdx(0); setElapsed(0); setStatus('ready'); lastSpokenKey.current=''; }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconRotate/></button>
                             <button onClick={() => { if (idx>0) { const pi=idx-1; setIdx(pi); setTimeLeft(steps[pi].seconds); stepDurRef.current=steps[pi].seconds; stepStartRef.current=null; lastSpokenKey.current=''; } }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconBack/></button>
                             <button onClick={() => { if (idx<steps.length-1) { const ni=idx+1; setIdx(ni); setTimeLeft(steps[ni].seconds); stepDurRef.current=steps[ni].seconds; stepStartRef.current=null; lastSpokenKey.current=''; } }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconForward/></button>
                         </div>
