@@ -65,7 +65,7 @@
 
         const APP_ID = "mientrenador-v3";
         const APP_TITLE = "Mi Entrenador Saludable";
-        const APP_VERSION = "51.0.0";
+        const APP_VERSION = "52.0.0";
 
         const WARMUP_STEPS = [
             { label: 'TOBILLO DERECHO', voice: 'Tobillo derecho' },
@@ -151,6 +151,17 @@
                 return () => { unsubW(); unsubH(); };
             }, [user]);
 
+            const handleStartWorkout = (w) => {
+                // DESPERTAR MOTOR DE VOZ AQUÍ (Interacción de usuario)
+                if (window.speechSynthesis) {
+                    window.speechSynthesis.cancel();
+                    const wakeUp = new SpeechSynthesisUtterance('');
+                    window.speechSynthesis.speak(wakeUp);
+                }
+                setSelectedWorkout(w);
+                setView('play');
+            };
+
             if (loading) return <div className="h-full w-full flex items-center justify-center bg-slate-950"><div className="animate-spin w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full"/></div>;
             if (!user) return <AuthView APP_TITLE={APP_TITLE} APP_VERSION={APP_VERSION}/>;
 
@@ -166,7 +177,7 @@
                         </header>
                     )}
                     <main className="flex-1 relative flex flex-col min-h-0">
-                        {view === 'workouts' && <WorkoutsView workouts={workouts} user={user} onStart={w => { setSelectedWorkout(w); setView('play'); }} onEdit={w => { setSelectedWorkout(w); setView('create'); }} onCreate={() => { setSelectedWorkout(null); setView('create'); }} />}
+                        {view === 'workouts' && <WorkoutsView workouts={workouts} user={user} onStart={handleStartWorkout} onEdit={w => { setSelectedWorkout(w); setView('create'); }} onCreate={() => { setSelectedWorkout(null); setView('create'); }} />}
                         {view === 'avance' && <AvanceView history={history} />}
                         {view === 'create' && <CreateView user={user} workoutToEdit={selectedWorkout} onCancel={() => setView('workouts')} />}
                         {view === 'play' && <PlayerView workout={selectedWorkout} onExit={() => setView('workouts')} onComplete={(name, time) => { db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid).collection('history').add({ workoutName:name, totalTime:time, date: new Date().toISOString() }); setView('workouts'); }} />}
@@ -251,7 +262,7 @@
         function InputField({ label, val, set }) { return ( <div className="flex flex-col items-center"> <span className="text-[8px] opacity-40 mb-2 uppercase">{label}</span> <input type="number" className="w-full bg-slate-800/40 p-4 rounded-xl text-center font-black text-white border border-white/5 outline-none" value={val} onChange={e=>set(e.target.value)} /> </div> ); }
 
         function PlayerView({ workout, onExit, onComplete }) {
-            const [status, setStatus] = useState('ready'); 
+            const [status, setStatus] = useState('ready'); // Iniciamos en ready para evitar botón gigante
             const [idx, setIdx] = useState(0);
             const [timeLeft, setTimeLeft] = useState(0);
             const [elapsed, setElapsed] = useState(0);
@@ -323,10 +334,6 @@
                     if (i < 15) s.push({ label: 'CAMBIO', seconds: 10, color: 'bg-blue-200', phase: 'cambio-est' });
                 }
                 setSteps(s); setTimeLeft(s[0].seconds); stepDurRef.current = s[0].seconds;
-                
-                // Pre-calentamiento silencioso del motor
-                const warm = new SpeechSynthesisUtterance('');
-                window.speechSynthesis.speak(warm);
             }, [workout]);
 
             const announceStep = (step, isFirst) => {
@@ -336,8 +343,7 @@
                     whistle();
                     return;
                 }
-                if (ph === 'entrenamiento') { whistle(); return; }
-                if (ph === 'estiramientos') { whistle(); return; }
+                if (ph === 'entrenamiento' || ph === 'estiramientos') { whistle(); return; }
                 if (ph === 'cambio-warmup') { speak('Cambio'); if (step.nextVoice) speak(step.nextVoice); return; }
                 if (ph === 'post-warmup' || ph === 'zone-rest' || ph === 'ciclo-rest' || ph === 'pre-stretches') { speak('Descanso'); return; }
                 if (ph === 'cambio-ent' || ph === 'cambio-est') { speak('Cambio'); return; }
@@ -346,25 +352,11 @@
             const togglePlay = () => {
                 if (!firstPlayDone.current) {
                     firstPlayDone.current = true;
-                    setWasPausedByHide(false);
-                    
-                    // LÓGICA DE VOZ AISLADA:
-                    // 1. Limpiamos cualquier cola previa
-                    window.speechSynthesis.cancel();
-                    
-                    const msg = new SpeechSynthesisUtterance('Prepárate');
-                    msg.lang = 'es-ES'; msg.rate = 1.05;
-                    
-                    // 2. Solo cuando la voz TERMINA, arrancamos el tiempo
-                    msg.onend = () => {
-                        setStatus('running');
-                    };
-                    
-                    window.speechSynthesis.speak(msg);
-                } else {
-                    setStatus(s => s === 'running' ? 'paused' : 'running');
-                    setWasPausedByHide(false);
+                    // LÓGICA DE VOZ SIN DESFASE
+                    speak('Prepárate', true);
                 }
+                setStatus(s => s === 'running' ? 'paused' : 'running');
+                setWasPausedByHide(false);
             };
 
             useEffect(() => {
