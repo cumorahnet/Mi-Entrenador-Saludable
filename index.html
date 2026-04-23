@@ -248,31 +248,24 @@
         function InputField({ label, val, set }) { return ( <div className="flex flex-col items-center"> <span className="text-[8px] opacity-40 mb-2 uppercase">{label}</span> <input type="number" className="w-full bg-slate-800/40 p-4 rounded-xl text-center font-black text-white border border-white/5 outline-none" value={val} onChange={e=>set(e.target.value)} /> </div> ); }
 
         function PlayerView({ workout, onExit, onComplete }) {
-            // status: 'ready' | 'running' | 'paused' | 'finished'
-            const [status,   setStatus]   = useState('ready');
-            const [idx,      setIdx]      = useState(0);
-            const [timeLeft, setTimeLeft] = useState(15);
-            const [elapsed,  setElapsed]  = useState(0);
-            const [steps,    setSteps]    = useState([]);
+            const [status, setStatus] = useState('ready'); // Cambiado a 'ready' para evitar el botón gigante inicial
+            const [idx, setIdx] = useState(0);
+            const [timeLeft, setTimeLeft] = useState(0);
+            const [elapsed, setElapsed] = useState(0);
+            const [steps, setSteps] = useState([]);
             const [wasPausedByHide, setWasPausedByHide] = useState(false);
 
-            const savedRef      = useRef(false);
-            const wakeLockRef   = useRef(null);
-            const videoRef      = useRef(null);
             const lastSpokenKey = useRef('');
+            const savedRef = useRef(false);
+            const wakeLockRef = useRef(null);
+            const videoRef = useRef(null);
+            const startRef = useRef(null);
+            const stepStartRef = useRef(null);
+            const stepDurRef = useRef(0);
+            const firstPlayDone = useRef(false);
 
-            // Todos los valores del timer viven en refs para evitar stale closures
-            // y para que el reset sea instantáneo sin depender del ciclo de render.
-            const idxRef      = useRef(0);
-            const timeLeftRef = useRef(15);
-            const elapsedRef  = useRef(0);
-            const stepDurRef  = useRef(15);
-            const tickRef     = useRef(null);   // referencia al setInterval activo
-            const runningRef  = useRef(false);  // espejo de status para el interval
-
-            // ── Wake Lock ─────────────────────────────────────────────────────
             const requestStayAwake = async () => {
-                if (videoRef.current) videoRef.current.play().catch(()=>{});
+                if (videoRef.current && status === 'running') videoRef.current.play().catch(()=>{});
                 try { if ('wakeLock' in navigator && !wakeLockRef.current) wakeLockRef.current = await navigator.wakeLock.request('screen'); } catch(e){}
             };
             const releaseStayAwake = () => {
@@ -280,251 +273,151 @@
                 if (wakeLockRef.current) { wakeLockRef.current.release(); wakeLockRef.current = null; }
             };
 
-            // Visibilidad (pantalla bloqueada en móvil)
             useEffect(() => {
-                const onVis = () => {
-                    if (document.hidden && runningRef.current) {
-                        runningRef.current = false;
-                        setStatus('paused');
-                        setWasPausedByHide(true);
-                        releaseStayAwake();
-                    } else if (!document.hidden && 'wakeLock' in navigator) {
-                        requestStayAwake();
+                const handleVisibilityChange = () => {
+                    if (document.hidden) { 
+                        if (status === 'running') {
+                            setStatus('paused'); 
+                            setWasPausedByHide(true); // Solo aquí activamos el indicador para el botón gigante
+                        }
+                        releaseStayAwake(); 
+                    } else { 
+                        if ('wakeLock' in navigator) requestStayAwake(); 
                     }
                 };
-                document.addEventListener('visibilitychange', onVis);
-                return () => document.removeEventListener('visibilitychange', onVis);
-            }, []);
+                document.addEventListener('visibilitychange', handleVisibilityChange);
+                return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+            }, [status]);
 
-            // ── Construir pasos ───────────────────────────────────────────────
+            useEffect(() => {
+                if (status === 'running') requestStayAwake(); else releaseStayAwake();
+                return () => releaseStayAwake();
+            }, [status]);
+
             useEffect(() => {
                 if (!workout) return;
                 const ent = { ...DEFAULT_PARAMS.entrenamiento, ...(workout.phases?.entrenamiento || {}) };
                 const s = [];
                 s.push({ label:'PREPÁRATE', seconds:15, color:'bg-yellow-400', phase:'inicio' });
                 WARMUP_STEPS.forEach((ws, i) => {
-                    s.push({ label: ws.label, voice: ws.voice, seconds: 30, color:'bg-yellow-400', phase:'calentamiento' });
-                    if (i < WARMUP_STEPS.length - 1)
-                        s.push({ label:'CAMBIO', seconds:5, color:'bg-yellow-300', phase:'cambio-warmup', nextVoice: WARMUP_STEPS[i+1].voice });
+                    s.push({ label: ws.label, seconds: 30, color: 'bg-yellow-400', phase: 'calentamiento' });
+                    if (i < WARMUP_STEPS.length - 1) s.push({ label: 'CAMBIO', seconds: 5, color: 'bg-yellow-300', phase: 'cambio-warmup', nextVoice: WARMUP_STEPS[i+1].voice });
                 });
                 s.push({ label:'DESCANSO', seconds:20, color:'bg-rose-400', phase:'post-warmup' });
                 for (let cy = 1; cy <= ent.cycles; cy++) {
                     TRAINING_ZONES.forEach((zone, zi) => {
                         for (let r = 1; r <= ent.rounds; r++) {
-                            s.push({ label: zone, seconds: ent.action, color:'bg-emerald-400', phase:'entrenamiento', r, tr: ent.rounds, cy, tc: ent.cycles });
-                            if (r < ent.rounds)
-                                s.push({ label:'CAMBIO', seconds: ent.change, color:'bg-yellow-300', phase:'cambio-ent', nextZone: zone });
+                            s.push({ label: zone, seconds: ent.action, color: 'bg-emerald-400', phase: 'entrenamiento', r, tr: ent.rounds, cy, tc: ent.cycles });
+                            if (r < ent.rounds) s.push({ label: 'CAMBIO', seconds: ent.change, color: 'bg-yellow-300', phase: 'cambio-ent', nextZone: zone });
                         }
-                        if (zi < TRAINING_ZONES.length - 1)
-                            s.push({ label:'DESCANSO', seconds: ent.zoneRest, color:'bg-sky-500', phase:'zone-rest', nextZone: TRAINING_ZONES[zi+1] });
+                        if (zi < TRAINING_ZONES.length - 1) s.push({ label: 'DESCANSO', seconds: ent.zoneRest, color: 'bg-sky-500', phase: 'zone-rest', nextZone: TRAINING_ZONES[zi+1] });
                     });
-                    if (cy < ent.cycles)
-                        s.push({ label:'DESCANSO', seconds: ent.rest, color:'bg-rose-500', phase:'ciclo-rest', nextZone: TRAINING_ZONES[0] });
+                    if (cy < ent.cycles) s.push({ label: 'DESCANSO', seconds: ent.rest, color: 'bg-rose-500', phase: 'ciclo-rest', nextZone: TRAINING_ZONES[0] });
                 }
                 s.push({ label:'DESCANSO', seconds:30, color:'bg-blue-200', phase:'pre-stretches' });
                 for (let i = 0; i < 16; i++) {
-                    s.push({ label:'ESTIRAMIENTO', seconds:30, color:'bg-blue-400', phase:'estiramientos' });
-                    if (i < 15) s.push({ label:'CAMBIO', seconds:10, color:'bg-blue-200', phase:'cambio-est' });
+                    s.push({ label: '', seconds: 30, color: 'bg-blue-400', phase: 'estiramientos' });
+                    if (i < 15) s.push({ label: 'CAMBIO', seconds: 10, color: 'bg-blue-200', phase: 'cambio-est' });
                 }
-                setSteps(s);
-                // Resetear todo al cargar nueva rutina
-                idxRef.current      = 0;
-                timeLeftRef.current = s[0].seconds;
-                stepDurRef.current  = s[0].seconds;
-                elapsedRef.current  = 0;
-                lastSpokenKey.current = '';
-                setIdx(0);
-                setTimeLeft(s[0].seconds);
-                setElapsed(0);
-                setStatus('ready');
+                setSteps(s); setTimeLeft(s[0].seconds); stepDurRef.current = s[0].seconds;
             }, [workout]);
 
-            // ── Motor del timer (puro refs, sin dependencias de estado) ───────
-            const startTicker = () => {
-                if (tickRef.current) clearInterval(tickRef.current);
-                const tickStart    = Date.now();
-                const elapsedBase  = elapsedRef.current;
-                const stepBase     = timeLeftRef.current; // segundos que quedaban al arrancar
-                const stepStart    = Date.now() - ((stepDurRef.current - stepBase) * 1000);
-
-                tickRef.current = setInterval(() => {
-                    if (!runningRef.current) return;
-
-                    const now        = Date.now();
-                    const newElapsed = elapsedBase + Math.floor((now - tickStart) / 1000);
-                    const remaining  = stepDurRef.current - Math.floor((now - stepStart) / 1000);
-
-                    // Actualizar elapsed en pantalla
-                    if (newElapsed !== elapsedRef.current) {
-                        elapsedRef.current = newElapsed;
-                        setElapsed(newElapsed);
-                    }
-
-                    if (remaining > 0) {
-                        if (remaining !== timeLeftRef.current) {
-                            timeLeftRef.current = remaining;
-                            setTimeLeft(remaining);
-                        }
-
-                        // ── Lógica de voz durante el paso ─────────────────────
-                        const currStep = steps[idxRef.current];
-                        const vKey = `${idxRef.current}_${remaining}`;
-                        if (lastSpokenKey.current !== vKey) {
-                            lastSpokenKey.current = vKey;
-                            const ph = currStep?.phase;
-
-                            // PREPÁRATE: anunciar calentamiento a mitad del paso
-                            if (ph === 'inicio') {
-                                if (remaining === 10) speak('Calentamiento');
-                                if (remaining === 7)  speak('Comenzamos con tobillo derecho');
-                            }
-                            // DESCANSOS: anunciar qué sigue
-                            if (ph === 'post-warmup' && remaining === 10) speak('Seguimos ejercitando. Piernas');
-                            if (ph === 'zone-rest'   && remaining === 10) speak('Seguimos con ' + (currStep.nextZone||'').toLowerCase());
-                            if (ph === 'ciclo-rest'  && remaining === 10) speak('Nuevo ciclo. Piernas');
-                            if (ph === 'pre-stretches' && remaining === 10) speak('Estiramientos');
-                            // Cuenta regresiva 3-2-1 en todos los pasos
-                            if (remaining <= 3) speak(String(remaining));
-                        }
-
-                    } else {
-                        // ── Avanzar al siguiente paso ──────────────────────────
-                        const stepsSnap = steps; // closure sobre el estado actual
-                        const nextIdx   = idxRef.current + 1;
-
-                        if (nextIdx < stepsSnap.length) {
-                            const nextStep = stepsSnap[nextIdx];
-
-                            // Voz al cambiar de paso (sincronizada con pantalla)
-                            const ph = nextStep.phase;
-                            if (ph === 'calentamiento' || ph === 'entrenamiento' || ph === 'estiramientos') {
-                                whistle();
-                            } else if (ph === 'cambio-warmup') {
-                                speak('Cambio'); if (nextStep.nextVoice) speak(nextStep.nextVoice);
-                            } else if (ph === 'cambio-ent') {
-                                speak('Cambio');
-                            } else if (ph === 'cambio-est') {
-                                speak('Cambio');
-                            } else if (ph === 'post-warmup') {
-                                speak('Descansa');
-                            } else if (ph === 'zone-rest' || ph === 'ciclo-rest' || ph === 'pre-stretches') {
-                                speak('Descansa');
-                            }
-
-                            idxRef.current      = nextIdx;
-                            timeLeftRef.current = nextStep.seconds;
-                            stepDurRef.current  = nextStep.seconds;
-                            lastSpokenKey.current = '';
-
-                            setIdx(nextIdx);
-                            setTimeLeft(nextStep.seconds);
-                            if ('vibrate' in navigator) navigator.vibrate(150);
-
-                            // Reiniciar el ticker para el nuevo paso
-                            clearInterval(tickRef.current);
-                            if (runningRef.current) startTicker();
-
-                        } else {
-                            // Fin del entrenamiento
-                            runningRef.current = false;
-                            setStatus('finished');
-                            speak('¡Excelente trabajo! Entrenamiento completado.');
-                            releaseStayAwake();
-                            if (!savedRef.current) {
-                                onComplete(workout.name, elapsedRef.current);
-                                savedRef.current = true;
-                            }
-                        }
-                    }
-                }, 250);
+            const announceStep = (step, isFirst) => {
+                const ph = step.phase;
+                if (ph === 'calentamiento') {
+                    // Primer movimiento: anunciar fase + nombre. Resto: solo silbatazo.
+                    if (isFirst) { speak('Calentamiento'); speak(step.voice || step.label.toLowerCase()); }
+                    whistle();
+                    return;
+                }
+                if (ph === 'entrenamiento') { whistle(); return; }
+                if (ph === 'estiramientos') { whistle(); return; }
+                if (ph === 'cambio-warmup') { speak('Cambio'); if (step.nextVoice) speak(step.nextVoice); return; }
+                if (ph === 'post-warmup')   { speak('Descansa'); return; }
+                if (ph === 'zone-rest')     { speak('Descansa'); return; }
+                if (ph === 'ciclo-rest')    { speak('Descansa'); return; }
+                if (ph === 'cambio-ent')    { speak('Cambio'); return; }
+                if (ph === 'pre-stretches') { speak('Descansa'); return; }
+                if (ph === 'cambio-est')    { speak('Cambio'); return; }
             };
 
-            const stopTicker = () => {
-                if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
-            };
-
-            // ── togglePlay ────────────────────────────────────────────────────
             const togglePlay = () => {
                 setWasPausedByHide(false);
-                if (status === 'ready' || status === 'paused') {
-                    runningRef.current = true;
-                    setStatus('running');
-                    requestStayAwake();
-                    // Si es el primer arranque, hablar "Prepárate" directamente
-                    // en el evento de usuario (desbloquea speechSynthesis en todos los navegadores)
-                    if (status === 'ready') {
-                        window.speechSynthesis.cancel();
-                        voiceQueue.length = 0; voiceBusy = false;
-                        const msg = new SpeechSynthesisUtterance('Prepárate');
-                        msg.lang = 'es-ES'; msg.rate = 1.05;
-                        msg.onend = () => { voiceBusy = false; flushVoice(); };
-                        msg.onerror = () => { voiceBusy = false; flushVoice(); };
-                        voiceBusy = true;
-                        window.speechSynthesis.speak(msg);
-                    }
-                    startTicker();
-                } else if (status === 'running') {
-                    runningRef.current = false;
-                    setStatus('paused');
-                    stopTicker();
-                    releaseStayAwake();
+                if (!firstPlayDone.current) {
+                    firstPlayDone.current = true;
+                    // Limpiar cola completamente y hablar "Prepárate" solo,
+                    // directamente en el evento de usuario (desbloquea el motor de voz).
+                    // NO se encola nada más — el timer manejará el resto de los anuncios.
+                    window.speechSynthesis.cancel();
+                    voiceQueue.length = 0;
+                    voiceBusy = false;
+                    const msg = new SpeechSynthesisUtterance('Prepárate');
+                    msg.lang = 'es-ES'; msg.rate = 1.05;
+                    // onend NO encola nada — el timer es el que habla desde aquí
+                    msg.onend = msg.onerror = () => { voiceBusy = false; };
+                    voiceBusy = true;
+                    window.speechSynthesis.speak(msg);
                 }
+                setStatus(s => s === 'running' ? 'paused' : 'running');
             };
 
-            // ── Reset ─────────────────────────────────────────────────────────
-            const resetAll = () => {
-                stopTicker();
-                runningRef.current = false;
-                window.speechSynthesis.cancel();
-                voiceQueue.length = 0; voiceBusy = false;
-                idxRef.current      = 0;
-                const dur           = steps[0]?.seconds || 15;
-                timeLeftRef.current = dur;
-                stepDurRef.current  = dur;
-                elapsedRef.current  = 0;
-                lastSpokenKey.current = '';
-                savedRef.current    = false;
-                setIdx(0);
-                setTimeLeft(dur);
-                setElapsed(0);
-                setStatus('ready');
-                setWasPausedByHide(false);
-            };
+            useEffect(() => {
+                let interval = null;
+                if (status === 'running') {
+                    if (!startRef.current) startRef.current = Date.now() - (elapsed * 1000);
+                    if (!stepStartRef.current) stepStartRef.current = Date.now() - ((stepDurRef.current - timeLeft) * 1000);
+                    interval = setInterval(() => {
+                        const now = Date.now();
+                        const totalSec = Math.floor((now - startRef.current) / 1000); setElapsed(totalSec);
+                        const stepPassed = Math.floor((now - stepStartRef.current) / 1000);
+                        const remaining = stepDurRef.current - stepPassed;
+                        if (remaining > 0) {
+                            setTimeLeft(remaining);
+                            const vKey = `${idx}_${remaining}`;
+                            if (lastSpokenKey.current !== vKey) {
+                                lastSpokenKey.current = vKey;
+                                // Voces durante descansos (anuncian lo que viene)
+                                if (steps[idx].phase === 'post-warmup' && remaining === 10) speak('Seguimos ejercitando. Piernas');
+                                if (steps[idx].phase === 'cambio-ent'  && remaining === 4)  speak('Seguimos con ' + (steps[idx].nextZone||'').toLowerCase());
+                                if (steps[idx].phase === 'zone-rest'   && remaining === 10) speak('Seguimos con ' + (steps[idx].nextZone||'').toLowerCase());
+                                if (steps[idx].phase === 'ciclo-rest'  && remaining === 10) speak('Nuevo ciclo. Piernas');
+                                if (steps[idx].phase === 'pre-stretches' && remaining === 10) speak('Estiramientos');
+                                // Cuenta regresiva 3-2-1 en todos los pasos
+                                if (remaining <= 3) speak(String(remaining));
+                            }
+                        } else {
+                            if (idx < steps.length - 1) {
+                                const n = idx + 1; announceStep(steps[n], n === 1); setIdx(n); setTimeLeft(steps[n].seconds);
+                                stepDurRef.current = steps[n].seconds; stepStartRef.current = Date.now(); lastSpokenKey.current = '';
+                                if ('vibrate' in navigator) navigator.vibrate(150);
+                            } else {
+                                setStatus('finished'); speak('Excelente trabajo!');
+                                if (!savedRef.current) { onComplete(workout.name, totalSec); savedRef.current = true; }
+                            }
+                        }
+                    }, 250);
+                } else {
+                    startRef.current = null;
+                    stepStartRef.current = null;
+                }
+                return () => clearInterval(interval);
+            }, [status, idx, steps, timeLeft, elapsed]);
 
-            // Cleanup al desmontar
-            useEffect(() => () => { stopTicker(); releaseStayAwake(); }, []);
-
-            // ── Render ────────────────────────────────────────────────────────
-            if (status === 'finished') return (
-                <div className="h-screen flex flex-col items-center justify-center p-8 bg-slate-950 text-white text-center">
-                    <div className="text-8xl mb-6">🏆</div>
-                    <h1 className="text-5xl font-black italic mb-4">¡HECHO!</h1>
-                    <p className="text-slate-400 text-sm mb-10">Tiempo: {formatTime(elapsed)}</p>
-                    <button onClick={onExit} className="w-full max-w-sm bg-white text-black py-6 rounded-full font-black uppercase">Finalizar</button>
-                </div>
-            );
+            if (status === 'finished') return <div className="h-screen flex flex-col items-center justify-center p-8 bg-slate-950 text-white text-center"><h1 className="text-5xl font-black italic mb-4">¡HECHO!</h1><button onClick={onExit} className="w-full max-w-sm bg-white text-black py-6 rounded-full font-black uppercase">Finalizar</button></div>;
 
             const curr = steps[idx];
             return (
                 <div className={`h-screen flex flex-col transition-colors duration-700 ${curr?.color || 'bg-slate-950'} text-white`}>
-                    <video ref={videoRef} loop muted playsInline style={{position:'absolute',width:'1px',height:'1px',opacity:0.01}}>
-                        <source src="https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/one-second-loop.mp4" type="video/mp4"/>
-                    </video>
-
-                    {/* Header */}
+                    <video ref={videoRef} loop muted playsInline style={{position:'absolute',width:'1px',height:'1px',opacity:0.01}}><source src="https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/one-second-loop.mp4" type="video/mp4"/></video>
+                    
                     <div className="bg-black/10 p-4 pt-10 flex justify-between items-center shrink-0 z-10">
-                        <div className="leading-none text-left">
-                            <span className="text-[10px] font-black text-orange-500 uppercase">Tiempo</span>
-                            <p className="text-xl font-black italic">{formatTime(elapsed)}</p>
-                        </div>
-                        <div className="text-center">
-                            <h2 className="text-[10px] font-black uppercase italic truncate max-w-[120px] tracking-tight">{workout?.name || 'Rutina'}</h2>
-                        </div>
+                        <div className="leading-none text-left"><span className="text-[10px] font-black text-orange-500 uppercase">Tiempo</span><p className="text-xl font-black italic">{formatTime(elapsed)}</p></div>
+                        <div className="text-center"><h2 className="text-[10px] font-black uppercase italic truncate max-w-[120px] tracking-tight">{workout?.name || 'Rutina'}</h2></div>
                         <button onClick={onExit} className="opacity-40 text-xl font-black px-2">✕</button>
                     </div>
 
-                    {/* Pantalla central */}
                     <div className="flex-1 flex flex-col items-center justify-center text-center px-4 min-h-0 relative">
+                        {/* Bug Play Duplicado: Solo mostrar si se pausó por cambio de pantalla */}
                         {wasPausedByHide && status === 'paused' && (
                             <div className="absolute inset-0 z-40 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center">
                                 <button onClick={togglePlay} className="bg-orange-500 p-10 rounded-full shadow-2xl active:scale-90"><IconPlay/></button>
@@ -534,49 +427,20 @@
                         <div className="timer-huge tabular-nums">{timeLeft}</div>
                     </div>
 
-                    {/* Controles */}
                     <div className="bg-slate-950 p-6 pb-10 flex flex-col items-center shrink-0">
                         <div className="w-full max-w-md grid grid-cols-3 items-center mb-6 text-center italic">
-                            <div className="flex flex-col">
-                                <span className="text-[14vw] font-black text-sky-400 leading-none">{curr?.tr ? curr.tr - (curr.r||0) + 1 : '-'}</span>
-                                <span className="text-[8px] opacity-40">Rondas</span>
-                            </div>
+                            <div className="flex flex-col"><span className="text-[14vw] font-black text-sky-400 leading-none">{curr?.tr ? curr.tr - (curr.r||0) + 1 : '-'}</span><span className="text-[8px] opacity-40">Rondas</span></div>
                             <div className="flex justify-center">
                                 <button onClick={togglePlay} className="w-20 h-20 rounded-full border-4 border-yellow-400 flex items-center justify-center active:scale-90">
                                     {status === 'running' ? <IconPause/> : <IconPlay/>}
                                 </button>
                             </div>
-                            <div className="flex flex-col">
-                                <span className="text-[14vw] font-black text-yellow-400 leading-none">{curr?.tc ? curr.tc - (curr.cy||0) + 1 : '-'}</span>
-                                <span className="text-[8px] opacity-40">Ciclos</span>
-                            </div>
+                            <div className="flex flex-col"><span className="text-[14vw] font-black text-yellow-400 leading-none">{curr?.tc ? curr.tc - (curr.cy||0) + 1 : '-'}</span><span className="text-[8px] opacity-40">Ciclos</span></div>
                         </div>
                         <div className="flex gap-4">
-                            <button onClick={resetAll} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconRotate/></button>
-                            <button onClick={() => {
-                                if (idxRef.current > 0) {
-                                    stopTicker();
-                                    const pi = idxRef.current - 1;
-                                    idxRef.current = pi;
-                                    timeLeftRef.current = steps[pi].seconds;
-                                    stepDurRef.current  = steps[pi].seconds;
-                                    lastSpokenKey.current = '';
-                                    setIdx(pi); setTimeLeft(steps[pi].seconds);
-                                    if (runningRef.current) startTicker();
-                                }
-                            }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconBack/></button>
-                            <button onClick={() => {
-                                if (idxRef.current < steps.length - 1) {
-                                    stopTicker();
-                                    const ni = idxRef.current + 1;
-                                    idxRef.current = ni;
-                                    timeLeftRef.current = steps[ni].seconds;
-                                    stepDurRef.current  = steps[ni].seconds;
-                                    lastSpokenKey.current = '';
-                                    setIdx(ni); setTimeLeft(steps[ni].seconds);
-                                    if (runningRef.current) startTicker();
-                                }
-                            }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconForward/></button>
+                            <button onClick={() => { setIdx(0); setElapsed(0); setStatus('ready'); startRef.current=null; stepStartRef.current=null; lastSpokenKey.current=''; firstPlayDone.current=false; window.speechSynthesis.cancel(); voiceQueue.length=0; voiceBusy=false; if(steps[0]) { setTimeLeft(steps[0].seconds); stepDurRef.current=steps[0].seconds; } }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconRotate/></button>
+                            <button onClick={() => { if (idx>0) { const pi=idx-1; setIdx(pi); setTimeLeft(steps[pi].seconds); stepDurRef.current=steps[pi].seconds; stepStartRef.current=null; lastSpokenKey.current=''; } }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconBack/></button>
+                            <button onClick={() => { if (idx<steps.length-1) { const ni=idx+1; setIdx(ni); setTimeLeft(steps[ni].seconds); stepDurRef.current=steps[ni].seconds; stepStartRef.current=null; lastSpokenKey.current=''; } }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconForward/></button>
                         </div>
                     </div>
                 </div>
