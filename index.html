@@ -65,7 +65,7 @@
 
         const APP_ID = "mientrenador-v3";
         const APP_TITLE = "Mi Entrenador Saludable";
-        const APP_VERSION = "50.0.0";
+        const APP_VERSION = "51.0.0";
 
         const WARMUP_STEPS = [
             { label: 'TOBILLO DERECHO', voice: 'Tobillo derecho' },
@@ -118,7 +118,7 @@
             const text = voiceQueue.shift();
             const msg = new SpeechSynthesisUtterance(text);
             msg.lang = 'es-ES'; msg.rate = 1.05;
-            msg.onend = () => { voiceBusy = false; flushVoice(); };
+            msg.onend = msg.onerror = () => { voiceBusy = false; flushVoice(); };
             window.speechSynthesis.speak(msg);
         };
         const speak = (text, interrupt = false) => {
@@ -207,7 +207,10 @@
                     {workouts.length === 0 ? <div className="text-center p-12 opacity-30 italic font-black text-[10px]">Sin rutinas</div> : workouts.map(w => (
                         <div key={w.id} className="glass-card p-6 flex justify-between items-center shadow-lg">
                             <div className="flex-1 cursor-pointer" onClick={()=>onStart(w)}><h3 className="font-black uppercase italic text-sm">{w.name}</h3><span className="text-[10px] text-orange-400 font-black uppercase italic">Activa</span></div>
-                            <div className="flex gap-2"><button onClick={()=>onStart(w)} className="bg-white text-black p-4 rounded-xl"><IconPlay/></button><button onClick={()=>onEdit(w)} className="bg-slate-800 p-4 rounded-xl text-[10px] font-black uppercase italic">Edit</button></div>
+                            <div className="flex gap-2">
+                                <button onClick={()=>onStart(w)} className="bg-white text-black p-4 rounded-xl"><IconPlay/></button>
+                                <button onClick={()=>onEdit(w)} className="bg-slate-800 p-4 rounded-xl text-[10px] font-black uppercase italic">Edit</button>
+                            </div>
                         </div>
                     ))}
                     <button onClick={onCreate} className="w-full bg-white/5 border border-white/10 py-6 rounded-full font-black uppercase italic">➕ NUEVA RUTINA</button>
@@ -248,7 +251,7 @@
         function InputField({ label, val, set }) { return ( <div className="flex flex-col items-center"> <span className="text-[8px] opacity-40 mb-2 uppercase">{label}</span> <input type="number" className="w-full bg-slate-800/40 p-4 rounded-xl text-center font-black text-white border border-white/5 outline-none" value={val} onChange={e=>set(e.target.value)} /> </div> ); }
 
         function PlayerView({ workout, onExit, onComplete }) {
-            const [status, setStatus] = useState('ready'); // Cambiado a 'ready' para evitar el botón gigante inicial
+            const [status, setStatus] = useState('ready'); 
             const [idx, setIdx] = useState(0);
             const [timeLeft, setTimeLeft] = useState(0);
             const [elapsed, setElapsed] = useState(0);
@@ -278,7 +281,7 @@
                     if (document.hidden) { 
                         if (status === 'running') {
                             setStatus('paused'); 
-                            setWasPausedByHide(true); // Solo aquí activamos el indicador para el botón gigante
+                            setWasPausedByHide(true);
                         }
                         releaseStayAwake(); 
                     } else { 
@@ -320,12 +323,15 @@
                     if (i < 15) s.push({ label: 'CAMBIO', seconds: 10, color: 'bg-blue-200', phase: 'cambio-est' });
                 }
                 setSteps(s); setTimeLeft(s[0].seconds); stepDurRef.current = s[0].seconds;
+                
+                // Pre-calentamiento silencioso del motor
+                const warm = new SpeechSynthesisUtterance('');
+                window.speechSynthesis.speak(warm);
             }, [workout]);
 
             const announceStep = (step, isFirst) => {
                 const ph = step.phase;
                 if (ph === 'calentamiento') {
-                    // Primer movimiento: anunciar fase + nombre. Resto: solo silbatazo.
                     if (isFirst) { speak('Calentamiento'); speak(step.voice || step.label.toLowerCase()); }
                     whistle();
                     return;
@@ -333,32 +339,32 @@
                 if (ph === 'entrenamiento') { whistle(); return; }
                 if (ph === 'estiramientos') { whistle(); return; }
                 if (ph === 'cambio-warmup') { speak('Cambio'); if (step.nextVoice) speak(step.nextVoice); return; }
-                if (ph === 'post-warmup')   { speak('Descansa'); return; }
-                if (ph === 'zone-rest')     { speak('Descansa'); return; }
-                if (ph === 'ciclo-rest')    { speak('Descansa'); return; }
-                if (ph === 'cambio-ent')    { speak('Cambio'); return; }
-                if (ph === 'pre-stretches') { speak('Descansa'); return; }
-                if (ph === 'cambio-est')    { speak('Cambio'); return; }
+                if (ph === 'post-warmup' || ph === 'zone-rest' || ph === 'ciclo-rest' || ph === 'pre-stretches') { speak('Descanso'); return; }
+                if (ph === 'cambio-ent' || ph === 'cambio-est') { speak('Cambio'); return; }
             };
 
             const togglePlay = () => {
-                setWasPausedByHide(false);
                 if (!firstPlayDone.current) {
                     firstPlayDone.current = true;
-                    // Limpiar cola completamente y hablar "Prepárate" solo,
-                    // directamente en el evento de usuario (desbloquea el motor de voz).
-                    // NO se encola nada más — el timer manejará el resto de los anuncios.
+                    setWasPausedByHide(false);
+                    
+                    // LÓGICA DE VOZ AISLADA:
+                    // 1. Limpiamos cualquier cola previa
                     window.speechSynthesis.cancel();
-                    voiceQueue.length = 0;
-                    voiceBusy = false;
+                    
                     const msg = new SpeechSynthesisUtterance('Prepárate');
                     msg.lang = 'es-ES'; msg.rate = 1.05;
-                    // onend NO encola nada — el timer es el que habla desde aquí
-                    msg.onend = msg.onerror = () => { voiceBusy = false; };
-                    voiceBusy = true;
+                    
+                    // 2. Solo cuando la voz TERMINA, arrancamos el tiempo
+                    msg.onend = () => {
+                        setStatus('running');
+                    };
+                    
                     window.speechSynthesis.speak(msg);
+                } else {
+                    setStatus(s => s === 'running' ? 'paused' : 'running');
+                    setWasPausedByHide(false);
                 }
-                setStatus(s => s === 'running' ? 'paused' : 'running');
             };
 
             useEffect(() => {
@@ -376,13 +382,13 @@
                             const vKey = `${idx}_${remaining}`;
                             if (lastSpokenKey.current !== vKey) {
                                 lastSpokenKey.current = vKey;
-                                // Voces durante descansos (anuncian lo que viene)
+                                if (idx === 0 && remaining === 12) speak('Calentamiento');
+                                if (idx === 0 && remaining === 8) speak('Comencemos con Tobillo derecho');
                                 if (steps[idx].phase === 'post-warmup' && remaining === 10) speak('Seguimos ejercitando. Piernas');
                                 if (steps[idx].phase === 'cambio-ent'  && remaining === 4)  speak('Seguimos con ' + (steps[idx].nextZone||'').toLowerCase());
                                 if (steps[idx].phase === 'zone-rest'   && remaining === 10) speak('Seguimos con ' + (steps[idx].nextZone||'').toLowerCase());
                                 if (steps[idx].phase === 'ciclo-rest'  && remaining === 10) speak('Nuevo ciclo. Piernas');
                                 if (steps[idx].phase === 'pre-stretches' && remaining === 10) speak('Estiramientos');
-                                // Cuenta regresiva 3-2-1 en todos los pasos
                                 if (remaining <= 3) speak(String(remaining));
                             }
                         } else {
@@ -417,7 +423,6 @@
                     </div>
 
                     <div className="flex-1 flex flex-col items-center justify-center text-center px-4 min-h-0 relative">
-                        {/* Bug Play Duplicado: Solo mostrar si se pausó por cambio de pantalla */}
                         {wasPausedByHide && status === 'paused' && (
                             <div className="absolute inset-0 z-40 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center">
                                 <button onClick={togglePlay} className="bg-orange-500 p-10 rounded-full shadow-2xl active:scale-90"><IconPlay/></button>
@@ -438,7 +443,7 @@
                             <div className="flex flex-col"><span className="text-[14vw] font-black text-yellow-400 leading-none">{curr?.tc ? curr.tc - (curr.cy||0) + 1 : '-'}</span><span className="text-[8px] opacity-40">Ciclos</span></div>
                         </div>
                         <div className="flex gap-4">
-                            <button onClick={() => { setIdx(0); setElapsed(0); setStatus('ready'); startRef.current=null; stepStartRef.current=null; lastSpokenKey.current=''; firstPlayDone.current=false; window.speechSynthesis.cancel(); voiceQueue.length=0; voiceBusy=false; if(steps[0]) { setTimeLeft(steps[0].seconds); stepDurRef.current=steps[0].seconds; } }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconRotate/></button>
+                            <button onClick={() => { setIdx(0); setElapsed(0); setStatus('ready'); startRef.current=null; stepStartRef.current=null; lastSpokenKey.current=''; firstPlayDone.current=false; window.speechSynthesis.cancel(); if(steps[0]) { setTimeLeft(steps[0].seconds); stepDurRef.current=steps[0].seconds; } }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconRotate/></button>
                             <button onClick={() => { if (idx>0) { const pi=idx-1; setIdx(pi); setTimeLeft(steps[pi].seconds); stepDurRef.current=steps[pi].seconds; stepStartRef.current=null; lastSpokenKey.current=''; } }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconBack/></button>
                             <button onClick={() => { if (idx<steps.length-1) { const ni=idx+1; setIdx(ni); setTimeLeft(steps[ni].seconds); stepDurRef.current=steps[ni].seconds; stepStartRef.current=null; lastSpokenKey.current=''; } }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconForward/></button>
                         </div>
