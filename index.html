@@ -65,7 +65,7 @@
 
         const APP_ID = "mientrenador-v3";
         const APP_TITLE = "Mi Entrenador Saludable";
-        const APP_VERSION = "52.0.0";
+        const APP_VERSION = "53.0.0";
 
         const WARMUP_STEPS = [
             { label: 'TOBILLO DERECHO', voice: 'Tobillo derecho' },
@@ -152,11 +152,11 @@
             }, [user]);
 
             const handleStartWorkout = (w) => {
-                // DESPERTAR MOTOR DE VOZ AQUÍ (Interacción de usuario)
+                // DESBLOQUEO SILENCIOSO DEL AUDIO (Crucial para eliminar el lag)
                 if (window.speechSynthesis) {
-                    window.speechSynthesis.cancel();
-                    const wakeUp = new SpeechSynthesisUtterance('');
-                    window.speechSynthesis.speak(wakeUp);
+                    const silent = new SpeechSynthesisUtterance(' ');
+                    silent.volume = 0;
+                    window.speechSynthesis.speak(silent);
                 }
                 setSelectedWorkout(w);
                 setView('play');
@@ -262,7 +262,7 @@
         function InputField({ label, val, set }) { return ( <div className="flex flex-col items-center"> <span className="text-[8px] opacity-40 mb-2 uppercase">{label}</span> <input type="number" className="w-full bg-slate-800/40 p-4 rounded-xl text-center font-black text-white border border-white/5 outline-none" value={val} onChange={e=>set(e.target.value)} /> </div> ); }
 
         function PlayerView({ workout, onExit, onComplete }) {
-            const [status, setStatus] = useState('ready'); // Iniciamos en ready para evitar botón gigante
+            const [status, setStatus] = useState('ready'); 
             const [idx, setIdx] = useState(0);
             const [timeLeft, setTimeLeft] = useState(0);
             const [elapsed, setElapsed] = useState(0);
@@ -290,14 +290,9 @@
             useEffect(() => {
                 const handleVisibilityChange = () => {
                     if (document.hidden) { 
-                        if (status === 'running') {
-                            setStatus('paused'); 
-                            setWasPausedByHide(true);
-                        }
+                        if (status === 'running') { setStatus('paused'); setWasPausedByHide(true); }
                         releaseStayAwake(); 
-                    } else { 
-                        if ('wakeLock' in navigator) requestStayAwake(); 
-                    }
+                    } else { if ('wakeLock' in navigator) requestStayAwake(); }
                 };
                 document.addEventListener('visibilitychange', handleVisibilityChange);
                 return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -350,13 +345,19 @@
             };
 
             const togglePlay = () => {
-                if (!firstPlayDone.current) {
-                    firstPlayDone.current = true;
-                    // LÓGICA DE VOZ SIN DESFASE
-                    speak('Prepárate', true);
-                }
-                setStatus(s => s === 'running' ? 'paused' : 'running');
+                // EJECUCIÓN INMEDIATA VISUAL
+                const newStatus = status === 'running' ? 'paused' : 'running';
+                setStatus(newStatus);
                 setWasPausedByHide(false);
+
+                // GESTIÓN DE VOZ ASÍNCRONA PARA ELIMINAR LAG
+                if (newStatus === 'running' && !firstPlayDone.current) {
+                    firstPlayDone.current = true;
+                    setTimeout(() => {
+                        window.speechSynthesis.cancel();
+                        speak('Prepárate', true);
+                    }, 0);
+                }
             };
 
             useEffect(() => {
@@ -394,10 +395,7 @@
                             }
                         }
                     }, 250);
-                } else {
-                    startRef.current = null;
-                    stepStartRef.current = null;
-                }
+                } else { startRef.current = null; stepStartRef.current = null; }
                 return () => clearInterval(interval);
             }, [status, idx, steps, timeLeft, elapsed]);
 
@@ -407,13 +405,11 @@
             return (
                 <div className={`h-screen flex flex-col transition-colors duration-700 ${curr?.color || 'bg-slate-950'} text-white`}>
                     <video ref={videoRef} loop muted playsInline style={{position:'absolute',width:'1px',height:'1px',opacity:0.01}}><source src="https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/one-second-loop.mp4" type="video/mp4"/></video>
-                    
                     <div className="bg-black/10 p-4 pt-10 flex justify-between items-center shrink-0 z-10">
                         <div className="leading-none text-left"><span className="text-[10px] font-black text-orange-500 uppercase">Tiempo</span><p className="text-xl font-black italic">{formatTime(elapsed)}</p></div>
                         <div className="text-center"><h2 className="text-[10px] font-black uppercase italic truncate max-w-[120px] tracking-tight">{workout?.name || 'Rutina'}</h2></div>
                         <button onClick={onExit} className="opacity-40 text-xl font-black px-2">✕</button>
                     </div>
-
                     <div className="flex-1 flex flex-col items-center justify-center text-center px-4 min-h-0 relative">
                         {wasPausedByHide && status === 'paused' && (
                             <div className="absolute inset-0 z-40 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center">
@@ -423,15 +419,10 @@
                         <h2 className="text-[11vw] font-black uppercase italic text-black/80 leading-none mb-2">{curr?.label || 'LISTO'}</h2>
                         <div className="timer-huge tabular-nums">{timeLeft}</div>
                     </div>
-
                     <div className="bg-slate-950 p-6 pb-10 flex flex-col items-center shrink-0">
                         <div className="w-full max-w-md grid grid-cols-3 items-center mb-6 text-center italic">
                             <div className="flex flex-col"><span className="text-[14vw] font-black text-sky-400 leading-none">{curr?.tr ? curr.tr - (curr.r||0) + 1 : '-'}</span><span className="text-[8px] opacity-40">Rondas</span></div>
-                            <div className="flex justify-center">
-                                <button onClick={togglePlay} className="w-20 h-20 rounded-full border-4 border-yellow-400 flex items-center justify-center active:scale-90">
-                                    {status === 'running' ? <IconPause/> : <IconPlay/>}
-                                </button>
-                            </div>
+                            <div className="flex justify-center"><button onClick={togglePlay} className="w-20 h-20 rounded-full border-4 border-yellow-400 flex items-center justify-center active:scale-90">{status === 'running' ? <IconPause/> : <IconPlay/>}</button></div>
                             <div className="flex flex-col"><span className="text-[14vw] font-black text-yellow-400 leading-none">{curr?.tc ? curr.tc - (curr.cy||0) + 1 : '-'}</span><span className="text-[8px] opacity-40">Ciclos</span></div>
                         </div>
                         <div className="flex gap-4">
@@ -452,38 +443,16 @@
             const getChartData = () => {
                 const now = new Date();
                 if (period === 'semana') {
-                    const labels = Array.from({ length: 7 }, (_, i) => {
-                        const d = new Date(); d.setDate(d.getDate() - 6 + i);
-                        return d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' });
-                    });
-                    const map = {};
-                    history.forEach(h => {
-                        const k = new Date(h.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' });
-                        map[k] = (map[k] || 0) + (h.totalTime || 0);
-                    });
+                    const labels = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - 6 + i); return d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }); });
+                    const map = {}; history.forEach(h => { const k = new Date(h.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }); map[k] = (map[k] || 0) + (h.totalTime || 0); });
                     return { labels, data: labels.map(l => Math.floor((map[l] || 0) / 60)) };
                 }
                 if (period === 'mes') {
-                    const weeks = Array.from({ length: 4 }, (_, i) => {
-                        const start = new Date(); start.setDate(start.getDate() - 27 + i * 7);
-                        start.setHours(0, 0, 0, 0);
-                        const end = new Date(start); end.setDate(end.getDate() + 6);
-                        end.setHours(23, 59, 59, 999);
-                        return { label: `${start.getDate()}/${start.getMonth() + 1}`, start, end };
-                    });
-                    return {
-                        labels: weeks.map(w => w.label),
-                        data: weeks.map(w => Math.floor(history.filter(h => {
-                            const d = new Date(h.date);
-                            return d >= w.start && d <= w.end;
-                        }).reduce((a, h) => a + (h.totalTime || 0), 0) / 60))
-                    };
+                    const weeks = Array.from({ length: 4 }, (_, i) => { const start = new Date(); start.setDate(start.getDate() - 27 + i * 7); start.setHours(0, 0, 0, 0); const end = new Date(start); end.setDate(end.getDate() + 6); end.setHours(23, 59, 59, 999); return { label: `${start.getDate()}/${start.getMonth() + 1}`, start, end }; });
+                    return { labels: weeks.map(w => w.label), data: weeks.map(w => Math.floor(history.filter(h => { const d = new Date(h.date); return d >= w.start && d <= w.end; }).reduce((a, h) => a + (h.totalTime || 0), 0) / 60)) };
                 }
                 const labels = Array.from({ length: 12 }, (_, i) => new Date(now.getFullYear(), i, 1).toLocaleDateString('es-ES', { month: 'short' }));
-                const data = Array.from({ length: 12 }, (_, i) => Math.floor(history.filter(h => {
-                    const d = new Date(h.date);
-                    return d.getMonth() === i && d.getFullYear() === now.getFullYear();
-                }).reduce((a, h) => a + (h.totalTime || 0), 0) / 60));
+                const data = Array.from({ length: 12 }, (_, i) => Math.floor(history.filter(h => { const d = new Date(h.date); return d.getMonth() === i && d.getFullYear() === now.getFullYear(); }).reduce((a, h) => a + (h.totalTime || 0), 0) / 60));
                 return { labels, data };
             };
             useEffect(() => {
@@ -491,51 +460,18 @@
                 if (!ctx) return;
                 if (chartInst.current) chartInst.current.destroy();
                 const { labels, data } = getChartData();
-                chartInst.current = new Chart(ctx, {
-                    type: 'bar',
-                    data: { labels, datasets: [{ label: 'Minutos', data, backgroundColor: '#f97316', borderRadius: 8 }] },
-                    options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b' } }, x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } } } }
-                });
+                chartInst.current = new Chart(ctx, { type: 'bar', data: { labels, datasets: [{ label: 'Minutos', data, backgroundColor: '#f97316', borderRadius: 8 }] }, options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b' } }, x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } } } } });
                 return () => chartInst.current?.destroy();
             }, [history, period]);
-            const periodSessions = (() => {
-                const from = new Date();
-                if (period === 'semana') from.setDate(from.getDate() - 6);
-                else if (period === 'mes') from.setDate(from.getDate() - 27);
-                else from.setMonth(0, 1);
-                from.setHours(0, 0, 0, 0);
-                return history.filter(h => new Date(h.date) >= from);
-            })();
+            const periodSessions = (() => { const from = new Date(); if (period === 'semana') from.setDate(from.getDate() - 6); else if (period === 'mes') from.setDate(from.getDate() - 27); else from.setMonth(0, 1); from.setHours(0, 0, 0, 0); return history.filter(h => new Date(h.date) >= from); })();
             const periodSec = periodSessions.reduce((a, h) => a + (h.totalTime || 0), 0);
             return (
                 <div className="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4 pb-28">
-                    <div className="glass-card p-6 text-center">
-                        <span className="text-[9px] opacity-40 block mb-1 uppercase">Tiempo Total Acumulado</span>
-                        <span className="text-3xl font-black text-orange-500">{Math.floor(totalSec / 3600)}h {Math.floor((totalSec % 3600) / 60)}m</span>
-                    </div>
-                    <div className="flex gap-2">
-                        {['semana', 'mes', 'año'].map(p => (
-                            <button key={p} onClick={() => setPeriod(p)} className={`flex-1 py-3 rounded-xl font-black uppercase text-[10px] transition-all ${period === p ? 'bg-orange-500 text-white' : 'bg-white/5 text-slate-400'}`}>
-                                {p}
-                            </button>
-                        ))}
-                    </div>
-                    <div className="glass-card p-5 flex justify-between items-center">
-                        <div className="text-left"><span className="text-[9px] opacity-40 uppercase block">Esta {period}</span><span className="text-2xl font-black text-sky-400">{Math.floor(periodSec / 3600)}h {Math.floor((periodSec % 3600) / 60)}m</span></div>
-                        <div className="text-right"><span className="text-[9px] opacity-40 uppercase block">Sesiones</span><span className="text-2xl font-black text-emerald-400">{periodSessions.length}</span></div>
-                    </div>
+                    <div className="glass-card p-6 text-center"><span className="text-[9px] opacity-40 block mb-1 uppercase">Tiempo Total Acumulado</span><span className="text-3xl font-black text-orange-500">{Math.floor(totalSec / 3600)}h {Math.floor((totalSec % 3600) / 60)}m</span></div>
+                    <div className="flex gap-2">{['semana', 'mes', 'año'].map(p => ( <button key={p} onClick={() => setPeriod(p)} className={`flex-1 py-3 rounded-xl font-black uppercase text-[10px] transition-all ${period === p ? 'bg-orange-500 text-white' : 'bg-white/5 text-slate-400'}`}> {p} </button> ))}</div>
+                    <div className="glass-card p-5 flex justify-between items-center"><div className="text-left"><span className="text-[9px] opacity-40 uppercase block">Esta {period}</span><span className="text-2xl font-black text-sky-400">{Math.floor(periodSec / 3600)}h {Math.floor((periodSec % 3600) / 60)}m</span></div><div className="text-right"><span className="text-[9px] opacity-40 uppercase block">Sesiones</span><span className="text-2xl font-black text-emerald-400">{periodSessions.length}</span></div></div>
                     <div className="glass-card p-4"><div style={{ height: '200px' }}><canvas ref={chartRef} /></div></div>
-                    {periodSessions.length > 0 && (
-                        <div className="glass-card p-4 space-y-3">
-                            <span className="text-[9px] opacity-40 uppercase text-center block mb-1">Sesiones recientes</span>
-                            {[...periodSessions].reverse().slice(0, 15).map((h, i) => (
-                                <div key={i} className="flex justify-between items-center border-b border-white/5 pb-2 last:border-0 last:pb-0">
-                                    <div><p className="text-xs font-black uppercase italic">{h.workoutName || 'Sesión'}</p><p className="text-[9px] text-slate-500">{new Date(h.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}</p></div>
-                                    <span className="text-orange-500 font-black text-xs">{formatTime(h.totalTime || 0)}</span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                    {periodSessions.length > 0 && ( <div className="glass-card p-4 space-y-3"><span className="text-[9px] opacity-40 uppercase text-center block mb-1">Sesiones recientes</span>{[...periodSessions].reverse().slice(0, 15).map((h, i) => ( <div key={i} className="flex justify-between items-center border-b border-white/5 pb-2 last:border-0 last:pb-0"> <div><p className="text-xs font-black uppercase italic">{h.workoutName || 'Sesión'}</p><p className="text-[9px] text-slate-500">{new Date(h.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}</p></div> <span className="text-orange-500 font-black text-xs">{formatTime(h.totalTime || 0)}</span> </div> )) } </div> )}
                 </div>
             );
         }
