@@ -65,7 +65,7 @@
 
         const APP_ID = "mientrenador-v3";
         const APP_TITLE = "Mi Entrenador";
-        const APP_VERSION = "38.0.0";
+        const APP_VERSION = "39.0.0";
 
         const WARMUP_STEPS = [
             { label: 'TOBILLO DERECHO', voice: 'Tobillo derecho' },
@@ -82,8 +82,8 @@
 
         const TRAINING_ZONES = ['PIERNAS', 'BRAZOS', 'TRONCO'];
         const DEFAULT_PARAMS = { entrenamiento: { action: 30, change: 5, rounds: 3, cycles: 4, rest: 60, zoneRest: 30 } };
+        const formatTime = (s) => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`;
 
-        // ── SONIDO: SILBATO DE ÁRBITRO ──────────────────────────────────────────
         const whistle = () => {
             try {
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -229,7 +229,6 @@
             );
         }
 
-        // ── PLAYER ───────────────────────────────────────────────────────────────
         function PlayerView({ workout, onExit, onComplete }) {
             const [status, setStatus] = useState('paused');
             const [idx, setIdx] = useState(0);
@@ -254,7 +253,6 @@
                 if (wakeLockRef.current) { wakeLockRef.current.release(); wakeLockRef.current = null; }
             };
 
-            // Pausa al cambiar ventana
             useEffect(() => {
                 const handleVisibilityChange = () => {
                     if (document.hidden) { setStatus('paused'); releaseStayAwake(); }
@@ -269,7 +267,6 @@
                 return () => releaseStayAwake();
             }, [status]);
 
-            // Cargar pasos
             useEffect(() => {
                 if (!workout) return;
                 const ent = { ...DEFAULT_PARAMS.entrenamiento, ...(workout.phases?.entrenamiento || {}) };
@@ -297,13 +294,15 @@
 
                 s.push({ label:'DESCANSO', seconds:30, color:'bg-blue-200', phase:'pre-stretches' });
 
-                // Estiramientos sin nombres ni voces de nombre
                 for (let i = 0; i < 16; i++) {
                     s.push({ label: '', seconds: 30, color: 'bg-blue-400', phase: 'estiramientos' });
                     if (i < 15) s.push({ label: 'CAMBIO', seconds: 10, color: 'bg-blue-200', phase: 'cambio-est' });
                 }
 
-                setSteps(s); setTimeLeft(s[0].seconds); stepDurRef.current = s[0].seconds;
+                setSteps(s); 
+                setTimeLeft(s[0].seconds); 
+                stepDurRef.current = s[0].seconds;
+                speak('Prepárate', true);
             }, [workout]);
 
             const announceStep = (step) => {
@@ -323,9 +322,11 @@
                     if (!stepStartRef.current) stepStartRef.current = Date.now();
                     interval = setInterval(() => {
                         const now = Date.now();
-                        const totalSec = Math.floor((now - startRef.current) / 1000); setElapsed(totalSec);
+                        const totalSec = Math.floor((now - startRef.current) / 1000);
+                        setElapsed(totalSec);
                         const stepPassed = Math.floor((now - stepStartRef.current) / 1000);
                         const remaining = stepDurRef.current - stepPassed;
+                        
                         if (remaining > 0) {
                             setTimeLeft(remaining);
                             const vKey = `${idx}_${remaining}`;
@@ -334,7 +335,6 @@
                                 if (idx === 0 && remaining === 12) speak('Calentamiento');
                                 if (idx === 0 && remaining === 8) speak('Comencemos con Tobillo derecho');
                                 
-                                // Voces durante descansos
                                 if (steps[idx].phase === 'post-warmup' && remaining === 7) speak('Ejercicio. Comencemos con pierna');
                                 if (steps[idx].phase === 'cambio-ent' && remaining === 4) speak('Seguimos con ' + steps[idx].nextZone.toLowerCase());
                                 if (steps[idx].phase === 'zone-rest' && remaining === 6) speak('Seguimos con ' + steps[idx].nextZone.toLowerCase());
@@ -344,14 +344,23 @@
                             }
                         } else {
                             if (idx < steps.length - 1) {
-                                const n = idx + 1; announceStep(steps[n]); setIdx(n); setTimeLeft(steps[n].seconds);
-                                stepDurRef.current = steps[n].seconds; stepStartRef.current = Date.now(); lastSpokenKey.current = '';
+                                const n = idx + 1; 
+                                announceStep(steps[n]); 
+                                setIdx(n); 
+                                setTimeLeft(steps[n].seconds);
+                                stepDurRef.current = steps[n].seconds; 
+                                stepStartRef.current = Date.now(); 
+                                lastSpokenKey.current = '';
+                                if ('vibrate' in navigator) navigator.vibrate(150);
                             } else {
                                 setStatus('finished'); speak('Excelente trabajo!');
                                 if (!savedRef.current) { onComplete(workout.name, totalSec); savedRef.current = true; }
                             }
                         }
                     }, 250);
+                } else {
+                    startRef.current = null;
+                    stepStartRef.current = null;
                 }
                 return () => clearInterval(interval);
             }, [status, idx, steps]);
@@ -372,7 +381,7 @@
                                 <button onClick={() => setStatus('running')} className="bg-orange-500 p-10 rounded-full shadow-2xl active:scale-90"><IconPlay/></button>
                             </div>
                         )}
-                        <h2 className="text-[11vw] font-black uppercase italic text-black/80 leading-none mb-2">{curr?.label}</h2>
+                        <h2 className="text-[11vw] font-black uppercase italic text-black/80 leading-none mb-2">{curr?.label || 'LISTO'}</h2>
                         <div className="timer-huge tabular-nums">{timeLeft}</div>
                     </div>
 
@@ -381,10 +390,15 @@
                             <div className="flex flex-col"><span className="text-[14vw] font-black text-sky-400 leading-none">{curr?.tr ? curr.tr - (curr.r||0) + 1 : '-'}</span><span className="text-[8px] opacity-40">Rondas</span></div>
                             <div className="flex justify-center">
                                 {status === 'running' && (
-                                    <button onClick={() => setStatus('paused')} className="w-20 h-20 rounded-full border-4 border-yellow-400 flex items-center justify-center"><IconPause/></button>
+                                    <button onClick={() => setStatus('paused')} className="w-20 h-20 rounded-full border-4 border-yellow-400 flex items-center justify-center active:scale-90"><IconPause/></button>
                                 )}
                             </div>
                             <div className="flex flex-col"><span className="text-[14vw] font-black text-yellow-400 leading-none">{curr?.tc ? curr.tc - (curr.cy||0) + 1 : '-'}</span><span className="text-[8px] opacity-40">Ciclos</span></div>
+                        </div>
+                        <div className="flex gap-4">
+                            <button onClick={() => { setIdx(0); setElapsed(0); setStatus('paused'); lastSpokenKey.current=''; }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconRotate/></button>
+                            <button onClick={() => { if (idx>0) { const pi=idx-1; setIdx(pi); setTimeLeft(steps[pi].seconds); stepDurRef.current=steps[pi].seconds; stepStartRef.current=Date.now(); lastSpokenKey.current=''; } }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconBack/></button>
+                            <button onClick={() => { if (idx<steps.length-1) { const ni=idx+1; setIdx(ni); setTimeLeft(steps[ni].seconds); stepDurRef.current=steps[ni].seconds; stepStartRef.current=Date.now(); lastSpokenKey.current=''; } }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconForward/></button>
                         </div>
                     </div>
                 </div>
