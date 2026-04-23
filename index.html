@@ -65,7 +65,7 @@
 
         const APP_ID = "mientrenador-v3";
         const APP_TITLE = "Mi Entrenador Saludable";
-        const APP_VERSION = "48.0.0";
+        const APP_VERSION = "49.0.0";
 
         const WARMUP_STEPS = [
             { label: 'TOBILLO DERECHO', voice: 'Tobillo derecho' },
@@ -84,40 +84,29 @@
         const DEFAULT_PARAMS = { entrenamiento: { action: 30, change: 5, rounds: 3, cycles: 4, rest: 60, zoneRest: 30 } };
         const formatTime = (s) => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`;
 
-        // ── SONIDO: SILBATO DE ÁRBITRO REFORZADO (Doble tiempo y más fuerte) ─────
         const whistle = () => {
             try {
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
                 const now = ctx.currentTime;
-                const duration = 1.6; // Doble de tiempo
-
-                const createOsc = (freq, type = 'sine', vol = 0.8) => { // Volumen aumentado
+                const duration = 1.6;
+                const createOsc = (freq, type = 'sine', vol = 0.8) => {
                     const osc = ctx.createOscillator();
                     const gain = ctx.createGain();
                     const mod = ctx.createOscillator();
                     const modGain = ctx.createGain();
-
                     osc.type = type;
                     osc.frequency.setValueAtTime(freq, now);
-
                     mod.frequency.setValueAtTime(35, now); 
                     modGain.gain.setValueAtTime(freq * 0.07, now);
-                    mod.connect(modGain);
-                    modGain.connect(osc.frequency);
-
-                    osc.connect(gain);
-                    gain.connect(ctx.destination);
-
+                    mod.connect(modGain); modGain.connect(osc.frequency);
+                    osc.connect(gain); gain.connect(ctx.destination);
                     gain.gain.setValueAtTime(0, now);
-                    gain.gain.linearRampToValueAtTime(vol, now + 0.08); // Ataque más fuerte
+                    gain.gain.linearRampToValueAtTime(vol, now + 0.08);
                     gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
-
                     osc.start(now); mod.start(now);
                     osc.stop(now + duration); mod.stop(now + duration);
                 };
-
-                createOsc(3500); 
-                createOsc(3515, 'triangle', 0.4); 
+                createOsc(3500); createOsc(3515, 'triangle', 0.4);
             } catch(e) {}
         };
 
@@ -259,11 +248,12 @@
         function InputField({ label, val, set }) { return ( <div className="flex flex-col items-center"> <span className="text-[8px] opacity-40 mb-2 uppercase">{label}</span> <input type="number" className="w-full bg-slate-800/40 p-4 rounded-xl text-center font-black text-white border border-white/5 outline-none" value={val} onChange={e=>set(e.target.value)} /> </div> ); }
 
         function PlayerView({ workout, onExit, onComplete }) {
-            const [status, setStatus] = useState('paused');
+            const [status, setStatus] = useState('ready'); // Cambiado a 'ready' para evitar el botón gigante inicial
             const [idx, setIdx] = useState(0);
             const [timeLeft, setTimeLeft] = useState(0);
             const [elapsed, setElapsed] = useState(0);
             const [steps, setSteps] = useState([]);
+            const [wasPausedByHide, setWasPausedByHide] = useState(false);
 
             const lastSpokenKey = useRef('');
             const savedRef = useRef(false);
@@ -285,8 +275,15 @@
 
             useEffect(() => {
                 const handleVisibilityChange = () => {
-                    if (document.hidden) { setStatus('paused'); releaseStayAwake(); }
-                    else { if ('wakeLock' in navigator) requestStayAwake(); }
+                    if (document.hidden) { 
+                        if (status === 'running') {
+                            setStatus('paused'); 
+                            setWasPausedByHide(true); // Solo aquí activamos el indicador para el botón gigante
+                        }
+                        releaseStayAwake(); 
+                    } else { 
+                        if ('wakeLock' in navigator) requestStayAwake(); 
+                    }
                 };
                 document.addEventListener('visibilitychange', handleVisibilityChange);
                 return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -337,13 +334,14 @@
 
             const togglePlay = () => {
                 if (!firstPlayDone.current) {
-                    // Pre-calentar voz silenciosamente para evitar desfase en primer arranque
+                    window.speechSynthesis.cancel(); // Limpia colas previas
                     const warm = new SpeechSynthesisUtterance('');
                     window.speechSynthesis.speak(warm);
                     speak('Prepárate', true);
                     firstPlayDone.current = true;
                 }
                 setStatus(s => s === 'running' ? 'paused' : 'running');
+                setWasPausedByHide(false); // Limpiamos el estado del botón gigante al interactuar
             };
 
             useEffect(() => {
@@ -395,18 +393,14 @@
                     <video ref={videoRef} loop muted playsInline style={{position:'absolute',width:'1px',height:'1px',opacity:0.01}}><source src="https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/one-second-loop.mp4" type="video/mp4"/></video>
                     
                     <div className="bg-black/10 p-4 pt-10 flex justify-between items-center shrink-0 z-10">
-                        <div className="leading-none text-left">
-                            <span className="text-[10px] font-black text-orange-500 uppercase">Tiempo</span>
-                            <p className="text-xl font-black italic">{formatTime(elapsed)}</p>
-                        </div>
-                        <div className="text-center">
-                            <h2 className="text-[10px] font-black uppercase italic truncate max-w-[120px] tracking-tight">{workout?.name || 'Rutina'}</h2>
-                        </div>
+                        <div className="leading-none text-left"><span className="text-[10px] font-black text-orange-500 uppercase">Tiempo</span><p className="text-xl font-black italic">{formatTime(elapsed)}</p></div>
+                        <div className="text-center"><h2 className="text-[10px] font-black uppercase italic truncate max-w-[120px] tracking-tight">{workout?.name || 'Rutina'}</h2></div>
                         <button onClick={onExit} className="opacity-40 text-xl font-black px-2">✕</button>
                     </div>
 
                     <div className="flex-1 flex flex-col items-center justify-center text-center px-4 min-h-0 relative">
-                        {status === 'paused' && (
+                        {/* Bug Play Duplicado: Solo mostrar si se pausó por cambio de pantalla */}
+                        {wasPausedByHide && status === 'paused' && (
                             <div className="absolute inset-0 z-40 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center">
                                 <button onClick={togglePlay} className="bg-orange-500 p-10 rounded-full shadow-2xl active:scale-90"><IconPlay/></button>
                             </div>
@@ -419,14 +413,14 @@
                         <div className="w-full max-w-md grid grid-cols-3 items-center mb-6 text-center italic">
                             <div className="flex flex-col"><span className="text-[14vw] font-black text-sky-400 leading-none">{curr?.tr ? curr.tr - (curr.r||0) + 1 : '-'}</span><span className="text-[8px] opacity-40">Rondas</span></div>
                             <div className="flex justify-center">
-                                {status === 'running' && (
-                                    <button onClick={togglePlay} className="w-20 h-20 rounded-full border-4 border-yellow-400 flex items-center justify-center active:scale-90"><IconPause/></button>
-                                )}
+                                <button onClick={togglePlay} className="w-20 h-20 rounded-full border-4 border-yellow-400 flex items-center justify-center active:scale-90">
+                                    {status === 'running' ? <IconPause/> : <IconPlay/>}
+                                </button>
                             </div>
                             <div className="flex flex-col"><span className="text-[14vw] font-black text-yellow-400 leading-none">{curr?.tc ? curr.tc - (curr.cy||0) + 1 : '-'}</span><span className="text-[8px] opacity-40">Ciclos</span></div>
                         </div>
                         <div className="flex gap-4">
-                            <button onClick={() => { setIdx(0); setElapsed(0); setStatus('paused'); lastSpokenKey.current=''; firstPlayDone.current=false; }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconRotate/></button>
+                            <button onClick={() => { setIdx(0); setElapsed(0); setStatus('ready'); lastSpokenKey.current=''; firstPlayDone.current=false; }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconRotate/></button>
                             <button onClick={() => { if (idx>0) { const pi=idx-1; setIdx(pi); setTimeLeft(steps[pi].seconds); stepDurRef.current=steps[pi].seconds; stepStartRef.current=null; lastSpokenKey.current=''; } }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconBack/></button>
                             <button onClick={() => { if (idx<steps.length-1) { const ni=idx+1; setIdx(ni); setTimeLeft(steps[ni].seconds); stepDurRef.current=steps[ni].seconds; stepStartRef.current=null; lastSpokenKey.current=''; } }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconForward/></button>
                         </div>
@@ -512,29 +506,16 @@
                         ))}
                     </div>
                     <div className="glass-card p-5 flex justify-between items-center">
-                        <div className="text-left">
-                            <span className="text-[9px] opacity-40 uppercase block">Esta {period}</span>
-                            <span className="text-2xl font-black text-sky-400">{Math.floor(periodSec / 3600)}h {Math.floor((periodSec % 3600) / 60)}m</span>
-                        </div>
-                        <div className="text-right">
-                            <span className="text-[9px] opacity-40 uppercase block">Sesiones</span>
-                            <span className="text-2xl font-black text-emerald-400">{periodSessions.length}</span>
-                        </div>
+                        <div className="text-left"><span className="text-[9px] opacity-40 uppercase block">Esta {period}</span><span className="text-2xl font-black text-sky-400">{Math.floor(periodSec / 3600)}h {Math.floor((periodSec % 3600) / 60)}m</span></div>
+                        <div className="text-right"><span className="text-[9px] opacity-40 uppercase block">Sesiones</span><span className="text-2xl font-black text-emerald-400">{periodSessions.length}</span></div>
                     </div>
-                    <div className="glass-card p-4">
-                        <div style={{ height: '200px' }}>
-                            <canvas ref={chartRef} />
-                        </div>
-                    </div>
+                    <div className="glass-card p-4"><div style={{ height: '200px' }}><canvas ref={chartRef} /></div></div>
                     {periodSessions.length > 0 && (
                         <div className="glass-card p-4 space-y-3">
                             <span className="text-[9px] opacity-40 uppercase text-center block mb-1">Sesiones recientes</span>
                             {[...periodSessions].reverse().slice(0, 15).map((h, i) => (
                                 <div key={i} className="flex justify-between items-center border-b border-white/5 pb-2 last:border-0 last:pb-0">
-                                    <div>
-                                        <p className="text-xs font-black uppercase italic">{h.workoutName || 'Sesión'}</p>
-                                        <p className="text-[9px] text-slate-500">{new Date(h.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
-                                    </div>
+                                    <div><p className="text-xs font-black uppercase italic">{h.workoutName || 'Sesión'}</p><p className="text-[9px] text-slate-500">{new Date(h.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}</p></div>
                                     <span className="text-orange-500 font-black text-xs">{formatTime(h.totalTime || 0)}</span>
                                 </div>
                             ))}
