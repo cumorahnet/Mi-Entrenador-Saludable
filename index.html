@@ -65,7 +65,7 @@
 
         const APP_ID = "mientrenador-v3";
         const APP_TITLE = "Mi Entrenador";
-        const APP_VERSION = "41.0.0";
+        const APP_VERSION = "42.0.0";
 
         const WARMUP_STEPS = [
             { label: 'TOBILLO DERECHO', voice: 'Tobillo derecho' },
@@ -267,8 +267,12 @@
 
             useEffect(() => {
                 const handleVisibilityChange = () => {
-                    if (document.hidden) { setStatus('paused'); releaseStayAwake(); }
-                    else { if ('wakeLock' in navigator) requestStayAwake(); }
+                    if (document.hidden) { 
+                        setStatus('paused'); 
+                        releaseStayAwake(); 
+                    } else { 
+                        if ('wakeLock' in navigator) requestStayAwake(); 
+                    }
                 };
                 document.addEventListener('visibilitychange', handleVisibilityChange);
                 return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -311,7 +315,9 @@
                     if (i < 15) s.push({ label: 'CAMBIO', seconds: 10, color: 'bg-blue-200', phase: 'cambio-est' });
                 }
 
-                setSteps(s); setTimeLeft(s[0].seconds); stepDurRef.current = s[0].seconds;
+                setSteps(s); 
+                setTimeLeft(s[0].seconds); 
+                stepDurRef.current = s[0].seconds;
                 speak('Prepárate', true);
             }, [workout]);
 
@@ -328,11 +334,15 @@
             useEffect(() => {
                 let interval = null;
                 if (status === 'running') {
+                    // Mantenemos el tiempo transcurrido si ya existía para evitar reinicios
                     if (!startRef.current) startRef.current = Date.now() - (elapsed * 1000);
-                    if (!stepStartRef.current) stepStartRef.current = Date.now();
+                    // Mantenemos el tiempo del paso actual
+                    if (!stepStartRef.current) stepStartRef.current = Date.now() - ((stepDurRef.current - timeLeft) * 1000);
+                    
                     interval = setInterval(() => {
                         const now = Date.now();
-                        const totalSec = Math.floor((now - startRef.current) / 1000); setElapsed(totalSec);
+                        const totalSec = Math.floor((now - startRef.current) / 1000);
+                        setElapsed(totalSec);
                         const stepPassed = Math.floor((now - stepStartRef.current) / 1000);
                         const remaining = stepDurRef.current - stepPassed;
                         
@@ -353,8 +363,13 @@
                             }
                         } else {
                             if (idx < steps.length - 1) {
-                                const n = idx + 1; announceStep(steps[n]); setIdx(n); setTimeLeft(steps[n].seconds);
-                                stepDurRef.current = steps[n].seconds; stepStartRef.current = Date.now(); lastSpokenKey.current = '';
+                                const n = idx + 1; 
+                                announceStep(steps[n]); 
+                                setIdx(n); 
+                                setTimeLeft(steps[n].seconds);
+                                stepDurRef.current = steps[n].seconds; 
+                                stepStartRef.current = Date.now(); 
+                                lastSpokenKey.current = '';
                                 if ('vibrate' in navigator) navigator.vibrate(150);
                             } else {
                                 setStatus('finished'); speak('Excelente trabajo!');
@@ -363,19 +378,27 @@
                         }
                     }, 250);
                 } else {
+                    // Al pausar, limpiamos las referencias de tiempo para que se recalculen al reanudar
                     startRef.current = null;
                     stepStartRef.current = null;
                 }
                 return () => clearInterval(interval);
-            }, [status, idx, steps]);
+            }, [status, idx, steps, timeLeft, elapsed]);
+
+            if (status === 'finished') return <div className="h-screen flex flex-col items-center justify-center p-8 bg-slate-950 text-white text-center"><h1 className="text-5xl font-black italic mb-4">¡HECHO!</h1><button onClick={onExit} className="w-full max-w-sm bg-white text-black py-6 rounded-full font-black uppercase">Finalizar</button></div>;
 
             const curr = steps[idx];
             return (
                 <div className={`h-screen flex flex-col transition-colors duration-700 ${curr?.color || 'bg-slate-950'} text-white`}>
                     <video ref={videoRef} loop muted playsInline style={{position:'absolute',width:'1px',height:'1px',opacity:0.01}}><source src="https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/one-second-loop.mp4" type="video/mp4"/></video>
                     
+                    {/* Header Restaurado */}
                     <div className="bg-black/10 p-4 pt-10 flex justify-between items-center shrink-0">
-                        <div className="leading-none"><span className="text-[10px] font-black text-orange-500 uppercase">Tiempo</span><p className="text-xl font-black italic">{formatTime(elapsed)}</p></div>
+                        <div className="leading-none">
+                            <span className="text-[10px] font-black text-orange-500 uppercase">Tiempo</span>
+                            <p className="text-xl font-black italic">{formatTime(elapsed)}</p>
+                        </div>
+                        <h2 className="text-[10px] font-black uppercase italic truncate max-w-[150px] tracking-tight">{workout.name}</h2>
                         <button onClick={onExit} className="opacity-40 text-xl font-black px-2">✕</button>
                     </div>
 
