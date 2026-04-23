@@ -333,22 +333,29 @@
             };
 
             const togglePlay = () => {
+                setWasPausedByHide(false);
                 if (!firstPlayDone.current) {
-                    // Hablar DIRECTAMENTE en el handler del click (interacción de usuario).
-                    // Esto desbloquea speechSynthesis en todos los navegadores sin necesidad
-                    // de un utterance vacío que compite con la cola.
-                    voiceQueue.length = 0;
-                    voiceBusy = false;
+                    firstPlayDone.current = true;
+                    // Hablar "Prepárate" directamente en el evento de usuario (desbloquea el motor).
+                    // El timer NO arranca hasta que onend dispara setStatus('running').
                     window.speechSynthesis.cancel();
+                    voiceQueue.length = 0; voiceBusy = false;
                     const msg = new SpeechSynthesisUtterance('Prepárate');
                     msg.lang = 'es-ES'; msg.rate = 1.05;
-                    msg.onend = () => { voiceBusy = false; flushVoice(); };
+                    msg.onend = () => {
+                        voiceBusy = false;
+                        setStatus('running'); // arranca el timer DESPUÉS de que termina la voz
+                    };
+                    msg.onerror = () => {
+                        voiceBusy = false;
+                        setStatus('running'); // arranca igual si falla la voz
+                    };
                     voiceBusy = true;
                     window.speechSynthesis.speak(msg);
-                    firstPlayDone.current = true;
+                    // No llamamos setStatus aquí — lo hace onend
+                    return;
                 }
                 setStatus(s => s === 'running' ? 'paused' : 'running');
-                setWasPausedByHide(false);
             };
 
             useEffect(() => {
