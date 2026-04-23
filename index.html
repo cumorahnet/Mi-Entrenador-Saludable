@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#020617">
-    <title>Mi Entrenador | Fuerte y Saludable</title>
+    <title>Mi Entrenador Saludable</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -64,8 +64,8 @@
         const db   = firebase.firestore();
 
         const APP_ID = "mientrenador-v3";
-        const APP_TITLE = "Mi Entrenador";
-        const APP_VERSION = "46.0.0";
+        const APP_TITLE = "Mi Entrenador Saludable";
+        const APP_VERSION = "47.0.0";
 
         const WARMUP_STEPS = [
             { label: 'TOBILLO DERECHO', voice: 'Tobillo derecho' },
@@ -88,8 +88,8 @@
             try {
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
                 const now = ctx.currentTime;
-                const duration = 0.8;
-                const createOsc = (freq, type = 'sine', vol = 0.4) => {
+                const duration = 0.10;
+                const createOsc = (freq, type = 'sine', vol = 0.8) => {
                     const osc = ctx.createOscillator();
                     const gain = ctx.createGain();
                     const mod = ctx.createOscillator();
@@ -251,7 +251,6 @@
 
         function InputField({ label, val, set }) { return ( <div className="flex flex-col items-center"> <span className="text-[8px] opacity-40 mb-2 uppercase">{label}</span> <input type="number" className="w-full bg-slate-800/40 p-4 rounded-xl text-center font-black text-white border border-white/5 outline-none" value={val} onChange={e=>set(e.target.value)} /> </div> ); }
 
-        // ── PLAYER ───────────────────────────────────────────────────────────────
         function PlayerView({ workout, onExit, onComplete }) {
             const [status, setStatus] = useState('paused');
             const [idx, setIdx] = useState(0);
@@ -329,8 +328,12 @@
                 if (ph === 'cambio-est') { speak('Cambio'); return; }
             };
 
+            // Ajuste 2: Voz "Prepárate" exactamente después del primer Play
             const togglePlay = () => {
-                if (!firstPlayDone.current) { speak('Prepárate', true); firstPlayDone.current = true; }
+                if (!firstPlayDone.current) {
+                    speak('Prepárate', true);
+                    firstPlayDone.current = true;
+                }
                 setStatus(s => s === 'running' ? 'paused' : 'running');
             };
 
@@ -423,7 +426,6 @@
             );
         }
 
-        // ── AVANCE ───────────────────────────────────────────────────────────────
         function AvanceView({ history }) {
             const [period, setPeriod] = useState('semana');
             const chartRef = useRef(null);
@@ -526,7 +528,7 @@
                     {periodSessions.length > 0 && (
                         <div className="glass-card p-4 space-y-3">
                             <span className="text-[9px] opacity-40 uppercase text-center block mb-1">Sesiones recientes</span>
-                            {[...periodSessions].reverse().slice(0, 10).map((h, i) => (
+                            {[...periodSessions].reverse().slice(0, 15).map((h, i) => (
                                 <div key={i} className="flex justify-between items-center border-b border-white/5 pb-2 last:border-0 last:pb-0">
                                     <div>
                                         <p className="text-xs font-black uppercase italic">{h.workoutName || 'Sesión'}</p>
