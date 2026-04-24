@@ -65,7 +65,7 @@
 
         const APP_ID = "mientrenador-v3";
         const APP_TITLE = "Mi Entrenador Saludable";
-        const APP_VERSION = "55.0.0";
+        const APP_VERSION = "56.0.0";
 
         const WARMUP_STEPS = [
             { label: 'TOBILLO DERECHO', voice: 'Tobillo derecho' },
@@ -89,7 +89,7 @@
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
                 const now = ctx.currentTime;
                 const duration = 1.6;
-                const createOsc = (freq, type = 'sine', vol = 1.0) => {
+                const createOsc = (freq, type, vol) => {
                     const osc = ctx.createOscillator();
                     const gain = ctx.createGain();
                     const mod = ctx.createOscillator();
@@ -106,25 +106,17 @@
                     osc.start(now); mod.start(now);
                     osc.stop(now + duration); mod.stop(now + duration);
                 };
-                createOsc(3500); createOsc(3530, 'triangle', 0.5);
+                createOsc(3500, 'sine', 0.8);
+                createOsc(3530, 'triangle', 0.4);
             } catch(e) {}
         };
 
-        const voiceQueue = [];
-        let voiceBusy = false;
-        const flushVoice = () => {
-            if (voiceBusy || voiceQueue.length === 0 || !window.speechSynthesis) return;
-            voiceBusy = true;
-            const text = voiceQueue.shift();
-            const msg = new SpeechSynthesisUtterance(text);
-            msg.lang = 'es-ES'; msg.rate = 1.1;
-            msg.onend = msg.onerror = () => { voiceBusy = false; flushVoice(); };
-            window.speechSynthesis.speak(msg);
-        };
         const speak = (text, interrupt = false) => {
             if (!window.speechSynthesis) return;
-            if (interrupt) { window.speechSynthesis.cancel(); voiceQueue.length = 0; voiceBusy = false; }
-            voiceQueue.push(text); flushVoice();
+            if (interrupt) window.speechSynthesis.cancel();
+            const msg = new SpeechSynthesisUtterance(text);
+            msg.lang = 'es-ES'; msg.rate = 1.1;
+            window.speechSynthesis.speak(msg);
         };
 
         function App() {
@@ -152,7 +144,6 @@
             }, [user]);
 
             const handleStartWorkout = (w) => {
-                // DESBLOQUEO INICIAL DEL AUDIO
                 if (window.speechSynthesis) {
                     const silent = new SpeechSynthesisUtterance(' ');
                     silent.volume = 0;
@@ -259,7 +250,7 @@
             );
         }
 
-        function InputField({ label, val, set }) { return ( <div className="flex flex-col items-center"> <span className="text-[8px] opacity-40 mb-2 uppercase">{label}</span> <input type=\"number\" className=\"w-full bg-slate-800/40 p-4 rounded-xl text-center font-black text-white border border-white/5 outline-none\" value={val} onChange={e=>set(e.target.value)} /> </div> ); }
+        function InputField({ label, val, set }) { return ( <div className="flex flex-col items-center"> <span className="text-[8px] opacity-40 mb-2 uppercase">{label}</span> <input type="number" className="w-full bg-slate-800/40 p-4 rounded-xl text-center font-black text-white border border-white/5 outline-none" value={val} onChange={e=>set(e.target.value)} /> </div> ); }
 
         function PlayerView({ workout, onExit, onComplete }) {
             const [status, setStatus] = useState('ready'); 
@@ -284,7 +275,7 @@
             };
             const releaseStayAwake = () => {
                 if (videoRef.current) videoRef.current.pause();
-                if (wakeLockRef.current) { wakeLockRef.current.release(); wakeLockRef.current = null; }
+                if (wakeLockRef.current) { wakeLockRef.current.release().catch(()=>{}); wakeLockRef.current = null; }
             };
 
             useEffect(() => {
@@ -347,15 +338,13 @@
                 if (!firstPlayDone.current) {
                     firstPlayDone.current = true;
                     setWasPausedByHide(false);
-                    // LÓGICA DE VOZ AISLADA REAL:
-                    window.speechSynthesis.cancel();
+                    if (window.speechSynthesis) window.speechSynthesis.cancel();
                     const msg = new SpeechSynthesisUtterance('Prepárate');
                     msg.lang = 'es-ES'; msg.rate = 1.05;
-                    // SÓLO CUANDO LA VOZ TERMINA, EL TIMER ARRANCA
                     msg.onend = () => { setStatus('running'); };
                     window.speechSynthesis.speak(msg);
                 } else {
-                    setStatus(s => s === 'running' ? 'paused' : 'running');
+                    setStatus(prev => prev === 'running' ? 'paused' : 'running');
                     setWasPausedByHide(false);
                 }
             };
@@ -399,38 +388,31 @@
                 return () => clearInterval(interval);
             }, [status, idx, steps, timeLeft, elapsed]);
 
-            if (status === 'finished') return <div className="h-screen flex flex-col items-center justify-center p-8 bg-slate-950 text-white text-center"><h1 className=\"text-5xl font-black italic mb-4\">¡HECHO!</h1><button onClick={onExit} className=\"w-full max-w-sm bg-white text-black py-6 rounded-full font-black uppercase\">Finalizar</button></div>;
+            if (status === 'finished') return <div className="h-screen flex flex-col items-center justify-center p-8 bg-slate-950 text-white text-center"><h1 className="text-5xl font-black italic mb-4">¡HECHO!</h1><button onClick={onExit} className="w-full max-w-sm bg-white text-black py-6 rounded-full font-black uppercase">Finalizar</button></div>;
 
             const curr = steps[idx];
             return (
                 <div className={`h-screen flex flex-col transition-colors duration-700 ${curr?.color || 'bg-slate-950'} text-white`}>
                     <video ref={videoRef} loop muted playsInline style={{position:'absolute',width:'1px',height:'1px',opacity:0.01}}><source src="https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/one-second-loop.mp4" type="video/mp4"/></video>
-                    
                     <div className="bg-black/10 p-4 pt-10 flex justify-between items-center shrink-0 z-10">
                         <div className="leading-none text-left"><span className="text-[10px] font-black text-orange-500 uppercase">Tiempo</span><p className="text-xl font-black italic">{formatTime(elapsed)}</p></div>
                         <div className="text-center"><h2 className="text-[10px] font-black uppercase italic truncate max-w-[120px] tracking-tight">{workout?.name || 'Rutina'}</h2></div>
                         <button onClick={onExit} className="opacity-40 text-xl font-black px-2">✕</button>
                     </div>
-
                     <div className="flex-1 flex flex-col items-center justify-center text-center px-4 min-h-0 relative">
-                        {status === 'paused' || status === 'ready' && !wasPausedByHide ? (
+                        {(status === 'paused' || (status === 'ready' && !wasPausedByHide) || (wasPausedByHide && status === 'paused')) && (
                             <div className="absolute inset-0 z-40 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center">
                                 <button onClick={togglePlay} className="bg-orange-500 p-10 rounded-full shadow-2xl active:scale-90"><IconPlay/></button>
                             </div>
-                        ) : wasPausedByHide && status === 'paused' ? (
-                            <div className="absolute inset-0 z-40 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center">
-                                <button onClick={togglePlay} className="bg-orange-500 p-10 rounded-full shadow-2xl active:scale-90"><IconPlay/></button>
-                            </div>
-                        ) : null}
+                        )}
                         <h2 className="text-[11vw] font-black uppercase italic text-black/80 leading-none mb-2">{curr?.label || 'LISTO'}</h2>
                         <div className="timer-huge tabular-nums">{timeLeft}</div>
                     </div>
-
                     <div className="bg-slate-950 p-6 pb-10 flex flex-col items-center shrink-0">
                         <div className="w-full max-w-md grid grid-cols-3 items-center mb-6 text-center italic">
-                            <div className="flex flex-col"><span className="text-[14vw] font-black text-sky-400 leading-none">{curr?.tr ? curr.tr - (curr.r||0) + 1 : '-'}</span><span className=\"text-[8px] opacity-40\">Rondas</span></div>
-                            <div className=\"flex justify-center\"><button onClick={togglePlay} className=\"w-20 h-20 rounded-full border-4 border-yellow-400 flex items-center justify-center active:scale-90\">{status === 'running' ? <IconPause/> : <IconPlay/>}</button></div>
-                            <div className=\"flex flex-col\"><span className=\"text-[14vw] font-black text-yellow-400 leading-none\">{curr?.tc ? curr.tc - (curr.cy||0) + 1 : '-'}</span><span className=\"text-[8px] opacity-40\">Ciclos</span></div>
+                            <div className="flex flex-col"><span className="text-[14vw] font-black text-sky-400 leading-none">{curr?.tr ? curr.tr - (curr.r||0) + 1 : '-'}</span><span className="text-[8px] opacity-40">Rondas</span></div>
+                            <div className="flex justify-center"><button onClick={togglePlay} className="w-20 h-20 rounded-full border-4 border-yellow-400 flex items-center justify-center active:scale-90">{status === 'running' ? <IconPause/> : <IconPlay/>}</button></div>
+                            <div className="flex flex-col"><span className="text-[14vw] font-black text-yellow-400 leading-none">{curr?.tc ? curr.tc - (curr.cy||0) + 1 : '-'}</span><span className="text-[8px] opacity-40">Ciclos</span></div>
                         </div>
                     </div>
                 </div>
@@ -467,10 +449,14 @@
             return (
                 <div className="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4 pb-28">
                     <div className="glass-card p-6 text-center"><span className="text-[9px] opacity-40 block mb-1 uppercase">Tiempo Total Acumulado</span><span className="text-3xl font-black text-orange-500">{Math.floor(totalSec / 3600)}h {Math.floor((totalSec % 3600) / 60)}m</span></div>
-                    <div className="flex gap-2">{['semana', 'mes', 'año'].map(p => ( <button key={p} onClick={() => setPeriod(p)} className={`flex-1 py-3 rounded-xl font-black uppercase text-[10px] transition-all ${period === p ? 'bg-orange-500 text-white' : 'bg-white/5 text-slate-400'}`}> {p} </button> ))}</div>
-                    <div className="glass-card p-5 flex justify-between items-center"><div className="text-left"><span className="text-[9px] opacity-40 uppercase block">Esta {period}</span><span className="text-2xl font-black text-sky-400">{Math.floor(periodSec / 3600)}h {Math.floor((periodSec % 3600) / 60)}m</span></div><div className="text-right"><span className="text-[9px] opacity-40 uppercase block">Sesiones</span><span className="text-2xl font-black text-emerald-400">{periodSessions.length}</span></div></div>
+                    <div className="flex gap-2">
+                        {['semana', 'mes', 'año'].map(p => ( <button key={p} onClick={() => setPeriod(p)} className={`flex-1 py-3 rounded-xl font-black uppercase text-[10px] transition-all ${period === p ? 'bg-orange-500 text-white' : 'bg-white/5 text-slate-400'}`}> {p} </button> ))}
+                    </div>
+                    <div className="glass-card p-5 flex justify-between items-center">
+                        <div className="text-left"><span className="text-[9px] opacity-40 uppercase block">Esta {period}</span><span className="text-2xl font-black text-sky-400">{Math.floor(periodSec / 3600)}h {Math.floor((periodSec % 3600) / 60)}m</span></div>
+                        <div className="text-right"><span className="text-[9px] opacity-40 uppercase block">Sesiones</span><span className="text-2xl font-black text-emerald-400">{periodSessions.length}</span></div>
+                    </div>
                     <div className="glass-card p-4"><div style={{ height: '200px' }}><canvas ref={chartRef} /></div></div>
-                    {periodSessions.length > 0 && ( <div className="glass-card p-4 space-y-3"><span className="text-[9px] opacity-40 uppercase text-center block mb-1">Sesiones recientes</span>{[...periodSessions].reverse().slice(0, 15).map((h, i) => ( <div key={i} className="flex justify-between items-center border-b border-white/5 pb-2 last:border-0 last:pb-0"> <div><p className="text-xs font-black uppercase italic">{h.workoutName || 'Sesión'}</p><p className="text-[9px] text-slate-500">{new Date(h.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}</p></div> <span className="text-orange-500 font-black text-xs">{formatTime(h.totalTime || 0)}</span> </div> )) } </div> )}
                 </div>
             );
         }
