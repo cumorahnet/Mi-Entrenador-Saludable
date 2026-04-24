@@ -65,7 +65,7 @@
 
         const APP_ID = "mientrenador-v3";
         const APP_TITLE = "Mi Entrenador Saludable";
-        const APP_VERSION = "56.0.0";
+        const APP_VERSION = "54.0.0";
 
         const WARMUP_STEPS = [
             { label: 'TOBILLO DERECHO', voice: 'Tobillo derecho' },
@@ -89,34 +89,42 @@
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
                 const now = ctx.currentTime;
                 const duration = 1.6;
-                const createOsc = (freq, type, vol) => {
+                const createOsc = (freq, type = 'sine', vol = 0.8) => {
                     const osc = ctx.createOscillator();
                     const gain = ctx.createGain();
                     const mod = ctx.createOscillator();
                     const modGain = ctx.createGain();
                     osc.type = type;
                     osc.frequency.setValueAtTime(freq, now);
-                    mod.frequency.setValueAtTime(45, now); 
-                    modGain.gain.setValueAtTime(freq * 0.1, now);
+                    mod.frequency.setValueAtTime(35, now); 
+                    modGain.gain.setValueAtTime(freq * 0.07, now);
                     mod.connect(modGain); modGain.connect(osc.frequency);
                     osc.connect(gain); gain.connect(ctx.destination);
                     gain.gain.setValueAtTime(0, now);
-                    gain.gain.linearRampToValueAtTime(vol, now + 0.05);
+                    gain.gain.linearRampToValueAtTime(vol, now + 0.08);
                     gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
                     osc.start(now); mod.start(now);
                     osc.stop(now + duration); mod.stop(now + duration);
                 };
-                createOsc(3500, 'sine', 0.8);
-                createOsc(3530, 'triangle', 0.4);
+                createOsc(3500); createOsc(3515, 'triangle', 0.4);
             } catch(e) {}
         };
 
+        const voiceQueue = [];
+        let voiceBusy = false;
+        const flushVoice = () => {
+            if (voiceBusy || voiceQueue.length === 0 || !window.speechSynthesis) return;
+            voiceBusy = true;
+            const text = voiceQueue.shift();
+            const msg = new SpeechSynthesisUtterance(text);
+            msg.lang = 'es-ES'; msg.rate = 1.05;
+            msg.onend = msg.onerror = () => { voiceBusy = false; flushVoice(); };
+            window.speechSynthesis.speak(msg);
+        };
         const speak = (text, interrupt = false) => {
             if (!window.speechSynthesis) return;
-            if (interrupt) window.speechSynthesis.cancel();
-            const msg = new SpeechSynthesisUtterance(text);
-            msg.lang = 'es-ES'; msg.rate = 1.1;
-            window.speechSynthesis.speak(msg);
+            if (interrupt) { window.speechSynthesis.cancel(); voiceQueue.length = 0; voiceBusy = false; }
+            voiceQueue.push(text); flushVoice();
         };
 
         function App() {
@@ -144,6 +152,7 @@
             }, [user]);
 
             const handleStartWorkout = (w) => {
+                // DESBLOQUEO INICIAL (Voz silenciosa)
                 if (window.speechSynthesis) {
                     const silent = new SpeechSynthesisUtterance(' ');
                     silent.volume = 0;
@@ -275,7 +284,7 @@
             };
             const releaseStayAwake = () => {
                 if (videoRef.current) videoRef.current.pause();
-                if (wakeLockRef.current) { wakeLockRef.current.release().catch(()=>{}); wakeLockRef.current = null; }
+                if (wakeLockRef.current) { wakeLockRef.current.release(); wakeLockRef.current = null; }
             };
 
             useEffect(() => {
@@ -335,17 +344,24 @@
             };
 
             const togglePlay = () => {
-                if (!firstPlayDone.current) {
+                const isStarting = status !== 'running';
+                
+                // 1. PRIORIDAD: EJECUCIÓN VISUAL INSTANTÁNEA
+                setStatus(isStarting ? 'running' : 'paused');
+                setWasPausedByHide(false);
+
+                // 2. VOZ EN SEGUNDO PLANO (Async) PARA EVITAR LAG
+                if (isStarting && !firstPlayDone.current) {
                     firstPlayDone.current = true;
-                    setWasPausedByHide(false);
-                    if (window.speechSynthesis) window.speechSynthesis.cancel();
-                    const msg = new SpeechSynthesisUtterance('Prepárate');
-                    msg.lang = 'es-ES'; msg.rate = 1.05;
-                    msg.onend = () => { setStatus('running'); };
-                    window.speechSynthesis.speak(msg);
-                } else {
-                    setStatus(prev => prev === 'running' ? 'paused' : 'running');
-                    setWasPausedByHide(false);
+                    // Forzamos el inicio de voz sin bloquear el hilo principal del UI
+                    setTimeout(() => {
+                        if (window.speechSynthesis) {
+                            window.speechSynthesis.cancel();
+                            const msg = new SpeechSynthesisUtterance('Prepárate');
+                            msg.lang = 'es-ES'; msg.rate = 1.1;
+                            window.speechSynthesis.speak(msg);
+                        }
+                    }, 0);
                 }
             };
 
@@ -400,7 +416,7 @@
                         <button onClick={onExit} className="opacity-40 text-xl font-black px-2">✕</button>
                     </div>
                     <div className="flex-1 flex flex-col items-center justify-center text-center px-4 min-h-0 relative">
-                        {(status === 'paused' || (status === 'ready' && !wasPausedByHide) || (wasPausedByHide && status === 'paused')) && (
+                        {wasPausedByHide && status === 'paused' && (
                             <div className="absolute inset-0 z-40 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center">
                                 <button onClick={togglePlay} className="bg-orange-500 p-10 rounded-full shadow-2xl active:scale-90"><IconPlay/></button>
                             </div>
@@ -413,6 +429,11 @@
                             <div className="flex flex-col"><span className="text-[14vw] font-black text-sky-400 leading-none">{curr?.tr ? curr.tr - (curr.r||0) + 1 : '-'}</span><span className="text-[8px] opacity-40">Rondas</span></div>
                             <div className="flex justify-center"><button onClick={togglePlay} className="w-20 h-20 rounded-full border-4 border-yellow-400 flex items-center justify-center active:scale-90">{status === 'running' ? <IconPause/> : <IconPlay/>}</button></div>
                             <div className="flex flex-col"><span className="text-[14vw] font-black text-yellow-400 leading-none">{curr?.tc ? curr.tc - (curr.cy||0) + 1 : '-'}</span><span className="text-[8px] opacity-40">Ciclos</span></div>
+                        </div>
+                        <div className="flex gap-4">
+                            <button onClick={() => { setIdx(0); setElapsed(0); setStatus('ready'); startRef.current=null; stepStartRef.current=null; lastSpokenKey.current=''; firstPlayDone.current=false; window.speechSynthesis.cancel(); if(steps[0]) { setTimeLeft(steps[0].seconds); stepDurRef.current=steps[0].seconds; } }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconRotate/></button>
+                            <button onClick={() => { if (idx>0) { const pi=idx-1; setIdx(pi); setTimeLeft(steps[pi].seconds); stepDurRef.current=steps[pi].seconds; stepStartRef.current=null; lastSpokenKey.current=''; } }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconBack/></button>
+                            <button onClick={() => { if (idx<steps.length-1) { const ni=idx+1; setIdx(ni); setTimeLeft(steps[ni].seconds); stepDurRef.current=steps[ni].seconds; stepStartRef.current=null; lastSpokenKey.current=''; } }} className="p-4 bg-slate-800 rounded-full active:scale-75"><IconForward/></button>
                         </div>
                     </div>
                 </div>
@@ -442,21 +463,16 @@
                     data = Array.from({ length: 12 }, (_, i) => Math.floor(history.filter(h => { const d = new Date(h.date); return d.getMonth() === i && d.getFullYear() === now.getFullYear(); }).reduce((a, h) => a + (h.totalTime || 0), 0) / 60));
                 }
                 chartInst.current = new Chart(ctx, { type: 'bar', data: { labels, datasets: [{ label: 'Minutos', data, backgroundColor: '#f97316', borderRadius: 8 }] }, options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b' } }, x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } } } } });
-                return () => chartInst.current?.destroy();
             }, [history, period]);
             const periodSessions = (() => { const from = new Date(); if (period === 'semana') from.setDate(from.getDate() - 6); else if (period === 'mes') from.setDate(from.getDate() - 27); else from.setMonth(0, 1); from.setHours(0, 0, 0, 0); return history.filter(h => new Date(h.date) >= from); })();
             const periodSec = periodSessions.reduce((a, h) => a + (h.totalTime || 0), 0);
             return (
                 <div className="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4 pb-28">
                     <div className="glass-card p-6 text-center"><span className="text-[9px] opacity-40 block mb-1 uppercase">Tiempo Total Acumulado</span><span className="text-3xl font-black text-orange-500">{Math.floor(totalSec / 3600)}h {Math.floor((totalSec % 3600) / 60)}m</span></div>
-                    <div className="flex gap-2">
-                        {['semana', 'mes', 'año'].map(p => ( <button key={p} onClick={() => setPeriod(p)} className={`flex-1 py-3 rounded-xl font-black uppercase text-[10px] transition-all ${period === p ? 'bg-orange-500 text-white' : 'bg-white/5 text-slate-400'}`}> {p} </button> ))}
-                    </div>
-                    <div className="glass-card p-5 flex justify-between items-center">
-                        <div className="text-left"><span className="text-[9px] opacity-40 uppercase block">Esta {period}</span><span className="text-2xl font-black text-sky-400">{Math.floor(periodSec / 3600)}h {Math.floor((periodSec % 3600) / 60)}m</span></div>
-                        <div className="text-right"><span className="text-[9px] opacity-40 uppercase block">Sesiones</span><span className="text-2xl font-black text-emerald-400">{periodSessions.length}</span></div>
-                    </div>
+                    <div className="flex gap-2">{['semana', 'mes', 'año'].map(p => ( <button key={p} onClick={() => setPeriod(p)} className={`flex-1 py-3 rounded-xl font-black uppercase text-[10px] transition-all ${period === p ? 'bg-orange-500 text-white' : 'bg-white/5 text-slate-400'}`}> {p} </button> ))}</div>
+                    <div className="glass-card p-5 flex justify-between items-center"><div className="text-left"><span className="text-[9px] opacity-40 uppercase block">Esta {period}</span><span className="text-2xl font-black text-sky-400">{Math.floor(periodSec / 3600)}h {Math.floor((periodSec % 3600) / 60)}m</span></div><div className="text-right"><span className="text-[9px] opacity-40 uppercase block">Sesiones</span><span className="text-2xl font-black text-emerald-400">{periodSessions.length}</span></div></div>
                     <div className="glass-card p-4"><div style={{ height: '200px' }}><canvas ref={chartRef} /></div></div>
+                    {periodSessions.length > 0 && ( <div className="glass-card p-4 space-y-3"><span className="text-[9px] opacity-40 uppercase text-center block mb-1">Sesiones recientes</span>{[...periodSessions].reverse().slice(0, 15).map((h, i) => ( <div key={i} className="flex justify-between items-center border-b border-white/5 pb-2 last:border-0 last:pb-0"> <div><p className="text-xs font-black uppercase italic">{h.workoutName || 'Sesión'}</p><p className="text-[9px] text-slate-500">{new Date(h.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}</p></div> <span className="text-orange-500 font-black text-xs">{formatTime(h.totalTime || 0)}</span> </div> )) } </div> )}
                 </div>
             );
         }
