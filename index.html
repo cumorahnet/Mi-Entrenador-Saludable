@@ -65,7 +65,7 @@
 
         const APP_ID = "mientrenador-v3";
         const APP_TITLE = "Mi Entrenador Saludable";
-        const APP_VERSION = "53.0.0";
+        const APP_VERSION = "54.0.0";
 
         const WARMUP_STEPS = [
             { label: 'TOBILLO DERECHO', voice: 'Tobillo derecho' },
@@ -152,7 +152,7 @@
             }, [user]);
 
             const handleStartWorkout = (w) => {
-                // DESBLOQUEO SILENCIOSO DEL AUDIO (Crucial para eliminar el lag)
+                // DESBLOQUEO INICIAL (Voz silenciosa)
                 if (window.speechSynthesis) {
                     const silent = new SpeechSynthesisUtterance(' ');
                     silent.volume = 0;
@@ -335,8 +335,7 @@
                 const ph = step.phase;
                 if (ph === 'calentamiento') {
                     if (isFirst) { speak('Calentamiento'); speak(step.voice || step.label.toLowerCase()); }
-                    whistle();
-                    return;
+                    whistle(); return;
                 }
                 if (ph === 'entrenamiento' || ph === 'estiramientos') { whistle(); return; }
                 if (ph === 'cambio-warmup') { speak('Cambio'); if (step.nextVoice) speak(step.nextVoice); return; }
@@ -345,17 +344,23 @@
             };
 
             const togglePlay = () => {
-                // EJECUCIÓN INMEDIATA VISUAL
-                const newStatus = status === 'running' ? 'paused' : 'running';
-                setStatus(newStatus);
+                const isStarting = status !== 'running';
+                
+                // 1. PRIORIDAD: EJECUCIÓN VISUAL INSTANTÁNEA
+                setStatus(isStarting ? 'running' : 'paused');
                 setWasPausedByHide(false);
 
-                // GESTIÓN DE VOZ ASÍNCRONA PARA ELIMINAR LAG
-                if (newStatus === 'running' && !firstPlayDone.current) {
+                // 2. VOZ EN SEGUNDO PLANO (Async) PARA EVITAR LAG
+                if (isStarting && !firstPlayDone.current) {
                     firstPlayDone.current = true;
+                    // Forzamos el inicio de voz sin bloquear el hilo principal del UI
                     setTimeout(() => {
-                        window.speechSynthesis.cancel();
-                        speak('Prepárate', true);
+                        if (window.speechSynthesis) {
+                            window.speechSynthesis.cancel();
+                            const msg = new SpeechSynthesisUtterance('Prepárate');
+                            msg.lang = 'es-ES'; msg.rate = 1.1;
+                            window.speechSynthesis.speak(msg);
+                        }
                     }, 0);
                 }
             };
@@ -440,28 +445,24 @@
             const chartRef = useRef(null);
             const chartInst = useRef(null);
             const totalSec = history.reduce((a, h) => a + (h.totalTime || 0), 0);
-            const getChartData = () => {
-                const now = new Date();
-                if (period === 'semana') {
-                    const labels = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - 6 + i); return d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }); });
-                    const map = {}; history.forEach(h => { const k = new Date(h.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }); map[k] = (map[k] || 0) + (h.totalTime || 0); });
-                    return { labels, data: labels.map(l => Math.floor((map[l] || 0) / 60)) };
-                }
-                if (period === 'mes') {
-                    const weeks = Array.from({ length: 4 }, (_, i) => { const start = new Date(); start.setDate(start.getDate() - 27 + i * 7); start.setHours(0, 0, 0, 0); const end = new Date(start); end.setDate(end.getDate() + 6); end.setHours(23, 59, 59, 999); return { label: `${start.getDate()}/${start.getMonth() + 1}`, start, end }; });
-                    return { labels: weeks.map(w => w.label), data: weeks.map(w => Math.floor(history.filter(h => { const d = new Date(h.date); return d >= w.start && d <= w.end; }).reduce((a, h) => a + (h.totalTime || 0), 0) / 60)) };
-                }
-                const labels = Array.from({ length: 12 }, (_, i) => new Date(now.getFullYear(), i, 1).toLocaleDateString('es-ES', { month: 'short' }));
-                const data = Array.from({ length: 12 }, (_, i) => Math.floor(history.filter(h => { const d = new Date(h.date); return d.getMonth() === i && d.getFullYear() === now.getFullYear(); }).reduce((a, h) => a + (h.totalTime || 0), 0) / 60));
-                return { labels, data };
-            };
             useEffect(() => {
                 const ctx = chartRef.current?.getContext('2d');
                 if (!ctx) return;
                 if (chartInst.current) chartInst.current.destroy();
-                const { labels, data } = getChartData();
+                const now = new Date();
+                let labels, data;
+                if (period === 'semana') {
+                    labels = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - 6 + i); return d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }); });
+                    const map = {}; history.forEach(h => { const k = new Date(h.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }); map[k] = (map[k] || 0) + (h.totalTime || 0); });
+                    data = labels.map(l => Math.floor((map[l] || 0) / 60));
+                } else if (period === 'mes') {
+                    const weeks = Array.from({ length: 4 }, (_, i) => { const start = new Date(); start.setDate(start.getDate() - 27 + i * 7); start.setHours(0, 0, 0, 0); const end = new Date(start); end.setDate(end.getDate() + 6); end.setHours(23, 59, 59, 999); return { label: `${start.getDate()}/${start.getMonth() + 1}`, start, end }; });
+                    labels = weeks.map(w => w.label); data = weeks.map(w => Math.floor(history.filter(h => { const d = new Date(h.date); return d >= w.start && d <= w.end; }).reduce((a, h) => a + (h.totalTime || 0), 0) / 60));
+                } else {
+                    labels = Array.from({ length: 12 }, (_, i) => new Date(now.getFullYear(), i, 1).toLocaleDateString('es-ES', { month: 'short' }));
+                    data = Array.from({ length: 12 }, (_, i) => Math.floor(history.filter(h => { const d = new Date(h.date); return d.getMonth() === i && d.getFullYear() === now.getFullYear(); }).reduce((a, h) => a + (h.totalTime || 0), 0) / 60));
+                }
                 chartInst.current = new Chart(ctx, { type: 'bar', data: { labels, datasets: [{ label: 'Minutos', data, backgroundColor: '#f97316', borderRadius: 8 }] }, options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b' } }, x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } } } } });
-                return () => chartInst.current?.destroy();
             }, [history, period]);
             const periodSessions = (() => { const from = new Date(); if (period === 'semana') from.setDate(from.getDate() - 6); else if (period === 'mes') from.setDate(from.getDate() - 27); else from.setMonth(0, 1); from.setHours(0, 0, 0, 0); return history.filter(h => new Date(h.date) >= from); })();
             const periodSec = periodSessions.reduce((a, h) => a + (h.totalTime || 0), 0);
