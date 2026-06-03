@@ -675,180 +675,79 @@
 
         // --- Avance/History View Component ---
         function AvanceView({ history }) {
-            const [periodType, setPeriodType] = useState('semana'); // 'semana', 'mes', 'año'
-            const [periodOffset, setPeriodOffset] = useState(0); // 0: actual, -1: anterior, etc.
-
+            const [period, setPeriod] = useState('semana');
             const chartRef = useRef(null);
             const chartInst = useRef(null);
             const totalSec = history.reduce((a, h) => a + (h.totalTime || 0), 0);
-
-            // --- Helper Functions for Date Ranges ---
-            const startOfDay = (date) => {
-                const d = new Date(date);
-                d.setHours(0, 0, 0, 0);
-                return d;
-            };
-
-            const endOfDay = (date) => {
-                const d = new Date(date);
-                d.setHours(23, 59, 59, 999);
-                return d;
-            };
-
-            // Returns { start: Date, end: Date } for a week (Monday-Sunday)
-            const getWeekRange = (date, offset = 0) => {
-                const d = startOfDay(date);
-                d.setDate(d.getDate() + offset * 7); // Apply week offset
-                const day = d.getDay(); // 0 for Sunday, 1 for Monday, ..., 6 for Saturday
-                // Calculate the difference to get to Monday (if day is Sunday, it's 6 days back for previous week Monday).
-                // Otherwise, it's (day - 1) days back to this week's Monday.
-                const diff = d.getDate() - day + (day === 0 ? -6 : 1); 
-                const start = startOfDay(new Date(d.setDate(diff)));
-                const end = endOfDay(new Date(d.setDate(diff + 6)));
-                return { start, end };
-            };
-
-            // Returns { start: Date, end: Date } for a month
-            const getMonthRange = (date, offset = 0) => {
-                const d = startOfDay(date);
-                d.setMonth(d.getMonth() + offset);
-                const start = startOfDay(new Date(d.getFullYear(), d.getMonth(), 1));
-                const end = endOfDay(new Date(d.getFullYear(), d.getMonth() + 1, 0)); // Last day of month
-                return { start, end };
-            };
-
-            // Returns { start: Date, end: Date } for a year
-            const getYearRange = (date, offset = 0) => {
-                const d = startOfDay(date);
-                d.setFullYear(d.getFullYear() + offset);
-                const start = startOfDay(new Date(d.getFullYear(), 0, 1));
-                const end = endOfDay(new Date(d.getFullYear(), 11, 31));
-                return { start, end };
-            };
-            // --- End Helper Functions ---
-
-
-            // Calculate current period range based on type and offset
-            const currentPeriodRange = (() => {
-                const today = new Date();
-                if (periodType === 'semana') return getWeekRange(today, periodOffset);
-                if (periodType === 'mes') return getMonthRange(today, periodOffset);
-                if (periodType === 'año') return getYearRange(today, periodOffset);
-                return { start: new Date(0), end: new Date() }; // Default empty range
-            })();
-
-            // Filter history for the current selected period
-            const filteredHistory = history.filter(h => {
-                const hDate = new Date(h.date);
-                return hDate >= currentPeriodRange.start && hDate <= currentPeriodRange.end;
-            });
-
-            const periodSec = filteredHistory.reduce((a, h) => a + (h.totalTime || 0), 0);
-
 
             useEffect(() => {
                 const ctx = chartRef.current?.getContext('2d');
                 if (!ctx) return;
                 if (chartInst.current) chartInst.current.destroy();
 
-                let labels = [];
-                let data = [];
-                const aggregationMap = new Map(); // Key: label, Value: totalTime (seconds)
+                const now = new Date();
+                let labels, data;
 
-                if (periodType === 'semana') {
-                    // Labels for each day of the week
-                    for (let d = new Date(currentPeriodRange.start); d <= currentPeriodRange.end; d.setDate(d.getDate() + 1)) {
-                        labels.push(d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }));
-                    }
-                    // Aggregate data by day
-                    filteredHistory.forEach(h => {
-                        const dateKey = new Date(h.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' });
-                        aggregationMap.set(dateKey, (aggregationMap.get(dateKey) || 0) + (h.totalTime || 0));
+                if (period === 'semana') {
+                    labels = Array.from({ length: 7 }, (_, i) => { 
+                        const d = new Date(); 
+                        d.setDate(d.getDate() - 6 + i); 
+                        return d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }); 
                     });
-                    data = labels.map(label => Math.floor((aggregationMap.get(label) || 0) / 60));
-
-                } else if (periodType === 'mes') {
-                    labels = []; data = [];
-                    let weekCursor = new Date(currentPeriodRange.start);
-                    // Ensure weekCursor starts on Monday of the first week that touches the month
-                    weekCursor = startOfDay(new Date(weekCursor.setDate(weekCursor.getDate() - (weekCursor.getDay() === 0 ? 6 : weekCursor.getDay() - 1))));
-
-                    let currentWeekNumber = 1;
-                    while (weekCursor <= currentPeriodRange.end || (weekCursor.getMonth() === currentPeriodRange.end.getMonth() && weekCursor.getFullYear() === currentPeriodRange.end.getFullYear())) {
-                        const weekRange = {
-                            start: new Date(weekCursor),
-                            end: endOfDay(new Date(weekCursor.getFullYear(), weekCursor.getMonth(), weekCursor.getDate() + 6))
-                        };
-
-                        const effectiveWeekStart = startOfDay(new Date(Math.max(weekRange.start.getTime(), currentPeriodRange.start.getTime())));
-                        const effectiveWeekEnd = endOfDay(new Date(Math.min(weekRange.end.getTime(), currentPeriodRange.end.getTime())));
-                        
-                        if (effectiveWeekStart <= effectiveWeekEnd) {
-                            labels.push(`Semana ${currentWeekNumber} (${effectiveWeekStart.getDate()}/${effectiveWeekStart.getMonth() + 1})`);
-                            let weekTotalTime = 0;
-                            filteredHistory.forEach(h => {
-                                const hDate = new Date(h.date);
-                                if (hDate >= effectiveWeekStart && hDate <= effectiveWeekEnd) {
-                                    weekTotalTime += (h.totalTime || 0);
-                                }
-                            });
-                            data.push(Math.floor(weekTotalTime / 60));
-                            currentWeekNumber++; // Increment week number only if it's an "effective" week
-                        }
-                        
-                        weekCursor.setDate(weekCursor.getDate() + 7);
-                        // Stop if the week cursor has moved past the end of the month
-                        if (weekCursor.getMonth() !== currentPeriodRange.start.getMonth() && weekCursor > currentPeriodRange.end) break;
-                    }
-
-                } else { // periodType === 'año'
-                    // Labels for each month of the year
-                    for (let i = 0; i < 12; i++) {
-                        labels.push(new Date(currentPeriodRange.start.getFullYear(), i, 1).toLocaleDateString('es-ES', { month: 'short' }));
-                    }
-                    // Aggregate data by month
-                    filteredHistory.forEach(h => {
-                        const monthKey = new Date(h.date).toLocaleDateString('es-ES', { month: 'short' });
-                        aggregationMap.set(monthKey, (aggregationMap.get(monthKey) || 0) + (h.totalTime || 0));
+                    const map = {}; 
+                    history.forEach(h => { 
+                        const k = new Date(h.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }); 
+                        map[k] = (map[k] || 0) + (h.totalTime || 0); 
                     });
-                    data = labels.map(label => Math.floor((aggregationMap.get(label) || 0) / 60));
+                    data = labels.map(l => Math.floor((map[l] || 0) / 60));
+                } else if (period === 'mes') {
+                    // Get 4 weeks ending roughly today
+                    const weeksData = Array.from({ length: 4 }, (_, i) => {
+                        const end = new Date();
+                        end.setDate(end.getDate() - (3 - i) * 7); // Shift end date for each week
+                        end.setHours(23, 59, 59, 999);
+                        const start = new Date(end);
+                        start.setDate(start.getDate() - 6);
+                        start.setHours(0, 0, 0, 0);
+                        return { label: `${start.getDate()}/${start.getMonth() + 1}`, start, end };
+                    });
+                    labels = weeksData.map(w => w.label);
+                    data = weeksData.map(w => Math.floor(history.filter(h => { 
+                        const d = new Date(h.date); 
+                        return d >= w.start && d <= w.end; 
+                    }).reduce((a, h) => a + (h.totalTime || 0), 0) / 60));
+                } else { // Año
+                    labels = Array.from({ length: 12 }, (_, i) => new Date(now.getFullYear(), i, 1).toLocaleDateString('es-ES', { month: 'short' }));
+                    data = Array.from({ length: 12 }, (_, i) => Math.floor(history.filter(h => { 
+                        const d = new Date(h.date); 
+                        return d.getMonth() === i && d.getFullYear() === now.getFullYear(); 
+                    }).reduce((a, h) => a + (h.totalTime || 0), 0) / 60));
                 }
 
-                chartInst.current = new Chart(ctx, {
-                    type: 'bar',
-                    data: { labels, datasets: [{ label: 'Minutos', data, backgroundColor: '#f97316', borderRadius: 8 }] },
-                    options: {
-                        maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b' } },
-                            x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } }
-                        }
-                    }
+                chartInst.current = new Chart(ctx, { 
+                    type: 'bar', 
+                    data: { labels, datasets: [{ label: 'Minutos', data, backgroundColor: '#f97316', borderRadius: 8 }] }, 
+                    options: { 
+                        maintainAspectRatio: false, 
+                        plugins: { legend: { display: false } }, 
+                        scales: { 
+                            y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b' } }, 
+                            x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } } 
+                        } 
+                    } 
                 });
                 return () => chartInst.current?.destroy();
-            }, [history, periodType, periodOffset]); // Re-run effect when history or period changes
+            }, [history, period]);
 
-
-            const getPeriodTitle = () => {
-                const { start, end } = currentPeriodRange;
-                const startFormat = { day: 'numeric', month: 'short' };
-                const endFormat = { day: 'numeric', month: 'short' };
-
-                if (periodType === 'semana') {
-                    // Check if start and end are in the same month
-                    if (start.getMonth() === end.getMonth()) {
-                        return `Semana: ${start.getDate()} - ${end.toLocaleDateString('es-ES', endFormat)}`;
-                    } else {
-                        return `Semana: ${start.toLocaleDateString('es-ES', startFormat)} - ${end.toLocaleDateString('es-ES', endFormat)}`;
-                    }
-                } else if (periodType === 'mes') {
-                    return `Mes: ${start.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}`;
-                } else if (periodType === 'año') {
-                    return `Año: ${start.getFullYear()}`;
-                }
-                return '';
-            };
+            const periodSessions = (() => { 
+                const from = new Date(); 
+                if (period === 'semana') from.setDate(from.getDate() - 6); 
+                else if (period === 'mes') from.setDate(from.getDate() - 27); 
+                else from.setMonth(0, 1); 
+                from.setHours(0, 0, 0, 0); 
+                return history.filter(h => new Date(h.date) >= from); 
+            })();
+            const periodSec = periodSessions.reduce((a, h) => a + (h.totalTime || 0), 0);
 
             return (
                 <div className="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4 pb-28">
@@ -856,42 +755,21 @@
                         <span className="text-[9px] opacity-40 block mb-1 uppercase">Tiempo Total Acumulado</span>
                         <span className="text-3xl font-black text-orange-500">{Math.floor(totalSec / 3600)}h {Math.floor((totalSec % 3600) / 60)}m</span>
                     </div>
-                    
-                    {/* Period Type Buttons */}
                     <div className="flex gap-2">
-                        {['semana', 'mes', 'año'].map(p => (
-                            <button key={p} onClick={() => { setPeriodType(p); setPeriodOffset(0); }}
-                                className={`flex-1 py-3 rounded-xl font-black uppercase text-[10px] transition-all 
-                                            ${periodType === p ? 'bg-orange-500 text-white' : 'bg-white/5 text-slate-400'}`}>
-                                {p}
-                            </button>
+                        {['semana', 'mes', 'año'].map(p => ( 
+                            <button key={p} onClick={() => setPeriod(p)} className={`flex-1 py-3 rounded-xl font-black uppercase text-[10px] transition-all ${period === p ? 'bg-orange-500 text-white' : 'bg-white/5 text-slate-400'}`}> 
+                                {p} 
+                            </button> 
                         ))}
                     </div>
-
-                    {/* Period Navigation */}
-                    <div className="flex items-center justify-between glass-card p-4">
-                        <button onClick={() => setPeriodOffset(prev => prev - 1)}
-                                className="p-2 bg-white/5 text-slate-400 rounded-lg">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
-                        </button>
-                        <span className="text-sm font-black uppercase italic text-orange-400">
-                            {getPeriodTitle()}
-                        </span>
-                        <button onClick={() => setPeriodOffset(prev => prev + 1)}
-                                disabled={periodOffset >= 0} // Disable if on current period
-                                className={`p-2 rounded-lg ${periodOffset >= 0 ? 'bg-white/10 text-slate-600 cursor-not-allowed' : 'bg-white/5 text-slate-400'}`}>
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
-                        </button>
-                    </div>
-
                     <div className="glass-card p-5 flex justify-between items-center">
                         <div className="text-left">
-                            <span className="text-[9px] opacity-40 uppercase block">Tiempo en {periodType === 'semana' ? 'esta semana' : periodType === 'mes' ? 'este mes' : 'este año'}</span>
+                            <span className="text-[9px] opacity-40 uppercase block">Esta {period}</span>
                             <span className="text-2xl font-black text-sky-400">{Math.floor(periodSec / 3600)}h {Math.floor((periodSec % 3600) / 60)}m</span>
                         </div>
                         <div className="text-right">
                             <span className="text-[9px] opacity-40 uppercase block">Sesiones</span>
-                            <span className="text-2xl font-black text-emerald-400">{filteredHistory.length}</span>
+                            <span className="text-2xl font-black text-emerald-400">{periodSessions.length}</span>
                         </div>
                     </div>
                     <div className="glass-card p-4">
