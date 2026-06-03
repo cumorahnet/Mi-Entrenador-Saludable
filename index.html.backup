@@ -12,7 +12,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Removed Babel for production deployment -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
@@ -42,17 +42,16 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
-    <script type="text/babel">
+    <script>
         // --- Core React Hooks ---
         const { useState, useEffect, useRef } = React;
 
-        // --- Icon Components ---
-        const IconPlay    = () => <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>;
-        const IconPause   = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>;
-        // IconRotate, IconBack, IconForward are not used, but kept for completeness
-        const IconRotate  = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M1 4v6h6M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>;
-        const IconBack    = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M10.83 12L15.41 7.41 14 6l-6 6 6 6 1.41-1.41z"/></svg>;
-        const IconForward = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M13.17 12L8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>;
+        // --- Icon Components (converted from JSX to React.createElement) ---
+        const IconPlay    = () => React.createElement('svg', { width: "40", height: "40", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M8 5v14l11-7z" }));
+        const IconPause   = () => React.createElement('svg', { width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M6 19h4V5H6v14zm8-14v14h4V5h-4z" }));
+        const IconRotate  = () => React.createElement('svg', { width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "3" }, React.createElement('path', { d: "M1 4v6h6M3.51 15a9 9 0 1 0 2.13-9.36L1 10" }));
+        const IconBack    = () => React.createElement('svg', { width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M10.83 12L15.41 7.41 14 6l-6 6 6 6 1.41-1.41z" }));
+        const IconForward = () => React.createElement('svg', { width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M13.17 12L8.59 7.41 10 6l6 6-6 6-1.41-1.41z" }));
 
 
         // --- Firebase Initialization ---
@@ -148,7 +147,7 @@
             flushVoice();
         };
 
-        // --- Main App Component ---
+        // --- Main App Component (converted from JSX to React.createElement) ---
         function App() {
             const [user, setUser] = useState(null);
             const [view, setView] = useState('workouts');
@@ -160,7 +159,6 @@
             useEffect(() => {
                 const unsub = auth.onAuthStateChanged(u => {
                     setUser(u && !u.isAnonymous ? u : null);
-                    // Add a small delay for smoother transition, even if auth is fast
                     setTimeout(() => setLoading(false), 500); 
                 });
                 return unsub;
@@ -175,7 +173,6 @@
             }, [user]);
 
             const handleStartWorkout = (w) => {
-                // Pre-warmup for speech synthesis
                 if (window.speechSynthesis) {
                     const silent = new SpeechSynthesisUtterance(' ');
                     silent.volume = 0;
@@ -185,83 +182,82 @@
                 setView('play');
             };
 
-            if (loading) return <div className="h-full w-full flex items-center justify-center bg-slate-950"><div className="animate-spin w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full"/></div>;
-            if (!user) return <AuthView APP_TITLE={APP_TITLE} APP_VERSION={APP_VERSION}/>;
+            if (loading) return React.createElement('div', { className: "h-full w-full flex items-center justify-center bg-slate-950" }, React.createElement('div', { className: "animate-spin w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full" }));
+            if (!user) return React.createElement(AuthView, { APP_TITLE: APP_TITLE, APP_VERSION: APP_VERSION });
 
             return (
-                <div className="h-full w-full flex flex-col bg-slate-950 text-white overflow-hidden">
-                    {view !== 'play' && (
-                        <header className="p-5 flex justify-between items-center bg-slate-900 border-b border-white/5 shrink-0">
-                            <div onClick={() => setView('workouts')} className="cursor-pointer">
-                                <h1 className="text-lg font-black italic uppercase text-orange-500">{APP_TITLE}</h1>
-                                <p className="text-[8px] text-slate-500 font-bold uppercase">{user.email} | V{APP_VERSION}</p>
-                            </div>
-                            <button onClick={() => auth.signOut()} className="p-2 bg-red-500/10 rounded-xl text-red-500 font-bold text-[10px] px-4 uppercase italic">Salir</button>
-                        </header>
-                    )}
-                    <main className="flex-1 relative flex flex-col min-h-0">
-                        {view === 'workouts' && <WorkoutsView workouts={workouts} user={user} onStart={handleStartWorkout} onEdit={w => { setSelectedWorkout(w); setView('create'); }} onCreate={() => { setSelectedWorkout(null); setView('create'); }} />}
-                        {view === 'avance' && <AvanceView history={history} />}
-                        {view === 'create' && <CreateView user={user} workoutToEdit={selectedWorkout} onCancel={() => setView('workouts')} />}
-                        {view === 'play' && <PlayerView workout={selectedWorkout} onExit={() => setView('workouts')} onComplete={(name, time) => { db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid).collection('history').add({ workoutName:name, totalTime:time, date: new Date().toISOString() }); setView('workouts'); }} />}
-                    </main>
-                    {view !== 'play' && (
-                        <nav className="bg-slate-900 border-t border-white/5 p-4 flex justify-around items-center shrink-0">
-                            <button onClick={() => setView('workouts')} className={`flex flex-col items-center text-[9px] font-black ${view==='workouts'?'text-orange-500':'text-slate-500'}`}><span className="text-xl mb-1">🏋️</span>RUTINAS</button>
-                            <button onClick={() => setView('avance')} className={`flex flex-col items-center text-[9px] font-black ${view==='avance'?'text-orange-500':'text-slate-500'}`}><span className="text-xl mb-1">📊</span>AVANCE</button>
-                        </nav>
-                    )}
-                </div>
+                React.createElement('div', { className: "h-full w-full flex flex-col bg-slate-950 text-white overflow-hidden" },
+                    view !== 'play' && (
+                        React.createElement('header', { className: "p-5 flex justify-between items-center bg-slate-900 border-b border-white/5 shrink-0" },
+                            React.createElement('div', { onClick: () => setView('workouts'), className: "cursor-pointer" },
+                                React.createElement('h1', { className: "text-lg font-black italic uppercase text-orange-500" }, APP_TITLE),
+                                React.createElement('p', { className: "text-[8px] text-slate-500 font-bold uppercase" }, user.email, " | V", APP_VERSION)
+                            ),
+                            React.createElement('button', { onClick: () => auth.signOut(), className: "p-2 bg-red-500/10 rounded-xl text-red-500 font-bold text-[10px] px-4 uppercase italic" }, "Salir")
+                        )
+                    ),
+                    React.createElement('main', { className: "flex-1 relative flex flex-col min-h-0" },
+                        view === 'workouts' && React.createElement(WorkoutsView, { workouts: workouts, user: user, onStart: handleStartWorkout, onEdit: w => { setSelectedWorkout(w); setView('create'); }, onCreate: () => { setSelectedWorkout(null); setView('create'); } }),
+                        view === 'avance' && React.createElement(AvanceView, { history: history }),
+                        view === 'create' && React.createElement(CreateView, { user: user, workoutToEdit: selectedWorkout, onCancel: () => setView('workouts') }),
+                        view === 'play' && React.createElement(PlayerView, { workout: selectedWorkout, onExit: () => setView('workouts'), onComplete: (name, time) => { db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid).collection('history').add({ workoutName:name, totalTime:time, date: new Date().toISOString() }); setView('workouts'); } })
+                    ),
+                    view !== 'play' && (
+                        React.createElement('nav', { className: "bg-slate-900 border-t border-white/5 p-4 flex justify-around items-center shrink-0" },
+                            React.createElement('button', { onClick: () => setView('workouts'), className: `flex flex-col items-center text-[9px] font-black ${view==='workouts'?'text-orange-500':'text-slate-500'}` }, React.createElement('span', { className: "text-xl mb-1" }, "🏋️"), "RUTINAS"),
+                            React.createElement('button', { onClick: () => setView('avance'), className: `flex flex-col items-center text-[9px] font-black ${view==='avance'?'text-orange-500':'text-slate-500'}` }, React.createElement('span', { className: "text-xl mb-1" }, "📊"), "AVANCE")
+                        )
+                    )
+                )
             );
         }
 
-        // --- Auth View Component ---
+        // --- Auth View Component (converted from JSX to React.createElement) ---
         function AuthView({APP_TITLE, APP_VERSION}) {
             const [isReg, setIsReg] = useState(false);
             const [email, setEmail] = useState('');
             const [pass, setPass] = useState('');
             const handle = async e => { e.preventDefault(); try { if (isReg) await auth.createUserWithEmailAndPassword(email.trim(), pass); else await auth.signInWithEmailAndPassword(email.trim(), pass); } catch (err) { alert("Error: " + err.message); } };
             return (
-                <div className="h-screen flex flex-col items-center bg-slate-950 p-10 pt-20 text-center">
-                    <div className="text-7xl mb-6">🏃‍♂️</div>
-                    <h1 className="text-4xl font-black italic uppercase text-white">{APP_TITLE}</h1>
-                    <p className="text-[8px] text-slate-600 uppercase mb-8">V {APP_VERSION}</p>
-                    <form onSubmit={handle} className="space-y-4 w-full max-w-sm">
-                        <input type="email" placeholder="EMAIL" className="w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none" value={email} onChange={e=>setEmail(e.target.value)} required />
-                        <input type="password" placeholder="CLAVE" className="w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none" value={pass} onChange={e=>setPass(e.target.value)} required />
-                        <button type="submit" className="w-full bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic">{isReg?'REGISTRARSE':'ENTRAR'}</button>
-                    </form>
-                    <button onClick={()=>setIsReg(!isReg)} className="mt-8 text-slate-500 text-[10px] uppercase font-black">{isReg?'YA TENGO CUENTA':'CREAR CUENTA NUEVA'}</button>
-                </div>
+                React.createElement('div', { className: "h-screen flex flex-col items-center bg-slate-950 p-10 pt-20 text-center" },
+                    React.createElement('div', { className: "text-7xl mb-6" }, "🏃‍♂️"),
+                    React.createElement('h1', { className: "text-4xl font-black italic uppercase text-white" }, APP_TITLE),
+                    React.createElement('p', { className: "text-[8px] text-slate-600 uppercase mb-8" }, "V ", APP_VERSION),
+                    React.createElement('form', { onSubmit: handle, className: "space-y-4 w-full max-w-sm" },
+                        React.createElement('input', { type: "email", placeholder: "EMAIL", className: "w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value: email, onChange: e=>setEmail(e.target.value), required: true }),
+                        React.createElement('input', { type: "password", placeholder: "CLAVE", className: "w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value: pass, onChange: e=>setPass(e.target.value), required: true }),
+                        React.createElement('button', { type: "submit", className: "w-full bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic" }, isReg?'REGISTRARSE':'ENTRAR')
+                    ),
+                    React.createElement('button', { onClick: ()=>setIsReg(!isReg), className: "mt-8 text-slate-500 text-[10px] uppercase font-black" }, isReg?'YA TENGO CUENTA':'CREAR CUENTA NUEVA')
+                )
             );
         }
 
-        // --- Workouts List View Component ---
+        // --- Workouts List View Component (converted from JSX to React.createElement) ---
         function WorkoutsView({ workouts, user, onStart, onEdit, onCreate }) {
             return (
-                <div className="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4 pb-32">
-                    {workouts.length === 0 ? <div className="text-center p-12 opacity-30 italic font-black text-[10px]">Sin rutinas</div> : workouts.map(w => (
-                        <div key={w.id} className="glass-card p-6 flex justify-between items-center shadow-lg">
-                            <div className="flex-1 cursor-pointer" onClick={()=>onStart(w)}><h3 className="font-black uppercase italic text-sm">{w.name}</h3><span className="text-[10px] text-orange-400 font-black uppercase italic">Activa</span></div>
-                            <div className="flex gap-2">
-                                <button onClick={()=>onStart(w)} className="bg-white text-black p-4 rounded-xl"><IconPlay/></button>
-                                <button onClick={()=>onEdit(w)} className="bg-slate-800 p-4 rounded-xl text-[10px] font-black uppercase italic">Edit</button>
-                            </div>
-                        </div>
-                    ))}
-                    <button onClick={onCreate} className="w-full bg-white/5 border border-white/10 py-6 rounded-full font-black uppercase italic">➕ NUEVA RUTINA</button>
-                </div>
+                React.createElement('div', { className: "flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4 pb-32" },
+                    workouts.length === 0 ? React.createElement('div', { className: "text-center p-12 opacity-30 italic font-black text-[10px]" }, "Sin rutinas") : workouts.map(w => (
+                        React.createElement('div', { key: w.id, className: "glass-card p-6 flex justify-between items-center shadow-lg" },
+                            React.createElement('div', { className: "flex-1 cursor-pointer", onClick: ()=>onStart(w) }, React.createElement('h3', { className: "font-black uppercase italic text-sm" }, w.name), React.createElement('span', { className: "text-[10px] text-orange-400 font-black uppercase italic" }, "Activa")),
+                            React.createElement('div', { className: "flex gap-2" },
+                                React.createElement('button', { onClick: ()=>onStart(w), className: "bg-white text-black p-4 rounded-xl" }, React.createElement(IconPlay, null)),
+                                React.createElement('button', { onClick: ()=>onEdit(w), className: "bg-slate-800 p-4 rounded-xl text-[10px] font-black uppercase italic" }, "Edit")
+                            )
+                        )
+                    )),
+                    React.createElement('button', { onClick: onCreate, className: "w-full bg-white/5 border border-white/10 py-6 rounded-full font-black uppercase italic" }, "➕ NUEVA RUTINA")
+                )
             );
         }
 
-        // --- Create/Edit Workout View Component ---
+        // --- Create/Edit Workout View Component (converted from JSX to React.createElement) ---
         function CreateView({ user, workoutToEdit, onCancel }) {
-            // Deep merge default parameters with existing workoutToEdit phases
             const initialPhases = workoutToEdit?.phases
                 ? {
-                    ...DEFAULT_PARAMS, // Start with all defaults
-                    ...workoutToEdit.phases, // Override top-level keys
-                    entrenamiento: { // Deep merge for 'entrenamiento'
+                    ...DEFAULT_PARAMS, 
+                    ...workoutToEdit.phases, 
+                    entrenamiento: { 
                         ...DEFAULT_PARAMS.entrenamiento,
                         ...(workoutToEdit.phases.entrenamiento || {})
                     }
@@ -280,7 +276,6 @@
                 try {
                     const col = db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid).collection('workouts');
                     
-                    // Ensure all fields are present for saving, even if not explicitly touched by user
                     const dataToSave = { 
                         name: name.toUpperCase(), 
                         phases: {
@@ -322,48 +317,44 @@
             ];
 
             return (
-                <div className="flex-1 flex flex-col bg-slate-950 overflow-hidden text-center italic">
-                    <header className="p-6 flex items-center border-b border-white/5 shrink-0">
-                        <button onClick={onCancel} className="p-3 bg-slate-900 rounded-2xl shadow-lg text-white">⬅</button>
-                        <h2 className="text-xl font-black uppercase flex-1">Configurar</h2>
-                    </header>
-                    <div className="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-6 pb-28">
-                        <input type="text" placeholder="NOMBRE DE LA RUTINA" className="w-full p-6 bg-slate-900 border border-white/10 rounded-[2rem] font-black uppercase text-center text-white outline-none" value={name} onChange={e=>setName(e.target.value)} />
+                React.createElement('div', { className: "flex-1 flex flex-col bg-slate-950 overflow-hidden text-center italic" },
+                    React.createElement('header', { className: "p-6 flex items-center border-b border-white/5 shrink-0" },
+                        React.createElement('button', { onClick: onCancel, className: "p-3 bg-slate-900 rounded-2xl shadow-lg text-white" }, "⬅"),
+                        React.createElement('h2', { className: "text-xl font-black uppercase flex-1" }, "Configurar")
+                    ),
+                    React.createElement('div', { className: "flex-1 overflow-y-auto scrollbar-hide p-4 space-y-6 pb-28" },
+                        React.createElement('input', { type: "text", placeholder: "NOMBRE DE LA RUTINA", className: "w-full p-6 bg-slate-900 border border-white/10 rounded-[2rem] font-black uppercase text-center text-white outline-none", value: name, onChange: e=>setName(e.target.value) }),
                         
-                        <div className="glass-card p-6 space-y-4">
-                            <span className="font-black uppercase text-xs text-orange-500 border-b border-white/5 block pb-2">Entrenamiento</span>
-                            <div className="grid grid-cols-2 gap-4">
-                                {ENT_FIELDS.map(({f,label}) => <InputField key={f} label={label} val={(phases.entrenamiento?.[f] ?? DEFAULT_PARAMS.entrenamiento[f])} set={v=>update('entrenamiento',f,v)} />)}
-                            </div>
-                        </div>
+                        React.createElement('div', { className: "glass-card p-6 space-y-4" },
+                            React.createElement('span', { className: "font-black uppercase text-xs text-orange-500 border-b border-white/5 block pb-2" }, "Entrenamiento"),
+                            React.createElement('div', { className: "grid grid-cols-2 gap-4" }, ENT_FIELDS.map(({f,label}) => React.createElement(InputField, { key: f, label: label, val: (phases.entrenamiento?.[f] ?? DEFAULT_PARAMS.entrenamiento[f]), set: v=>update('entrenamiento',f,v) })))
+                        ),
 
-                        <div className="glass-card p-6 space-y-4">
-                            <span className="font-black uppercase text-xs text-orange-500 border-b border-white/5 block pb-2">Estiramientos</span>
-                            <div className="grid grid-cols-2 gap-4">
-                                {STRETCH_FIELDS.map(({f,label}) => <InputField key={f} label={label} val={(phases.entrenamiento?.[f] ?? DEFAULT_PARAMS.entrenamiento[f])} set={v=>update('entrenamiento',f,v)} />)}
-                            </div>
-                        </div>
-                    </div>
-                    <div className="p-6 bg-slate-950 border-t border-white/5 shrink-0">
-                        <button onClick={save} className="w-full bg-white text-black py-6 rounded-full font-black uppercase" disabled={saving}>
-                            {saving ? 'GUARDANDO...' : 'GUARDAR'}
-                        </button>
-                    </div>
-                </div>
+                        React.createElement('div', { className: "glass-card p-6 space-y-4" },
+                            React.createElement('span', { className: "font-black uppercase text-xs text-orange-500 border-b border-white/5 block pb-2" }, "Estiramientos"),
+                            React.createElement('div', { className: "grid grid-cols-2 gap-4" }, STRETCH_FIELDS.map(({f,label}) => React.createElement(InputField, { key: f, label: label, val: (phases.entrenamiento?.[f] ?? DEFAULT_PARAMS.entrenamiento[f]), set: v=>update('entrenamiento',f,v) })))
+                        )
+                    ),
+                    React.createElement('div', { className: "p-6 bg-slate-950 border-t border-white/5 shrink-0" },
+                        React.createElement('button', { onClick: save, className: "w-full bg-white text-black py-6 rounded-full font-black uppercase", disabled: saving },
+                            saving ? 'GUARDANDO...' : 'GUARDAR'
+                        )
+                    )
+                )
             );
         }
 
-        // --- Generic Input Field Component ---
+        // --- Generic Input Field Component (converted from JSX to React.createElement) ---
         function InputField({ label, val, set }) { 
             return ( 
-                <div className="flex flex-col items-center"> 
-                    <span className="text-[8px] opacity-40 mb-2 uppercase">{label}</span> 
-                    <input type="number" className="w-full bg-slate-800/40 p-4 rounded-xl text-center font-black text-white border border-white/5 outline-none" value={val} onChange={e=>set(e.target.value)} /> 
-                </div> 
+                React.createElement('div', { className: "flex flex-col items-center" }, 
+                    React.createElement('span', { className: "text-[8px] opacity-40 mb-2 uppercase" }, label), 
+                    React.createElement('input', { type: "number", className: "w-full bg-slate-800/40 p-4 rounded-xl text-center font-black text-white border border-white/5 outline-none", value: val, onChange: e=>set(e.target.value) })
+                ) 
             ); 
         }
 
-        // --- Workout Player View Component ---
+        // --- Workout Player View Component (converted from JSX to React.createElement) ---
         function PlayerView({ workout, onExit, onComplete }) {
             const [status, setStatus] = useState('ready'); 
             const [idx, setIdx] = useState(0);
@@ -372,22 +363,20 @@
             const [steps, setSteps] = useState([]);
             const [wasPausedByHide, setWasPausedByHide] = useState(false);
 
-            const spokenInitialForStep = useRef({}); // To track if initial voice for current step has been spoken
-            const lastSpokenKey = useRef(''); // To prevent duplicate countdown/midpoint speech within a short interval
+            const spokenInitialForStep = useRef({}); 
+            const lastSpokenKey = useRef(''); 
             const savedRef = useRef(false);
             const wakeLockRef = useRef(null);
-            const videoRef = useRef(null); // Used for wake lock workaround
-            const startRef = useRef(null); // Total elapsed time tracking
-            const stepStartRef = useRef(null); // Time tracking for current step
-            const stepDurRef = useRef(0); // Duration of current step
+            const videoRef = useRef(null); 
+            const startRef = useRef(null); 
+            const stepStartRef = useRef(null); 
+            const stepDurRef = useRef(0); 
 
             // --- Wake Lock Management ---
             const requestStayAwake = async () => {
-                // Workaround for iOS/some browsers: play a silent video
                 if (videoRef.current && status === 'running') {
                     videoRef.current.play().catch(()=>{});
                 }
-                // Request Screen Wake Lock API
                 try { 
                     if ('wakeLock' in navigator && !wakeLockRef.current) {
                         wakeLockRef.current = await navigator.wakeLock.request('screen'); 
@@ -402,7 +391,6 @@
                 }
             };
 
-            // Handle visibility change to pause/resume workout and wake lock
             useEffect(() => {
                 const handleVisibilityChange = () => {
                     if (document.hidden) { 
@@ -410,7 +398,6 @@
                         releaseStayAwake(); 
                     } else { 
                         if ('wakeLock' in navigator) requestStayAwake(); 
-                        // If it was paused by hide, unpause it
                         if (wasPausedByHide) { setStatus('running'); setWasPausedByHide(false); }
                     }
                 };
@@ -418,10 +405,9 @@
                 return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
             }, [status, wasPausedByHide]);
 
-            // Request/release wake lock based on status
             useEffect(() => {
                 if (status === 'running') requestStayAwake(); else releaseStayAwake();
-                return () => releaseStayAwake(); // Cleanup on unmount or status change
+                return () => releaseStayAwake(); 
             }, [status]);
 
             // --- Step Generation ---
@@ -433,7 +419,6 @@
                 };
                 const s = [];
 
-                // 1. Inicio - Prepárate
                 s.push({ 
                     label:'PREPÁRATE', seconds:15, color:'bg-yellow-400', phase:'inicio',
                     voiceInitial: 'Prepárate para el calentamiento',
@@ -441,7 +426,6 @@
                     voiceCountdown: true
                 });
 
-                // 2. Calentamiento
                 WARMUP_STEPS.forEach((ws, i) => {
                     s.push({ 
                         label: ws.label, seconds: 30, color: 'bg-yellow-400', phase: 'calentamiento',
@@ -465,7 +449,6 @@
                     voiceCountdown: true
                 });
 
-                // 3. Entrenamiento por ciclos y zonas
                 for (let cy = 1; cy <= ent.cycles; cy++) {
                     TRAINING_ZONES.forEach((zone, zi) => {
                         for (let r = 1; r <= ent.rounds; r++) {
@@ -505,7 +488,6 @@
                     }
                 }
                 
-                // 4. Estiramientos
                 s.push({ 
                     label:'DESCANSO', seconds:30, color:'bg-blue-200', phase:'pre-stretches',
                     voiceInitial: 'Descanso. Prepárate para los estiramientos',
@@ -537,26 +519,23 @@
 
             // --- Centralized Speech Handler ---
             const handleSpeech = (step, remaining) => {
-                if (!step || status !== 'running') return; // Only speak if running
+                if (!step || status !== 'running') return; 
 
                 const stepInitialKey = `${idx}_initial`;
 
-                // Initial announcement for the step (spoken once when remaining time is full duration)
                 if (remaining === step.seconds && step.voiceInitial && !spokenInitialForStep.current[stepInitialKey]) {
-                    speak(step.voiceInitial, true); // Interrupt previous speech and announce new step
+                    speak(step.voiceInitial, true); 
                     if (step.whistleOnStart) whistle();
-                    if ('vibrate' in navigator) navigator.vibrate(150); // Vibrate at start of step
-                    spokenInitialForStep.current[stepInitialKey] = true; // Mark as spoken for this step
+                    if ('vibrate' in navigator) navigator.vibrate(150); 
+                    spokenInitialForStep.current[stepInitialKey] = true; 
                 }
 
-                // Midpoint announcements
                 const vKeyMidpoint = `${idx}_midpoint_${remaining}`;
                 if (step.voiceMidpoint && remaining === step.voiceMidpoint.time && lastSpokenKey.current !== vKeyMidpoint) {
                     speak(step.voiceMidpoint.text);
                     lastSpokenKey.current = vKeyMidpoint;
                 }
 
-                // Countdown (only for last 3 seconds)
                 const vKeyCountdown = `${idx}_countdown_${remaining}`;
                 if (step.voiceCountdown && remaining > 0 && remaining <= 3 && lastSpokenKey.current !== vKeyCountdown) {
                     speak(String(remaining));
@@ -567,7 +546,6 @@
             // --- Toggle Play/Pause ---
             const togglePlay = () => {
                 if (status === 'ready') {
-                    // When starting from 'ready', clear any previous spoken flags
                     spokenInitialForStep.current = {};
                     setStatus('running');
                 } else {
@@ -578,7 +556,7 @@
 
             // --- Skip Current Step ---
             const skipStep = () => {
-                if (status === 'finished') return; // Cannot skip if finished
+                if (status === 'finished') return; 
 
                 if (idx < steps.length - 1) {
                     const n = idx + 1;
@@ -586,11 +564,10 @@
                     setTimeLeft(steps[n].seconds);
                     stepDurRef.current = steps[n].seconds;
                     stepStartRef.current = Date.now();
-                    lastSpokenKey.current = ''; // Reset for new step
-                    spokenInitialForStep.current = {}; // Reset spoken flags for new step
-                    speak('Saltando ejercicio, siguiente.', true); // Announce skip
+                    lastSpokenKey.current = ''; 
+                    spokenInitialForStep.current = {}; 
+                    speak('Saltando ejercicio, siguiente.', true); 
                 } else {
-                    // If it's the last step, end the workout
                     endWorkout();
                 }
             };
@@ -600,7 +577,7 @@
                 setStatus('finished');
                 speak('Entrenamiento finalizado. ¡Buen trabajo!', true);
                 if (!savedRef.current) {
-                    onComplete(workout.name, elapsed); // Save current elapsed time
+                    onComplete(workout.name, elapsed); 
                     savedRef.current = true;
                 }
             };
@@ -623,17 +600,16 @@
 
                         if (remaining > 0) {
                             setTimeLeft(remaining);
-                            handleSpeech(steps[idx], remaining); // Centralized speech handler
+                            handleSpeech(steps[idx], remaining); 
                         } else {
-                            // Move to next step or finish
                             if (idx < steps.length - 1) {
                                 const n = idx + 1; 
                                 setIdx(n); 
                                 setTimeLeft(steps[n].seconds);
                                 stepDurRef.current = steps[n].seconds; 
                                 stepStartRef.current = Date.now(); 
-                                lastSpokenKey.current = ''; // Reset for new step
-                                spokenInitialForStep.current = {}; // Reset for new step
+                                lastSpokenKey.current = ''; 
+                                spokenInitialForStep.current = {}; 
                             } else {
                                 setStatus('finished'); 
                                 speak('¡Excelente trabajo! Rutina completada.');
@@ -643,81 +619,79 @@
                                 }
                             }
                         }
-                    }, 250); // Update every 250ms for smoother countdown
+                    }, 250); 
                 } else { 
                     startRef.current = null; 
                     stepStartRef.current = null; 
                 }
                 return () => clearInterval(interval);
-            }, [status, idx, steps, timeLeft, elapsed, workout, onComplete]); // Added workout and onComplete to deps
+            }, [status, idx, steps, timeLeft, elapsed, workout, onComplete]); 
 
-            // --- Render Logic ---
+            // --- Render Logic (converted from JSX to React.createElement) ---
             if (status === 'finished') return (
-                <div className="h-screen flex flex-col items-center justify-center p-8 bg-slate-950 text-white text-center">
-                    <h1 className="text-5xl font-black italic mb-4">¡HECHO!</h1>
-                    <button onClick={onExit} className="w-full max-w-sm bg-white text-black py-6 rounded-full font-black uppercase">Finalizar</button>
-                </div>
+                React.createElement('div', { className: "h-screen flex flex-col items-center justify-center p-8 bg-slate-950 text-white text-center" },
+                    React.createElement('h1', { className: "text-5xl font-black italic mb-4" }, "¡HECHO!"),
+                    React.createElement('button', { onClick: onExit, className: "w-full max-w-sm bg-white text-black py-6 rounded-full font-black uppercase" }, "Finalizar")
+                )
             );
 
             const curr = steps[idx];
             return (
-                <div className={`h-screen flex flex-col transition-colors duration-700 ${curr?.color || 'bg-slate-950'} text-white`}>
-                    {/* Silent video for iOS wake lock workaround */}
-                    <video ref={videoRef} loop muted playsInline style={{position:'absolute',width:'1px',height:'1px',opacity:0.01}}><source src="https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/one-second-loop.mp4" type="video/mp4"/></video>
+                React.createElement('div', { className: `h-screen flex flex-col transition-colors duration-700 ${curr?.color || 'bg-slate-950'} text-white` },
+                    React.createElement('video', { ref: videoRef, loop: true, muted: true, playsInline: true, style: {position:'absolute',width:'1px',height:'1px',opacity:0.01} }, React.createElement('source', { src: "https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/one-second-loop.mp4", type: "video/mp4" })),
                     
-                    <div className="bg-black/10 p-4 pt-10 flex justify-between items-center shrink-0 z-10">
-                        <div className="leading-none text-left">
-                            <span className="text-[10px] font-black text-orange-500 uppercase">Tiempo Total</span>
-                            <p className="text-xl font-black italic">{formatTime(elapsed)}</p>
-                        </div>
-                        <div className="text-center">
-                            <h2 className="text-[10px] font-black uppercase italic truncate max-w-[120px] tracking-tight">{workout?.name || 'Rutina'}</h2>
-                        </div>
-                        <button onClick={onExit} className="opacity-40 text-xl font-black px-2">✕</button>
-                    </div>
+                    React.createElement('div', { className: "bg-black/10 p-4 pt-10 flex justify-between items-center shrink-0 z-10" },
+                        React.createElement('div', { className: "leading-none text-left" },
+                            React.createElement('span', { className: "text-[10px] font-black text-orange-500 uppercase" }, "Tiempo Total"),
+                            React.createElement('p', { className: "text-xl font-black italic" }, formatTime(elapsed))
+                        ),
+                        React.createElement('div', { className: "text-center" },
+                            React.createElement('h2', { className: "text-[10px] font-black uppercase italic truncate max-w-[120px] tracking-tight" }, workout?.name || 'Rutina')
+                        ),
+                        React.createElement('button', { onClick: onExit, className: "opacity-40 text-xl font-black px-2" }, "✕")
+                    ),
 
-                    <div className="flex-1 flex flex-col items-center justify-center text-center px-4 min-h-0 relative">
-                        {status === 'ready' || (wasPausedByHide && status === 'paused') ? (
-                            <div className="absolute inset-0 z-40 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center">
-                                <button onClick={togglePlay} className="bg-orange-500 p-10 rounded-full shadow-2xl active:scale-90"><IconPlay/></button>
-                            </div>
-                        ) : null}
-                        <h2 className="text-[11vw] font-black uppercase italic text-white/80 leading-none mb-2">{curr?.label || 'LISTO'}</h2>
-                        <div className="timer-huge tabular-nums text-white">{timeLeft}</div>
-                    </div>
+                    React.createElement('div', { className: "flex-1 flex flex-col items-center justify-center text-center px-4 min-h-0 relative" },
+                        (status === 'ready' || (wasPausedByHide && status === 'paused')) && (
+                            React.createElement('div', { className: "absolute inset-0 z-40 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center" },
+                                React.createElement('button', { onClick: togglePlay, className: "bg-orange-500 p-10 rounded-full shadow-2xl active:scale-90" }, React.createElement(IconPlay, null))
+                            )
+                        ),
+                        React.createElement('h2', { className: "text-[11vw] font-black uppercase italic text-white/80 leading-none mb-2" }, curr?.label || 'LISTO'),
+                        React.createElement('div', { className: "timer-huge tabular-nums text-white" }, timeLeft)
+                    ),
 
-                    <div className="bg-slate-950 p-6 pb-10 flex flex-col items-center shrink-0">
-                        <div className="w-full max-w-md grid grid-cols-3 items-center mb-6 text-center italic">
-                            <button onClick={skipStep} className="bg-slate-800/40 py-4 rounded-xl text-[10px] font-black uppercase text-white/70 active:scale-95">Saltar</button>
-                            <div className="flex justify-center">
-                                {/* ELIMINADO: El botón de Play/Pause solo se muestra si el estado NO es 'ready' */}
-                                {status !== 'ready' && (
-                                    <button onClick={togglePlay} className="w-20 h-20 rounded-full border-4 border-yellow-400 flex items-center justify-center active:scale-90">
-                                        {status === 'running' ? <IconPause/> : <IconPlay/>}
-                                    </button>
-                                )}
-                            </div>
-                            <button onClick={endWorkout} className="bg-red-500/20 py-4 rounded-xl text-[10px] font-black uppercase text-red-400 active:scale-95">Finalizar</button>
-                        </div>
-                        <div className="w-full max-w-md grid grid-cols-2 items-center text-center italic">
-                             <div className="flex flex-col">
-                                <span className="text-[14vw] font-black text-sky-400 leading-none">{curr?.tr ? curr.tr - (curr.r||0) + 1 : '-'}</span>
-                                <span className="text-[8px] opacity-40">Rondas Restantes</span>
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-[14vw] font-black text-yellow-400 leading-none">{curr?.tc ? curr.tc - (curr.cy||0) + 1 : '-'}</span>
-                                <span className="text-[8px] opacity-40">Ciclos Restantes</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                    React.createElement('div', { className: "bg-slate-950 p-6 pb-10 flex flex-col items-center shrink-0" },
+                        React.createElement('div', { className: "w-full max-w-md grid grid-cols-3 items-center mb-6 text-center italic" },
+                            React.createElement('button', { onClick: skipStep, className: "bg-slate-800/40 py-4 rounded-xl text-[10px] font-black uppercase text-white/70 active:scale-95" }, "Saltar"),
+                            React.createElement('div', { className: "flex justify-center" },
+                                status !== 'ready' && ( // Only show if not in 'ready' state (big play button is visible)
+                                    React.createElement('button', { onClick: togglePlay, className: "w-20 h-20 rounded-full border-4 border-yellow-400 flex items-center justify-center active:scale-90" },
+                                        status === 'running' ? React.createElement(IconPause, null) : React.createElement(IconPlay, null)
+                                    )
+                                )
+                            ),
+                            React.createElement('button', { onClick: endWorkout, className: "bg-red-500/20 py-4 rounded-xl text-[10px] font-black uppercase text-red-400 active:scale-95" }, "Finalizar")
+                        ),
+                        React.createElement('div', { className: "w-full max-w-md grid grid-cols-2 items-center text-center italic" },
+                             React.createElement('div', { className: "flex flex-col" },
+                                React.createElement('span', { className: "text-[14vw] font-black text-sky-400 leading-none" }, curr?.tr ? curr.tr - (curr.r||0) + 1 : '-'),
+                                React.createElement('span', { className: "text-[8px] opacity-40" }, "Rondas Restantes")
+                            ),
+                            React.createElement('div', { className: "flex flex-col" },
+                                React.createElement('span', { className: "text-[14vw] font-black text-yellow-400 leading-none" }, curr?.tc ? curr.tc - (curr.cy||0) + 1 : '-'),
+                                React.createElement('span', { className: "text-[8px] opacity-40" }, "Ciclos Restantes")
+                            )
+                        )
+                    )
+                )
             );
         }
 
-        // --- Avance/History View Component ---
+        // --- Avance/History View Component (converted from JSX to React.createElement) ---
         function AvanceView({ history }) {
-            const [periodType, setPeriodType] = useState('semana'); // 'semana', 'mes', 'año'
-            const [periodOffset, setPeriodOffset] = useState(0); // 0: actual, -1: anterior, etc.
+            const [periodType, setPeriodType] = useState('semana'); 
+            const [periodOffset, setPeriodOffset] = useState(0); 
 
             const chartRef = useRef(null);
             const chartInst = useRef(null);
@@ -736,29 +710,24 @@
                 return d;
             };
 
-            // Returns { start: Date, end: Date } for a week (Monday-Sunday)
             const getWeekRange = (date, offset = 0) => {
                 const d = startOfDay(date);
-                d.setDate(d.getDate() + offset * 7); // Apply week offset
-                const day = d.getDay(); // 0 for Sunday, 1 for Monday, ..., 6 for Saturday
-                // Calculate the difference to get to Monday (if day is Sunday, it's 6 days back for previous week Monday).
-                // Otherwise, it's (day - 1) days back to this week's Monday.
+                d.setDate(d.getDate() + offset * 7); 
+                const day = d.getDay(); 
                 const diff = d.getDate() - day + (day === 0 ? -6 : 1); 
                 const start = startOfDay(new Date(d.setDate(diff)));
                 const end = endOfDay(new Date(d.setDate(diff + 6)));
                 return { start, end };
             };
 
-            // Returns { start: Date, end: Date } for a month
             const getMonthRange = (date, offset = 0) => {
                 const d = startOfDay(date);
                 d.setMonth(d.getMonth() + offset);
                 const start = startOfDay(new Date(d.getFullYear(), d.getMonth(), 1));
-                const end = endOfDay(new Date(d.getFullYear(), d.getMonth() + 1, 0)); // Last day of month
+                const end = endOfDay(new Date(d.getFullYear(), d.getMonth() + 1, 0)); 
                 return { start, end };
             };
 
-            // Returns { start: Date, end: Date } for a year
             const getYearRange = (date, offset = 0) => {
                 const d = startOfDay(date);
                 d.setFullYear(d.getFullYear() + offset);
@@ -768,17 +737,14 @@
             };
             // --- End Helper Functions ---
 
-
-            // Calculate current period range based on type and offset
             const currentPeriodRange = (() => {
                 const today = new Date();
                 if (periodType === 'semana') return getWeekRange(today, periodOffset);
                 if (periodType === 'mes') return getMonthRange(today, periodOffset);
                 if (periodType === 'año') return getYearRange(today, periodOffset);
-                return { start: new Date(0), end: new Date() }; // Default empty range
+                return { start: new Date(0), end: new Date() }; 
             })();
 
-            // Filter history for the current selected period
             const filteredHistory = history.filter(h => {
                 const hDate = new Date(h.date);
                 return hDate >= currentPeriodRange.start && hDate <= currentPeriodRange.end;
@@ -794,14 +760,12 @@
 
                 let labels = [];
                 let data = [];
-                const aggregationMap = new Map(); // Key: label, Value: totalTime (seconds)
+                const aggregationMap = new Map(); 
 
                 if (periodType === 'semana') {
-                    // Labels for each day of the week
                     for (let d = new Date(currentPeriodRange.start); d <= currentPeriodRange.end; d.setDate(d.getDate() + 1)) {
                         labels.push(d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }));
                     }
-                    // Aggregate data by day
                     filteredHistory.forEach(h => {
                         const dateKey = new Date(h.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' });
                         aggregationMap.set(dateKey, (aggregationMap.get(dateKey) || 0) + (h.totalTime || 0));
@@ -811,7 +775,6 @@
                 } else if (periodType === 'mes') {
                     labels = []; data = [];
                     let weekCursor = new Date(currentPeriodRange.start);
-                    // Ensure weekCursor starts on Monday of the first week that touches the month
                     weekCursor = startOfDay(new Date(weekCursor.setDate(weekCursor.getDate() - (weekCursor.getDay() === 0 ? 6 : weekCursor.getDay() - 1))));
 
                     let currentWeekNumber = 1;
@@ -834,20 +797,17 @@
                                 }
                             });
                             data.push(Math.floor(weekTotalTime / 60));
-                            currentWeekNumber++; // Increment week number only if it's an "effective" week
+                            currentWeekNumber++; 
                         }
                         
                         weekCursor.setDate(weekCursor.getDate() + 7);
-                        // Stop if the week cursor has moved past the end of the month
                         if (weekCursor.getMonth() !== currentPeriodRange.start.getMonth() && weekCursor > currentPeriodRange.end) break;
                     }
 
-                } else { // periodType === 'año'
-                    // Labels for each month of the year
+                } else { 
                     for (let i = 0; i < 12; i++) {
                         labels.push(new Date(currentPeriodRange.start.getFullYear(), i, 1).toLocaleDateString('es-ES', { month: 'short' }));
                     }
-                    // Aggregate data by month
                     filteredHistory.forEach(h => {
                         const monthKey = new Date(h.date).toLocaleDateString('es-ES', { month: 'short' });
                         aggregationMap.set(monthKey, (aggregationMap.get(monthKey) || 0) + (h.totalTime || 0));
@@ -868,7 +828,7 @@
                     }
                 });
                 return () => chartInst.current?.destroy();
-            }, [history, periodType, periodOffset]); // Re-run effect when history or period changes
+            }, [history, periodType, periodOffset]); 
 
 
             const getPeriodTitle = () => {
@@ -877,7 +837,6 @@
                 const endFormat = { day: 'numeric', month: 'short' };
 
                 if (periodType === 'semana') {
-                    // Check if start and end are in the same month
                     if (start.getMonth() === end.getMonth()) {
                         return `Semana: ${start.getDate()} - ${end.toLocaleDateString('es-ES', endFormat)}`;
                     } else {
@@ -892,60 +851,58 @@
             };
 
             return (
-                <div className="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4 pb-28">
-                    <div className="glass-card p-6 text-center">
-                        <span className="text-[9px] opacity-40 block mb-1 uppercase">Tiempo Total Acumulado</span>
-                        <span className="text-3xl font-black text-orange-500">{Math.floor(totalSec / 3600)}h {Math.floor((totalSec % 3600) / 60)}m</span>
-                    </div>
+                React.createElement('div', { className: "flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4 pb-28" },
+                    React.createElement('div', { className: "glass-card p-6 text-center" },
+                        React.createElement('span', { className: "text-[9px] opacity-40 block mb-1 uppercase" }, "Tiempo Total Acumulado"),
+                        React.createElement('span', { className: "text-3xl font-black text-orange-500" }, Math.floor(totalSec / 3600), "h ", Math.floor((totalSec % 3600) / 60), "m")
+                    ),
                     
-                    {/* Period Type Buttons */}
-                    <div className="flex gap-2">
-                        {['semana', 'mes', 'año'].map(p => (
-                            <button key={p} onClick={() => { setPeriodType(p); setPeriodOffset(0); }}
-                                className={`flex-1 py-3 rounded-xl font-black uppercase text-[10px] transition-all 
-                                            ${periodType === p ? 'bg-orange-500 text-white' : 'bg-white/5 text-slate-400'}`}>
-                                {p}
-                            </button>
-                        ))}
-                    </div>
+                    React.createElement('div', { className: "flex gap-2" },
+                        ['semana', 'mes', 'año'].map(p => (
+                            React.createElement('button', { key: p, onClick: () => { setPeriodType(p); setPeriodOffset(0); },
+                                className: `flex-1 py-3 rounded-xl font-black uppercase text-[10px] transition-all 
+                                            ${periodType === p ? 'bg-orange-500 text-white' : 'bg-white/5 text-slate-400'}` },
+                                p
+                            )
+                        ))
+                    ),
 
-                    {/* Period Navigation */}
-                    <div className="flex items-center justify-between glass-card p-4">
-                        <button onClick={() => setPeriodOffset(prev => prev - 1)}
-                                className="p-2 bg-white/5 text-slate-400 rounded-lg">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
-                        </button>
-                        <span className="text-sm font-black uppercase italic text-orange-400">
-                            {getPeriodTitle()}
-                        </span>
-                        <button onClick={() => setPeriodOffset(prev => prev + 1)}
-                                disabled={periodOffset >= 0} // Disable if on current period
-                                className={`p-2 rounded-lg ${periodOffset >= 0 ? 'bg-white/10 text-slate-600 cursor-not-allowed' : 'bg-white/5 text-slate-400'}`}>
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
-                        </button>
-                    </div>
+                    React.createElement('div', { className: "flex items-center justify-between glass-card p-4" },
+                        React.createElement('button', { onClick: () => setPeriodOffset(prev => prev - 1),
+                                className: "p-2 bg-white/5 text-slate-400 rounded-lg" },
+                            React.createElement('svg', { width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" }))
+                        ),
+                        React.createElement('span', { className: "text-sm font-black uppercase italic text-orange-400" },
+                            getPeriodTitle()
+                        ),
+                        React.createElement('button', { onClick: () => setPeriodOffset(prev => prev + 1),
+                                disabled: periodOffset >= 0, 
+                                className: `p-2 rounded-lg ${periodOffset >= 0 ? 'bg-white/10 text-slate-600 cursor-not-allowed' : 'bg-white/5 text-slate-400'}` },
+                            React.createElement('svg', { width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" }))
+                        )
+                    ),
 
-                    <div className="glass-card p-5 flex justify-between items-center">
-                        <div className="text-left">
-                            <span className="text-[9px] opacity-40 uppercase block">Tiempo en {periodType === 'semana' ? 'esta semana' : periodType === 'mes' ? 'este mes' : 'este año'}</span>
-                            <span className="text-2xl font-black text-sky-400">{Math.floor(periodSec / 3600)}h {Math.floor((periodSec % 3600) / 60)}m</span>
-                        </div>
-                        <div className="text-right">
-                            <span className="text-[9px] opacity-40 uppercase block">Sesiones</span>
-                            <span className="text-2xl font-black text-emerald-400">{filteredHistory.length}</span>
-                        </div>
-                    </div>
-                    <div className="glass-card p-4">
-                        <div style={{ height: '200px' }}>
-                            <canvas ref={chartRef} />
-                        </div>
-                    </div>
-                </div>
+                    React.createElement('div', { className: "glass-card p-5 flex justify-between items-center" },
+                        React.createElement('div', { className: "text-left" },
+                            React.createElement('span', { className: "text-[9px] opacity-40 uppercase block" }, "Tiempo en ", periodType === 'semana' ? 'esta semana' : periodType === 'mes' ? 'este mes' : 'este año'),
+                            React.createElement('span', { className: "text-2xl font-black text-sky-400" }, Math.floor(periodSec / 3600), "h ", Math.floor((periodSec % 3600) / 60), "m")
+                        ),
+                        React.createElement('div', { className: "text-right" },
+                            React.createElement('span', { className: "text-[9px] opacity-40 uppercase block" }, "Sesiones"),
+                            React.createElement('span', { className: "text-2xl font-black text-emerald-400" }, filteredHistory.length)
+                        )
+                    ),
+                    React.createElement('div', { className: "glass-card p-4" },
+                        React.createElement('div', { style: { height: '200px' } },
+                            React.createElement('canvas', { ref: chartRef })
+                        )
+                    )
+                )
             );
         }
 
         // --- Render Root Component ---
-        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+        ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App, null));
     </script>
 </body>
 </html>
