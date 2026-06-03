@@ -51,8 +51,9 @@
         const IconPause   = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>;
         // IconRotate, IconBack, IconForward are not used, but kept for completeness
         const IconRotate  = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M1 4v6h6M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>;
-        const IconBack    = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>;
-        const IconForward = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6zM16 6v12h2V6z"/></svg>;
+        const IconBack    = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M10.83 12L15.41 7.41 14 6l-6 6 6 6 1.41-1.41z"/></svg>;
+        const IconForward = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M13.17 12L8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>;
+
 
         // --- Firebase Initialization ---
         const firebaseConfig = {
@@ -143,7 +144,7 @@
         const speak = (text, interrupt = false, onEnd = null) => {
             if (!window.speechSynthesis) return;
             if (interrupt) { window.speechSynthesis.cancel(); voiceQueue.length = 0; voiceBusy = false; }
-            voiceQueue.push(onEnd ? { text, onEnd } : text); 
+            if (text) voiceQueue.push(onEnd ? { text, onEnd } : text); 
             flushVoice();
         };
 
@@ -371,14 +372,14 @@
             const [steps, setSteps] = useState([]);
             const [wasPausedByHide, setWasPausedByHide] = useState(false);
 
-            const lastSpokenKey = useRef('');
+            const spokenInitialForStep = useRef({}); // To track if initial voice for current step has been spoken
+            const lastSpokenKey = useRef(''); // To prevent duplicate countdown/midpoint speech within a short interval
             const savedRef = useRef(false);
             const wakeLockRef = useRef(null);
             const videoRef = useRef(null); // Used for wake lock workaround
             const startRef = useRef(null); // Total elapsed time tracking
             const stepStartRef = useRef(null); // Time tracking for current step
             const stepDurRef = useRef(0); // Duration of current step
-            const firstPlayDone = useRef(false); // Flag for initial "Prepárate" announcement
 
             // --- Wake Lock Management ---
             const requestStayAwake = async () => {
@@ -536,42 +537,74 @@
 
             // --- Centralized Speech Handler ---
             const handleSpeech = (step, remaining) => {
-                if (!step) return;
+                if (!step || status !== 'running') return; // Only speak if running
 
-                const vKey = `${idx}_${remaining}`;
-                if (lastSpokenKey.current === vKey) return; // Prevent duplicate speech in same interval
-                lastSpokenKey.current = vKey;
+                const stepInitialKey = `${idx}_initial`;
 
-                // Initial announcement for the step
-                if (remaining === step.seconds) {
+                // Initial announcement for the step (spoken once when remaining time is full duration)
+                if (remaining === step.seconds && step.voiceInitial && !spokenInitialForStep.current[stepInitialKey]) {
                     speak(step.voiceInitial, true); // Interrupt previous speech and announce new step
                     if (step.whistleOnStart) whistle();
                     if ('vibrate' in navigator) navigator.vibrate(150); // Vibrate at start of step
+                    spokenInitialForStep.current[stepInitialKey] = true; // Mark as spoken for this step
                 }
 
                 // Midpoint announcements
-                if (step.voiceMidpoint && remaining === step.voiceMidpoint.time) {
+                const vKeyMidpoint = `${idx}_midpoint_${remaining}`;
+                if (step.voiceMidpoint && remaining === step.voiceMidpoint.time && lastSpokenKey.current !== vKeyMidpoint) {
                     speak(step.voiceMidpoint.text);
+                    lastSpokenKey.current = vKeyMidpoint;
                 }
 
                 // Countdown (only for last 3 seconds)
-                if (step.voiceCountdown && remaining > 0 && remaining <= 3) {
+                const vKeyCountdown = `${idx}_countdown_${remaining}`;
+                if (step.voiceCountdown && remaining > 0 && remaining <= 3 && lastSpokenKey.current !== vKeyCountdown) {
                     speak(String(remaining));
+                    lastSpokenKey.current = vKeyCountdown;
                 }
             };
 
             // --- Toggle Play/Pause ---
             const togglePlay = () => {
-                if (!firstPlayDone.current) {
-                    firstPlayDone.current = true;
-                    setWasPausedByHide(false);
-                    // Initial "Prepárate" announcement, timer starts after it finishes
-                    speak('Prepárate para empezar', true, () => setStatus('running'));
+                if (status === 'ready') {
+                    // When starting from 'ready', clear any previous spoken flags
+                    spokenInitialForStep.current = {};
+                    setStatus('running');
                 } else {
                     setStatus(prev => prev === 'running' ? 'paused' : 'running');
-                    setWasPausedByHide(false);
+                }
+                setWasPausedByHide(false);
+            };
+
+            // --- Skip Current Step ---
+            const skipStep = () => {
+                if (status === 'finished') return; // Cannot skip if finished
+
+                if (idx < steps.length - 1) {
+                    const n = idx + 1;
+                    setIdx(n);
+                    setTimeLeft(steps[n].seconds);
+                    stepDurRef.current = steps[n].seconds;
+                    stepStartRef.current = Date.now();
+                    lastSpokenKey.current = ''; // Reset for new step
+                    spokenInitialForStep.current = {}; // Reset spoken flags for new step
+                    speak('Saltando ejercicio, siguiente.', true); // Announce skip
+                } else {
+                    // If it's the last step, end the workout
+                    endWorkout();
                 }
             };
+
+            // --- End Workout Prematurely ---
+            const endWorkout = () => {
+                setStatus('finished');
+                speak('Entrenamiento finalizado. ¡Buen trabajo!', true);
+                if (!savedRef.current) {
+                    onComplete(workout.name, elapsed); // Save current elapsed time
+                    savedRef.current = true;
+                }
+            };
+
 
             // --- Timer Logic ---
             useEffect(() => {
@@ -600,6 +633,7 @@
                                 stepDurRef.current = steps[n].seconds; 
                                 stepStartRef.current = Date.now(); 
                                 lastSpokenKey.current = ''; // Reset for new step
+                                spokenInitialForStep.current = {}; // Reset for new step
                             } else {
                                 setStatus('finished'); 
                                 speak('¡Excelente trabajo! Rutina completada.');
@@ -654,14 +688,21 @@
 
                     <div className="bg-slate-950 p-6 pb-10 flex flex-col items-center shrink-0">
                         <div className="w-full max-w-md grid grid-cols-3 items-center mb-6 text-center italic">
-                            <div className="flex flex-col">
+                            <button onClick={skipStep} className="bg-slate-800/40 py-4 rounded-xl text-[10px] font-black uppercase text-white/70 active:scale-95">Saltar</button>
+                            <div className="flex justify-center">
+                                {/* ELIMINADO: El botón de Play/Pause solo se muestra si el estado NO es 'ready' */}
+                                {status !== 'ready' && (
+                                    <button onClick={togglePlay} className="w-20 h-20 rounded-full border-4 border-yellow-400 flex items-center justify-center active:scale-90">
+                                        {status === 'running' ? <IconPause/> : <IconPlay/>}
+                                    </button>
+                                )}
+                            </div>
+                            <button onClick={endWorkout} className="bg-red-500/20 py-4 rounded-xl text-[10px] font-black uppercase text-red-400 active:scale-95">Finalizar</button>
+                        </div>
+                        <div className="w-full max-w-md grid grid-cols-2 items-center text-center italic">
+                             <div className="flex flex-col">
                                 <span className="text-[14vw] font-black text-sky-400 leading-none">{curr?.tr ? curr.tr - (curr.r||0) + 1 : '-'}</span>
                                 <span className="text-[8px] opacity-40">Rondas Restantes</span>
-                            </div>
-                            <div className="flex justify-center">
-                                <button onClick={togglePlay} className="w-20 h-20 rounded-full border-4 border-yellow-400 flex items-center justify-center active:scale-90">
-                                    {status === 'running' ? <IconPause/> : <IconPlay/>}
-                                </button>
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-[14vw] font-black text-yellow-400 leading-none">{curr?.tc ? curr.tc - (curr.cy||0) + 1 : '-'}</span>
