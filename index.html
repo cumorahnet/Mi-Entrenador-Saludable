@@ -837,7 +837,7 @@
                 } else {
                     endWorkout();
                 }
-            }, [endWorkout, advanceToStep, isGpsActive]);
+            }, [endWorkout, advanceToStep, isGpsActive, stopGpsTracking]); // Added stopGpsTracking
 
             // ── GPS Tracking functions ───────────────────────────────────────────────
             const announceGpsStats = useCallback((distance, timeSec) => {
@@ -877,7 +877,7 @@
                     }
                     setIsGpsActive(false);
                     setShowGpsControls(false); // Reset controls visibility
-                    setStatus('running'); // Return to normal running status
+                    setStatus('running'); // Return to normal running status so skipStep can proceed
                     // After announcing, skip to the next step (which should be POST_GPS_REST)
                     if (!isSkip) { // Only auto-skip if it wasn't triggered by a user skip action
                         skipStep();
@@ -889,14 +889,16 @@
                 if (!('geolocation' in navigator)) {
                     speak('Error: Geolocalización no disponible. No se puede iniciar el seguimiento.');
                     console.error("Geolocation is not supported by this browser.");
-                    skipStep(); // Immediately skip this step if GPS not available
+                    // If GPS is not available, immediately skip this step.
+                    setIsGpsActive(false); // Make sure it's not considered active
+                    setStatus('running'); // Back to normal state for skip
+                    skipStep(); // Skip to next phase (POST_GPS_REST)
                     return;
                 }
-                if (isGpsActive) return; // Prevent multiple starts
+                if (isGpsActive) return; // Prevent multiple starts if already active somehow
 
                 speak('Iniciando seguimiento de caminata o carrera. Las actualizaciones serán por audio cada diez minutos. Presiona el botón de encendido del celular para ver el botón de finalizar.', true);
                 setIsGpsActive(true); // Indicate GPS is active for UI
-                setStatus('gps-running'); // New status for GPS mode
                 setShowGpsControls(false); // Initially hide controls
 
                 gpsStartTime.current = Date.now();
@@ -933,7 +935,8 @@
                         setGpsCoordinates(prev => [...prev, { lat: latitude, lng: longitude, timestamp: now }]);
 
                         // Announce every 10 minutes (600 seconds)
-                        if (currentGpsTotalTime > 0 && (now - gpsAnnounceLastTime.current) >= (10 * 60 * 1000)) {
+                        // Only announce if currently in 'gps-running' status
+                        if (statusRef.current === 'gps-running' && currentGpsTotalTime > 0 && (now - gpsAnnounceLastTime.current) >= (10 * 60 * 1000)) {
                             announceGpsStats(gpsTotalDistance.current, currentGpsTotalTime);
                             gpsAnnounceLastTime.current = now;
                         }
@@ -945,14 +948,7 @@
                     },
                     options
                 );
-
-                // Initial announcement after a brief moment to allow GPS to acquire fix
-                setTimeout(() => {
-                    if (statusRef.current === 'gps-running') { // Only announce if still active
-                        speak('GPS activado. Iniciando seguimiento.');
-                    }
-                }, 5000); // Give GPS a few seconds to get first fix
-            }, [skipStep, announceGpsStats, isGpsActive, stopGpsTracking, setHasGpsDataAndRef]);
+            }, [skipStep, announceGpsStats, isGpsActive, stopGpsTracking, setHasGpsDataAndRef, statusRef]);
 
 
             // ── Toggle play/pause ────────────────────────────────────────────────────
@@ -977,6 +973,11 @@
                     if (stepStartRef.current    !== null) stepStartRef.current    += pausedMs;
                     pausedAtRef.current = null;
                     setStatus('running');
+                } else if (current === 'gps-running') {
+                    // No hay pausa en gps-running para no interrumpir el seguimiento.
+                    // Si se desea una pausa para GPS, se necesitaría lógica adicional.
+                    // Por ahora, se asume que 'gps-running' es un estado continuo.
+                    speak('No se puede pausar durante el seguimiento GPS. Presiona el botón de encendido del celular para ver el botón de finalizar.', true);
                 }
             }, [workout]);
 
@@ -1048,9 +1049,10 @@
                 const handleVisibilityChange = () => {
                     if (document.hidden) {
                         // Screen off / app moved to background
-                        if (statusRef.current === 'running' || statusRef.current === 'gps-running') {
+                        if (statusRef.current === 'running') {
                             pausedAtRef.current = Date.now();
-                            if (statusRef.current === 'running') setStatus('paused'); // Pause normal workout
+                            setStatus('paused'); // Pause normal workout
+                        } else if (statusRef.current === 'gps-running') {
                             // For GPS, we hide controls, but tracking continues in background (best effort)
                             setShowGpsControls(false); // Hide controls when screen is off
                         }
@@ -1077,13 +1079,14 @@
             // ── Speech helper (sin closures stale: recibe valores como params) ───────
             const handleSpeech = useCallback((step, stepIdx, remaining) => {
                 // Only speak for standard running phase, not when GPS is the primary focus
-                if (statusRef.current !== 'running' && step.phase !== GPS_PHASE_KEY) return;
-                
+                if (statusRef.current !== 'running' && statusRef.current !== 'gps-running') return; // Only process speech if running or gps-running
+
                 const initKey = `${stepIdx}_init`;
-                if (remaining === step.seconds && step.voiceInitial && !spokenInit.current[initKey]) {
+                // If it's the GPS_PHASE_KEY and status is 'running', this is the initial countdown
+                // If status is 'gps-running', we do not want initial voice for a step, only for GPS stats (handled separately)
+                if (remaining === step.seconds && step.voiceInitial && !spokenInit.current[initKey] && statusRef.current === 'running') {
                     speak(step.voiceInitial, true);
-                    if (step.whistleOnStart) whistle();
-                    if ('vibrate' in navigator) navigator.vibrate(150);
+                    if (step.whistleOnStart) navigator.vibrate(150); // Whistle is loud, vibrate is better for countdown
                     spokenInit.current[initKey] = true;
                 }
                 if (step.voiceMidpoint && remaining === step.voiceMidpoint.time) {
@@ -1093,6 +1096,11 @@
                 if (step.voiceCountdown && remaining > 0 && remaining <= 3) {
                     const k = `${stepIdx}_cd_${remaining}`;
                     if (lastSpokenKey.current !== k) { speak(String(remaining)); lastSpokenKey.current = k; }
+                }
+                // Whistle is only for the very start of an *action* step, not countdown
+                if (step.whistleOnStart && remaining === step.seconds && statusRef.current === 'running' && step.phase !== GPS_PHASE_KEY && !spokenInit.current[initKey + '_whistle']) {
+                    whistle();
+                    spokenInit.current[initKey + '_whistle'] = true;
                 }
             }, []);
 
@@ -1116,17 +1124,15 @@
                     elapsedRef.current = totalElap;
                     setUiElapsed(totalElap);
 
-                    // GPS tracking phase logic
-                    if (step.phase === GPS_PHASE_KEY) {
-                        if (!isGpsActive) { // isGpsActive state indicates if GPS watcher is actually running
-                            startGpsTracking();
-                        }
-                        // If GPS is active, main timer for step progression is handled by GPS logic and manual stop
-                        // This interval simply keeps elapsed time ticking in the background for overall workout.
-                        return;
+                    // If currently in a GPS tracking phase (after its initial countdown)
+                    // and not paused, we don't count down for THIS step.
+                    // The step's actual duration is controlled by stopGpsTracking.
+                    if (statusRef.current === 'gps-running') {
+                        // Keep elapsed time ticking, but UI for this step's countdown is irrelevant.
+                        return; // Exit here for the GPS tracking *duration* itself
                     }
 
-                    // If not in GPS phase, proceed with standard timer logic
+                    // Standard step logic (for all phases, including the 4-second GPS countdown)
                     if (statusRef.current !== 'running') return; // Ensure actual running state for normal steps
 
                     const passed   = Math.floor((now - stepStartRef.current) / 1000);
@@ -1138,10 +1144,19 @@
 
                     if (remaining === 0) {
                         // Step finished → advance
+                        // Special handling for GPS_PHASE_KEY when its countdown finishes
+                        if (step.phase === GPS_PHASE_KEY) {
+                            startGpsTracking(); // Now, start the actual GPS tracking
+                            setStatus('gps-running'); // Change status to reflect active GPS tracking
+                            // No advanceToStep here, as the GPS phase is of indefinite duration
+                            // The `stopGpsTracking` or `skipStep` will handle the advance.
+                            return; // Stop processing this step's countdown, now in GPS tracking mode.
+                        }
+
                         const next = ci + 1;
                         if (next < s.length) {
                             advanceToStep(next);
-                            // Disparar speech inicial del siguiente step en el same tick if it's not GPS step
+                            // Disparar speech inicial del siguiente step en el mismo tick
                             if (s[next].phase !== GPS_PHASE_KEY) {
                                 handleSpeech(s[next], next, s[next].seconds);
                             }
@@ -1152,7 +1167,7 @@
                 }, 250);
 
                 return () => clearInterval(interval);
-            }, [uiStatus, workout, onComplete, handleSpeech, advanceToStep, isGpsActive, startGpsTracking, endWorkout]);
+            }, [uiStatus, workout, onComplete, handleSpeech, advanceToStep, startGpsTracking, endWorkout]);
 
 
             // ── Render ───────────────────────────────────────────────────────────────
