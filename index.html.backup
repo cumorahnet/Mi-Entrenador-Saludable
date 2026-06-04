@@ -323,7 +323,7 @@
                 }
 
                 if (currentSegmentData.key === 'run' || currentSegmentData.key === 'walk') {
-                    // For GPS segments, pass the specific activity label for voice customization
+                    // For GPS segments, pass the specific activity label (e.g., "Carrera" or "Caminata") for voice customization
                     steps = steps.concat(currentSegmentData.generator(currentSegmentData.label.split(' ')[0], introForNextInternalSegment));
                 } else {
                     steps = steps.concat(currentSegmentData.generator(ent, introForNextInternalSegment));
@@ -777,7 +777,7 @@
                     setStatus('paused');
                 } else if (current === 'paused') {
                     // Reanudar: ajustar timestamps por el tiempo pausado
-                    const now = Date.now(); // CORRECTED: Changed Date.Now() to Date.now()
+                    const now = Date.now(); 
                     const pausedMs = pausedAtRef.current ? now - pausedAtRef.current : 0;
                     if (workoutStartRef.current !== null) workoutStartRef.current += pausedMs;
                     if (stepStartRef.current    !== null) stepStartRef.current    += pausedMs;
@@ -809,9 +809,10 @@
                 }
 
                 // Determine if GPS is part of the selected workout phases
-                // This state is crucial for conditional rendering of GPS UI and wake lock logic
                 const gpsIncluded = selectedWorkoutPhases.includes('run') || selectedWorkoutPhases.includes('walk');
-                setIsGpsActive(gpsIncluded); // Set initial state for GPS if 'run' or 'walk' phase is selected
+                // isGpsActive is ONLY set to true when startGpsTracking() is called, not here.
+                // It should be false initially, so that the timer's GPS_PHASE_KEY check triggers startGpsTracking.
+                // So, no setIsGpsActive(gpsIncluded) here.
 
                 const generated = generateWorkoutSteps(workout, DEFAULT_PARAMS, selectedWorkoutPhases);
                 stepsRef.current = generated;
@@ -822,13 +823,15 @@
                 setTime(firstSec);
 
                 // Automatically start the timer if steps are valid and visible after selection
+                // The `startGpsTracking` will be called by the main timer loop when `GPS_PHASE_KEY` is reached,
+                // and `isGpsActive` is initially false.
                 if (generated.length > 0 && generated[0].phase !== 'error') {
                      workoutStartRef.current = Date.now(); // Initialize workout start time
                      stepStartRef.current = Date.now();   // Initialize current step start time
                      setStatus('running'); // Start the main timer loop
                 }
 
-            }, [workout, isModeSelectionScreenVisible, selectedWorkoutPhases, stopGpsTracking]); // Removed isGpsActive from dependencies as it's set inside this effect.
+            }, [workout, isModeSelectionScreenVisible, selectedWorkoutPhases, stopGpsTracking]); // Removed isGpsActive from dependencies as it's meant to be managed internally by start/stopGpsTracking.
 
             // ── Wake lock ────────────────────────────────────────────────────────────
             const releaseWake = useCallback(() => {
@@ -986,11 +989,12 @@
             }
 
             // Render GPS tracking UI when active
-            if (isGpsActive && uiStatus === 'gps-running') { // Only show GPS screen if GPS is active and uiStatus is gps-running
+            // `isGpsActive` will be true if 'run' or 'walk' was selected AND `startGpsTracking` has been called.
+            // `uiStatus === 'gps-running'` confirms the app state is specifically in GPS tracking mode.
+            if (isGpsActive && uiStatus === 'gps-running') { 
                 return React.createElement('div', { className: "h-screen flex flex-col items-center justify-center bg-slate-950 text-white p-6" },
                     React.createElement('div', {
                         className: "absolute inset-0 bg-slate-950 flex flex-col items-center justify-center p-6",
-                        // No specific click handler here, visibility is driven by actual screen state
                     },
                         // Content visible when controls are hidden (minimal display, "screen off")
                         !showGpsControls && React.createElement('div', { className: "text-center" },
