@@ -704,8 +704,8 @@
 
                         // Calculate average speed for announcements
                         const averageSpeedKmH = (gpsTotalDistance.current > 0 && gpsTotalTime.current > 0)
-                                                ? (gpsTotalDistance.current / gpsTotalTime.current) * 3.6
-                                                : 0;
+                                                ? (gpsTotalDistance.current / currentGpsTotalTime) * 3.6
+                                                : 0; // Fixed: used currentGpsTotalTime here.
 
                         // Update state for internal tracking (not displayed) and potential final summary
                         setGpsData({
@@ -754,7 +754,7 @@
                     setStatus('paused');
                 } else if (current === 'paused') {
                     // Reanudar: ajustar timestamps por el tiempo pausado
-                    const now = Date.Now();
+                    const now = Date.now(); // CORRECTED: Changed Date.Now() to Date.now()
                     const pausedMs = pausedAtRef.current ? now - pausedAtRef.current : 0;
                     if (workoutStartRef.current !== null) workoutStartRef.current += pausedMs;
                     if (stepStartRef.current    !== null) stepStartRef.current    += pausedMs;
@@ -1185,7 +1185,8 @@
                     )
                 ),
                 // Gráfico de avance
-                React.createElement('div', { style: { height: '200px' } },
+                React.createElement('div', { className: "glass-card p-4" },
+                    React.createElement('div', { style: { height: '200px' } },
                         React.createElement('canvas', { ref: chartRef })
                     )
                 )

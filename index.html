@@ -271,17 +271,22 @@
 
 
         const generateWorkoutSteps = (workout, defaultParams, selectedPhasesKeys) => {
-            if (!workout || !selectedPhasesKeys || selectedPhasesKeys.length === 0) return [];
+            // Safety check: if no phases selected, return a single "No phases" step
+            if (!selectedPhasesKeys || selectedPhasesKeys.length === 0) {
+                return [{ label: 'NO HAY FASES', seconds: 5, color: 'bg-red-500', phase: 'error', voiceInitial: 'No se seleccionó ninguna fase. Por favor, cancela.', whistleOnStart: false, voiceCountdown: false }];
+            }
+            if (!workout) { // Should not happen if a workout is always passed to PlayerView
+                 return [{ label: 'ERROR DE RUTINA', seconds: 5, color: 'bg-red-500', phase: 'error', voiceInitial: 'Error: Rutina no encontrada. Por favor, cancela.', whistleOnStart: false, voiceCountdown: false }];
+            }
+
             const ent = { ...defaultParams.entrenamiento, ...(workout.phases?.entrenamiento || {}) };
             let steps = [];
 
-            // Filter and order the selected phases based on ALL_POSSIBLE_SEGMENTS_ORDERED_KEYS
             const activeSegments = ALL_POSSIBLE_SEGMENTS_DATA.filter(segment =>
                 selectedPhasesKeys.includes(segment.key)
             ).sort((a, b) => ALL_POSSIBLE_SEGMENTS_ORDERED_KEYS.indexOf(a.key) - ALL_POSSIBLE_SEGMENTS_ORDERED_KEYS.indexOf(b.key));
 
-            // Determine if an initial 'PREPÁRATE' is needed
-            // If the first selected segment is NOT 'warmup', we need a general 'PREPÁRATE'
+            // Add initial 'PREPÁRATE' if needed
             if (activeSegments.length > 0 && activeSegments[0].key !== 'warmup') {
                 let initialVoice = 'Prepárate para tu rutina.';
                 if (activeSegments[0].key === 'training') initialVoice = 'Prepárate para el entrenamiento principal.';
@@ -293,17 +298,14 @@
             for (let i = 0; i < activeSegments.length; i++) {
                 const currentSegmentData = activeSegments[i];
                 const nextSegmentData = activeSegments[i + 1];
-                let introForNextInternalSegment = null; // Intro message for the *next* segment if it exists
+                let introForNextInternalSegment = null;
 
                 if (nextSegmentData) {
                     introForNextInternalSegment = `A continuación, ${nextSegmentData.label.toLowerCase()}.`;
                 } else {
-                    // This is the last actual activity segment before the final "Workout Completed" message
-                    introForNextInternalSegment = 'Entrenamiento completado.';
+                    introForNextInternalSegment = 'Entrenamiento completado.'; // Final message before explicit completion step
                 }
 
-                // Call the generator for the current segment, passing the workout parameters and next phase intro
-                // The `generateGpsRunSegment` only needs `nextPhaseIntro`
                 if (currentSegmentData.key === 'run') {
                     steps = steps.concat(currentSegmentData.generator(introForNextInternalSegment));
                 } else {
@@ -311,7 +313,11 @@
                 }
             }
 
-            // Add the final overall completion step
+            // Ensure steps is not empty before adding final completion (should be caught by initial check but extra safe)
+            if (steps.length === 0) {
+                 return [{ label: 'ERROR DE GENERACIÓN', seconds: 5, color: 'bg-red-500', phase: 'error', voiceInitial: 'Error al generar los pasos de la rutina. Por favor, cancela.', whistleOnStart: false, voiceCountdown: false }];
+            }
+
             steps.push({ label: 'FINAL DE LA RUTINA', seconds: 10, color: 'bg-green-500', phase: 'finished', voiceInitial: 'Rutina finalizada. ¡Buen trabajo!', whistleOnStart: false, voiceCountdown: false });
 
             return steps;
@@ -703,9 +709,9 @@
                         lastPosition.current = { latitude, longitude, timestamp: now };
 
                         // Calculate average speed for announcements
-                        const averageSpeedKmH = (gpsTotalDistance.current > 0 && gpsTotalTime.current > 0)
+                        const averageSpeedKmH = (gpsTotalDistance.current > 0 && currentGpsTotalTime > 0) // Fixed: used currentGpsTotalTime here.
                                                 ? (gpsTotalDistance.current / currentGpsTotalTime) * 3.6
-                                                : 0; // Fixed: used currentGpsTotalTime here.
+                                                : 0;
 
                         // Update state for internal tracking (not displayed) and potential final summary
                         setGpsData({
@@ -797,7 +803,7 @@
                 const firstSec = generated.length > 0 ? generated[0].seconds : 0;
                 stepDurRef.current = firstSec;
                 setTime(firstSec);
-            }, [workout, isModeSelectionScreenVisible, selectedWorkoutPhases, stopGpsTracking, isGpsActive]); // Added isGpsActive dependency to ensure re-run if GPS status changes.
+            }, [workout, isModeSelectionScreenVisible, selectedWorkoutPhases, stopGpsTracking]); // Removed isGpsActive from dependencies as it's set inside this effect.
 
             // ── Wake lock ────────────────────────────────────────────────────────────
             const releaseWake = useCallback(() => {
@@ -929,10 +935,12 @@
 
 
             // ── Render ───────────────────────────────────────────────────────────────
-            if (!workout || (steps.length === 0 && uiStatus !== 'ready' && isModeSelectionScreenVisible))
-                return React.createElement('div', { className: "h-screen flex items-center justify-center bg-slate-950 text-white/50 text-sm italic" }, "Cargando rutina...");
+            // Add a check for workout being null here as well, in case onStart(null) was somehow called
+            if (!workout) {
+                return React.createElement('div', { className: "h-screen flex items-center justify-center bg-slate-950 text-white/50 text-sm italic" }, "Error: Rutina no seleccionada. Por favor, vuelve a la lista.");
+            }
 
-            // NEW: Render initial prompt for workout mode selection
+            // Render initial prompt for workout mode selection
             if (isModeSelectionScreenVisible) {
                 return React.createElement(ModeSelectionScreen, {
                     onModeSelected: (phases) => {
@@ -941,6 +949,15 @@
                     },
                     onCancel: onExit // Go back to workouts screen
                 });
+            }
+
+            // If steps are empty after mode selection (and mode selection is no longer visible)
+            if (steps.length === 0 && !isModeSelectionScreenVisible) {
+                return React.createElement('div', { className: "h-screen flex flex-col items-center justify-center bg-slate-950 text-white/50 text-sm italic p-4" },
+                    React.createElement('p', { className: "mb-4" }, "Error: No se pudieron generar los pasos de la rutina con las fases seleccionadas."),
+                    React.createElement('p', { className: "mb-8" }, "Por favor, vuelve a la lista de rutinas e inténtalo de nuevo seleccionando al menos una fase."),
+                    React.createElement('button', { onClick: onExit, className: "w-full max-w-sm bg-white/10 text-white py-4 rounded-full font-black uppercase active:scale-95 italic text-xs" }, "Volver a Rutinas")
+                );
             }
 
             // Render GPS tracking UI when active
@@ -977,10 +994,10 @@
                     React.createElement('button', { onClick: onExit, className: "w-full max-w-sm bg-white text-black py-6 rounded-full font-black uppercase" }, "Finalizar")
                 );
 
-            const curr = steps[uiIdx] || steps[0];
+            const curr = steps[uiIdx] || steps[0]; // curr is guaranteed to be defined here due to checks above
             const showOverlay = uiStatus === 'ready' || uiStatus === 'paused';
 
-            return React.createElement('div', { className: `h-screen flex flex-col transition-colors duration-700 ${curr?.color || 'bg-slate-950'} text-white` },
+            return React.createElement('div', { className: `h-screen flex flex-col transition-colors duration-700 ${curr.color || 'bg-slate-950'} text-white` },
                 React.createElement('video', { ref: videoRef, loop: true, muted: true, playsInline: true, style: { position: 'absolute', width: '1px', height: '1px', opacity: 0.01 } },
                     React.createElement('source', { src: "https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/one-second-loop.mp4", type: "video/mp4" })
                 ),
@@ -992,7 +1009,7 @@
                         React.createElement('p', { className: "text-xl font-black italic" }, formatTime(uiElapsed))
                     ),
                     React.createElement('div', { className: "text-center" },
-                        React.createElement('h2', { className: "text-[10px] font-black uppercase italic truncate max-w-[120px] tracking-tight" }, workout?.name || 'Rutina')
+                        React.createElement('h2', { className: "text-[10px] font-black uppercase italic truncate max-w-[120px] tracking-tight" }, workout.name || 'Rutina')
                     ),
                     React.createElement('button', { onClick: onExit, className: "opacity-40 text-xl font-black px-2" }, "✕")
                 ),
@@ -1004,7 +1021,7 @@
                             React.createElement(IconPlay, null)
                         )
                     ),
-                    React.createElement('h2', { className: "text-[11vw] font-black uppercase italic text-white/80 leading-none mb-2" }, curr?.label || 'LISTO'),
+                    React.createElement('h2', { className: "text-[11vw] font-black uppercase italic text-white/80 leading-none mb-2" }, curr.label || 'LISTO'),
                     React.createElement('div', { className: "timer-huge tabular-nums text-white" }, uiTimeLeft)
                 ),
 
@@ -1024,11 +1041,11 @@
                     ),
                     React.createElement('div', { className: "w-full max-w-md grid grid-cols-2 items-center text-center italic" },
                         React.createElement('div', { className: "flex flex-col" },
-                            React.createElement('span', { className: "text-[14vw] font-black text-sky-400 leading-none" }, curr?.tr ? curr.tr - (curr.r || 0) + 1 : '-'),
+                            React.createElement('span', { className: "text-[14vw] font-black text-sky-400 leading-none" }, curr.tr ? curr.tr - (curr.r || 0) + 1 : '-'),
                             React.createElement('span', { className: "text-[8px] opacity-40" }, "Rondas Restantes")
                         ),
                         React.createElement('div', { className: "flex flex-col" },
-                            React.createElement('span', { className: "text-[14vw] font-black text-yellow-400 leading-none" }, curr?.tc ? curr.tc - (curr.cy || 0) + 1 : '-'),
+                            React.createElement('span', { className: "text-[14vw] font-black text-yellow-400 leading-none" }, curr.tc ? curr.tc - (curr.cy || 0) + 1 : '-'),
                             React.createElement('span', { className: "text-[8px] opacity-40" }, "Ciclos Restantes")
                         )
                     )
