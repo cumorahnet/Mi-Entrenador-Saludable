@@ -1133,7 +1133,7 @@
                     }
 
                     // Standard step logic (for all phases, including the 4-second GPS countdown)
-                    if (statusRef.current !== 'running') return; // Ensure actual running state for normal steps
+                    // REMOVED: if (statusRef.current !== 'running') return; // This line was causing the freeze.
 
                     const passed   = Math.floor((now - stepStartRef.current) / 1000);
                     const remaining = Math.max(0, stepDurRef.current - passed);
