@@ -196,21 +196,23 @@
             return { start, end };
         };
 
-        const generateWorkoutSteps = (workout, defaultParams, includeRun = false) => {
-            if (!workout) return [];
-            const ent = { ...defaultParams.entrenamiento, ...(workout.phases?.entrenamiento || {}) };
+        // --- Helper functions for generating specific workout segments ---
+        const generateWarmupSegment = (ent, nextPhaseIntro = null) => {
             const s = [];
-
             s.push({ label: 'PREPÁRATE', seconds: 15, color: 'bg-yellow-400', phase: 'inicio', voiceInitial: 'Prepárate para el calentamiento', whistleOnStart: false, voiceCountdown: true });
-
             WARMUP_STEPS.forEach((ws, i) => {
                 s.push({ label: ws.label, seconds: 30, color: 'bg-yellow-400', phase: 'calentamiento', voiceInitial: ws.voice || ws.label.toLowerCase(), whistleOnStart: true, voiceCountdown: true });
                 if (i < WARMUP_STEPS.length - 1) {
                     s.push({ label: 'CAMBIO', seconds: 5, color: 'bg-yellow-300', phase: 'cambio-warmup', voiceInitial: 'Cambio', voiceMidpoint: { time: 2, text: WARMUP_STEPS[i + 1].voice }, whistleOnStart: false, voiceCountdown: true });
                 }
             });
-            s.push({ label: 'DESCANSO', seconds: 20, color: 'bg-rose-400', phase: 'post-warmup', voiceInitial: 'Descanso. A continuación, el entrenamiento principal. Piernas.', whistleOnStart: false, voiceCountdown: true });
+            const transitionVoice = nextPhaseIntro ? ` ${nextPhaseIntro}` : '';
+            s.push({ label: 'DESCANSO', seconds: 20, color: 'bg-rose-400', phase: 'post-warmup', voiceInitial: `Descanso.${transitionVoice}`, whistleOnStart: false, voiceCountdown: true });
+            return s;
+        };
 
+        const generateMainTrainingSegment = (ent, nextPhaseIntro = null) => {
+            const s = [];
             for (let cy = 1; cy <= ent.cycles; cy++) {
                 TRAINING_ZONES.forEach((zone, zi) => {
                     for (let r = 1; r <= ent.rounds; r++) {
@@ -227,15 +229,22 @@
                     s.push({ label: 'DESCANSO', seconds: ent.rest, color: 'bg-rose-500', phase: 'ciclo-rest', voiceInitial: `Descanso de ciclo. Queda ${ent.cycles - cy} ${ent.cycles - cy === 1 ? 'ciclo' : 'ciclos'}`, voiceMidpoint: { time: 10, text: 'Nuevo ciclo. Piernas.' }, whistleOnStart: false, voiceCountdown: true });
                 }
             }
+            const transitionVoice = nextPhaseIntro ? ` ${nextPhaseIntro}` : '';
+            s.push({ label: 'DESCANSO', seconds: 30, color: 'bg-rose-400', phase: 'post-training', voiceInitial: `Descanso.${transitionVoice}`, whistleOnStart: false, voiceCountdown: true });
+            return s;
+        };
 
-            // --- Post-workout run/walk logic ---
-            if (includeRun) {
-                s.push({ label: 'DESCANSO (PRE-GPS)', seconds: 20, color: 'bg-indigo-400', phase: 'pre-gps-rest', voiceInitial: 'Descanso. Prepárate para iniciar tu caminata o carrera.', whistleOnStart: false, voiceCountdown: true });
-                s.push({ label: 'INICIAR CAMINATA O CARRERA', seconds: 1, color: 'bg-gray-800', phase: GPS_PHASE_KEY, voiceInitial: 'Iniciando seguimiento de caminata o carrera.', whistleOnStart: true, voiceCountdown: false }); // Duration is 1s, but will be handled by GPS logic
-                s.push({ label: 'DESCANSO (POST-GPS)', seconds: 300, color: 'bg-teal-400', phase: POST_GPS_REST_PHASE_KEY, voiceInitial: 'Descanso de 5 minutos antes de los estiramientos.', whistleOnStart: false, voiceCountdown: true });
-            }
-            // --- End Post-workout run/walk logic ---
+        const generateGpsRunSegment = (nextPhaseIntro = null) => {
+            const s = [];
+            s.push({ label: 'DESCANSO (PRE-GPS)', seconds: 20, color: 'bg-indigo-400', phase: 'pre-gps-rest', voiceInitial: `Descanso. Prepárate para iniciar tu caminata o carrera.`, whistleOnStart: false, voiceCountdown: true });
+            s.push({ label: 'INICIAR CAMINATA O CARRERA', seconds: 1, color: 'bg-gray-800', phase: GPS_PHASE_KEY, voiceInitial: 'Iniciando seguimiento de caminata o carrera.', whistleOnStart: true, voiceCountdown: false });
+            const transitionVoice = nextPhaseIntro ? ` ${nextPhaseIntro}` : '';
+            s.push({ label: 'DESCANSO (POST-GPS)', seconds: 300, color: 'bg-teal-400', phase: POST_GPS_REST_PHASE_KEY, voiceInitial: `Descanso de 5 minutos.${transitionVoice}`, whistleOnStart: false, voiceCountdown: true });
+            return s;
+        };
 
+        const generateStretchSegment = (ent, nextPhaseIntro = null) => {
+            const s = [];
             s.push({ label: 'DESCANSO', seconds: 30, color: 'bg-blue-200', phase: 'pre-stretches', voiceInitial: 'Descanso. Prepárate para los estiramientos', whistleOnStart: false, voiceCountdown: true });
             for (let i = 0; i < ent.stretchSteps; i++) {
                 s.push({ label: `ESTIRAMIENTO ${i + 1}`, seconds: ent.stretchAction, color: 'bg-blue-400', phase: 'estiramientos', voiceInitial: `Estiramiento ${i + 1}`, whistleOnStart: true, voiceCountdown: true });
@@ -243,8 +252,118 @@
                     s.push({ label: 'CAMBIO', seconds: ent.stretchChange, color: 'bg-blue-200', phase: 'cambio-est', voiceInitial: 'Cambio', voiceMidpoint: { time: 2, text: `Siguiente estiramiento` }, whistleOnStart: false, voiceCountdown: true });
                 }
             }
+            const lastStepOfStretch = s[s.length -1];
+            if (lastStepOfStretch && nextPhaseIntro) {
+                lastStepOfStretch.voiceInitial += ` ${nextPhaseIntro}`;
+            }
             return s;
         };
+
+        // Define all possible segments with their keys, labels, and generator functions
+        const ALL_POSSIBLE_SEGMENTS_DATA = [
+            { key: 'warmup', label: 'Calentamiento', generator: generateWarmupSegment },
+            { key: 'training', label: 'Ejercicio Principal', generator: generateMainTrainingSegment },
+            { key: 'run', label: 'Caminata o Carrera (GPS)', generator: generateGpsRunSegment },
+            { key: 'stretch', label: 'Estiramientos', generator: generateStretchSegment },
+        ];
+        // The order of these keys defines the overall flow of the workout
+        const ALL_POSSIBLE_SEGMENTS_ORDERED_KEYS = ALL_POSSIBLE_SEGMENTS_DATA.map(s => s.key);
+
+
+        const generateWorkoutSteps = (workout, defaultParams, selectedPhasesKeys) => {
+            if (!workout || !selectedPhasesKeys || selectedPhasesKeys.length === 0) return [];
+            const ent = { ...defaultParams.entrenamiento, ...(workout.phases?.entrenamiento || {}) };
+            let steps = [];
+
+            // Filter and order the selected phases based on ALL_POSSIBLE_SEGMENTS_ORDERED_KEYS
+            const activeSegments = ALL_POSSIBLE_SEGMENTS_DATA.filter(segment =>
+                selectedPhasesKeys.includes(segment.key)
+            ).sort((a, b) => ALL_POSSIBLE_SEGMENTS_ORDERED_KEYS.indexOf(a.key) - ALL_POSSIBLE_SEGMENTS_ORDERED_KEYS.indexOf(b.key));
+
+            // Determine if an initial 'PREPÁRATE' is needed
+            // If the first selected segment is NOT 'warmup', we need a general 'PREPÁRATE'
+            if (activeSegments.length > 0 && activeSegments[0].key !== 'warmup') {
+                let initialVoice = 'Prepárate para tu rutina.';
+                if (activeSegments[0].key === 'training') initialVoice = 'Prepárate para el entrenamiento principal.';
+                else if (activeSegments[0].key === 'run') initialVoice = 'Prepárate para tu caminata o carrera.';
+                else if (activeSegments[0].key === 'stretch') initialVoice = 'Prepárate para los estiramientos.';
+                steps.push({ label: 'PREPÁRATE', seconds: 15, color: 'bg-yellow-400', phase: 'inicio', voiceInitial: initialVoice, whistleOnStart: false, voiceCountdown: true });
+            }
+
+            for (let i = 0; i < activeSegments.length; i++) {
+                const currentSegmentData = activeSegments[i];
+                const nextSegmentData = activeSegments[i + 1];
+                let introForNextInternalSegment = null; // Intro message for the *next* segment if it exists
+
+                if (nextSegmentData) {
+                    introForNextInternalSegment = `A continuación, ${nextSegmentData.label.toLowerCase()}.`;
+                } else {
+                    // This is the last actual activity segment before the final "Workout Completed" message
+                    introForNextInternalSegment = 'Entrenamiento completado.';
+                }
+
+                // Call the generator for the current segment, passing the workout parameters and next phase intro
+                // The `generateGpsRunSegment` only needs `nextPhaseIntro`
+                if (currentSegmentData.key === 'run') {
+                    steps = steps.concat(currentSegmentData.generator(introForNextInternalSegment));
+                } else {
+                    steps = steps.concat(currentSegmentData.generator(ent, introForNextInternalSegment));
+                }
+            }
+
+            // Add the final overall completion step
+            steps.push({ label: 'FINAL DE LA RUTINA', seconds: 10, color: 'bg-green-500', phase: 'finished', voiceInitial: 'Rutina finalizada. ¡Buen trabajo!', whistleOnStart: false, voiceCountdown: false });
+
+            return steps;
+        };
+
+
+        // ─── ModeSelectionScreen Component ──────────────────────────────────────────────
+        function ModeSelectionScreen({ onModeSelected, onCancel }) {
+            const [selectedPhases, setSelectedPhases] = useState([]);
+
+            const togglePhase = (phaseKey) => {
+                setSelectedPhases(prev =>
+                    prev.includes(phaseKey)
+                        ? prev.filter(key => key !== phaseKey)
+                        : [...prev, phaseKey]
+                );
+            };
+
+            const handleStart = () => {
+                if (selectedPhases.length === 0) {
+                    speak('Por favor, selecciona al menos una fase de entrenamiento.', true);
+                    return;
+                }
+                onModeSelected(selectedPhases);
+            };
+
+            return React.createElement('div', { className: "h-screen flex flex-col items-center justify-center bg-slate-950 p-8 text-white text-center" },
+                React.createElement('h1', { className: "text-4xl font-black italic mb-6 text-orange-500" }, "Configura tu Sesión"),
+                React.createElement('p', { className: "text-sm text-slate-400 mb-8" }, "Elige las fases de entrenamiento que deseas realizar:"),
+                React.createElement('div', { className: "flex flex-col space-y-4 w-full max-w-sm mb-10" },
+                    ALL_POSSIBLE_SEGMENTS_DATA.map(phase => // Use the ordered list for rendering checkboxes
+                        React.createElement('label', { key: phase.key, className: "flex items-center p-4 glass-card cursor-pointer" },
+                            React.createElement('input', {
+                                type: "checkbox",
+                                checked: selectedPhases.includes(phase.key),
+                                onChange: () => togglePhase(phase.key),
+                                className: "form-checkbox h-5 w-5 text-orange-500 rounded border-gray-300 mr-4 focus:ring-orange-500"
+                            }),
+                            React.createElement('span', { className: "text-lg font-bold italic flex-1 text-left" }, phase.label)
+                        )
+                    )
+                ),
+                React.createElement('button', {
+                    onClick: handleStart,
+                    className: "w-full max-w-sm bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic"
+                }, "INICIAR ENTRENAMIENTO"),
+                React.createElement('button', {
+                    onClick: onCancel,
+                    className: "mt-4 w-full max-w-sm bg-white/10 text-white py-4 rounded-full font-black uppercase active:scale-95 italic text-xs"
+                }, "Cancelar")
+            );
+        }
 
         // ─── App ────────────────────────────────────────────────────────────────────
         function App() {
@@ -293,7 +412,7 @@
                     React.createElement('button', { onClick: () => auth.signOut(), className: "p-2 bg-red-500/10 rounded-xl text-red-500 font-bold text-[10px] px-4 uppercase italic" }, "Salir")
                 ),
                 React.createElement('main', { className: "flex-1 relative flex flex-col min-h-0" },
-                    view === 'workouts' && React.createElement(WorkoutsView, { workouts, user, onStart: handleStartWorkout, onEdit: w => { setSelectedWorkout(w); setView('create'); }, onCreate: () => { setSelectedWorkout(null); setView('create'); } }),
+                    view === 'workouts' && React.createElement(WorkoutsView, { workouts, user, onStart: handleStartWorkout, onEdit: w => { setSelectedWorkout(w); setView('create'); }, onCreate: () => { setSelectedWorkout(null); setView('create'); } } ),
                     view === 'avance'   && React.createElement(AvanceView, { history }),
                     view === 'create'   && React.createElement(CreateView, { user, workoutToEdit: selectedWorkout, onCancel: () => setView('workouts') }),
                     view === 'play'     && React.createElement(PlayerView, {
@@ -376,7 +495,7 @@
                     else await col.add({ ...dataToSave, createdAt: new Date().toISOString() });
                     onCancel();
                 } catch (e) { alert("Error al guardar: " + e.message); setSaving(false); }
-            }, [name, saving, phases, user, workoutToEdit, onCancel]);
+                }, [name, saving, phases, user, workoutToEdit, onCancel]);
             const ENT_FIELDS = [
                 { f: 'action', label: 'Acción (s)' }, { f: 'change', label: 'Cambio (s)' },
                 { f: 'rounds', label: 'Rondas' }, { f: 'cycles', label: 'Ciclos' },
@@ -425,10 +544,11 @@
             const [uiElapsed, setUiElapsed]   = useState(0);
             const [steps, setSteps]           = useState([]);
 
-            // Post-workout run/walk states
-            const [askForRun, setAskForRun]               = useState(true); // Initial prompt visibility
-            const [includePostWorkoutRun, setIncludePostWorkoutRun] = useState(false); // User's decision
+            // Post-workout mode selection states
+            const [isModeSelectionScreenVisible, setIsModeSelectionScreenVisible] = useState(true); // Controls visibility of mode selection screen
+            const [selectedWorkoutPhases, setSelectedWorkoutPhases]               = useState(null); // User's chosen workout structure (array of phase keys)
             const [isGpsActive, setIsGpsActive]           = useState(false); // If GPS tracker is currently running
+            const [showGpsControls, setShowGpsControls]   = useState(false); // Controls visibility for GPS screen
             const [gpsData, setGpsData]                   = useState({ distance: 0, speed: 0, time: 0, pace: '0:00' });
 
             // ── Refs internos del timer (NO disparan re-render) ──────────────────────
@@ -453,7 +573,6 @@
             const gpsWatcherId            = useRef(null); // Geolocation watch ID
             const lastPosition            = useRef(null); // Last known GPS position
             const gpsStartTime            = useRef(null); // When GPS tracking actually started
-            const gpsAnnounceIntervalRef  = useRef(null); // Interval for 10-min voice announcements
             const gpsAnnounceLastTime     = useRef(0); // Timestamp of last voice announcement
             const gpsTotalDistance        = useRef(0); // Accumulated distance for the current segment
             const gpsTotalTime            = useRef(0); // Accumulated time for the current segment
@@ -496,14 +615,16 @@
                 if (advanceToStep(next)) {
                     speak('Saltando. Siguiente.', true);
                     // Disparar speech inicial del siguiente step en el mismo tick
-                    handleSpeech(stepsRef.current[next], next, stepsRef.current[next].seconds);
+                    if (stepsRef.current[next].phase !== GPS_PHASE_KEY) {
+                         handleSpeech(stepsRef.current[next], next, stepsRef.current[next].seconds);
+                    }
                 } else {
                     endWorkout();
                 }
-            }, [endWorkout, advanceToStep]); // handleSpeech added implicitly via advanceToStep in the new structure
+            }, [endWorkout, advanceToStep]);
 
             // ── GPS Tracking functions ───────────────────────────────────────────────
-            const announceGpsStats = useCallback((distance, timeSec) => { // Removed speedKmH, calculated within formatSpeed/Pace
+            const announceGpsStats = useCallback((distance, timeSec) => {
                 const formattedDistance = formatDistance(distance);
                 const formattedSpeed = formatSpeed(distance, timeSec);
                 const formattedPace = formatPace(distance, timeSec);
@@ -520,9 +641,18 @@
                     gpsAnnounceIntervalRef.current = null;
                 }
 
-                setIsGpsActive(false);
-                setStatus('running'); // Return to normal running status
-                speak('Seguimiento de caminata o carrera finalizado.', true, () => {
+                // Final announcement
+                const finalDistance = gpsTotalDistance.current;
+                const finalTime = gpsTotalTime.current;
+                speak('Seguimiento de caminata o carrera finalizado. ', true, () => {
+                    if (finalDistance > 0 && finalTime > 0) {
+                        announceGpsStats(finalDistance, finalTime);
+                    } else {
+                        speak('No se registró distancia significativa.');
+                    }
+                    setIsGpsActive(false);
+                    setShowGpsControls(false); // Reset controls visibility
+                    setStatus('running'); // Return to normal running status
                     // After announcing, skip to the next step (which should be POST_GPS_REST)
                     skipStep();
                 });
@@ -530,26 +660,26 @@
 
             const startGpsTracking = useCallback(() => {
                 if (!('geolocation' in navigator)) {
-                    speak('Error: Geolocalización no disponible.');
+                    speak('Error: Geolocalización no disponible. No se puede iniciar el seguimiento.');
                     console.error("Geolocation is not supported by this browser.");
-                    // Immediately skip this step if GPS not available
-                    skipStep();
+                    skipStep(); // Immediately skip this step if GPS not available
                     return;
                 }
                 if (isGpsActive) return; // Prevent multiple starts
 
-                speak('Iniciando seguimiento de caminata o carrera.', true);
+                speak('Iniciando seguimiento de caminata o carrera. Las actualizaciones serán por audio cada diez minutos. Presiona el botón de encendido del celular para ver el botón de finalizar.', true);
                 setIsGpsActive(true); // Indicate GPS is active for UI
                 setStatus('gps-running'); // New status for GPS mode
+                setShowGpsControls(false); // Initially hide controls
 
                 gpsStartTime.current = Date.now();
                 lastPosition.current = null;
                 gpsTotalDistance.current = 0;
                 gpsTotalTime.current = 0;
-                setGpsData({ distance: 0, speed: 0, time: 0, pace: '0:00' });
-                gpsAnnounceLastTime.current = gpsStartTime.current;
+                setGpsData({ distance: 0, speed: 0, time: 0, pace: '0:00' }); // Reset GPS data visually (though not displayed)
+                gpsAnnounceLastTime.current = gpsStartTime.current; // Initialize last announcement time
 
-                const options = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }; // Increased timeout
+                const options = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
 
                 gpsWatcherId.current = navigator.geolocation.watchPosition(
                     (position) => {
@@ -572,11 +702,12 @@
                         }
                         lastPosition.current = { latitude, longitude, timestamp: now };
 
-                        // Calculate average speed over entire run for announcement purposes
+                        // Calculate average speed for announcements
                         const averageSpeedKmH = (gpsTotalDistance.current > 0 && gpsTotalTime.current > 0)
                                                 ? (gpsTotalDistance.current / gpsTotalTime.current) * 3.6
                                                 : 0;
 
+                        // Update state for internal tracking (not displayed) and potential final summary
                         setGpsData({
                             distance: gpsTotalDistance.current, // in meters
                             speed: averageSpeedKmH, // in km/h
@@ -601,11 +732,10 @@
                 // Initial announcement after a brief moment to allow GPS to acquire fix
                 setTimeout(() => {
                     if (statusRef.current === 'gps-running') { // Only announce if still active
-                        announceGpsStats(gpsData.distance, gpsData.time); // Initial status
+                        speak('GPS activado. Iniciando seguimiento.');
                     }
                 }, 5000); // Give GPS a few seconds to get first fix
-
-            }, [skipStep, announceGpsStats, gpsData.distance, gpsData.time, stopGpsTracking, isGpsActive]);
+            }, [skipStep, announceGpsStats, isGpsActive, stopGpsTracking]);
 
 
             // ── Toggle play/pause ────────────────────────────────────────────────────
@@ -624,7 +754,7 @@
                     setStatus('paused');
                 } else if (current === 'paused') {
                     // Reanudar: ajustar timestamps por el tiempo pausado
-                    const now = Date.now();
+                    const now = Date.Now();
                     const pausedMs = pausedAtRef.current ? now - pausedAtRef.current : 0;
                     if (workoutStartRef.current !== null) workoutStartRef.current += pausedMs;
                     if (stepStartRef.current    !== null) stepStartRef.current    += pausedMs;
@@ -633,7 +763,7 @@
                 }
             }, [workout]);
 
-            // ── Inicialización cuando cambia workout o la decisión de la caminata ────
+            // ── Inicialización cuando cambia workout o el modo de entrenamiento ────
             useEffect(() => {
                 // Cancelar cualquier intervalo en curso limpiando status
                 setStatus('ready');
@@ -649,20 +779,25 @@
                 // Stop any GPS tracking if component re-initializes
                 if (isGpsActive) stopGpsTracking(); // This will clear watchers, set isGpsActive to false
 
-                // Only generate steps once includePostWorkoutRun is decided
-                if (askForRun) {
-                    setSteps([]); // Clear steps while asking
+                // Only generate steps once selectedWorkoutPhases is decided AND mode selection is no longer visible
+                if (isModeSelectionScreenVisible || !workout || !selectedWorkoutPhases) {
+                    setSteps([]); // Clear steps while asking or if mode not set
                     return;
                 }
 
-                const generated = workout ? generateWorkoutSteps(workout, DEFAULT_PARAMS, includePostWorkoutRun) : [];
+                // Determine if GPS is part of the selected workout phases
+                // This state is crucial for conditional rendering of GPS UI and wake lock logic
+                const gpsIncluded = selectedWorkoutPhases.includes('run');
+                setIsGpsActive(gpsIncluded); // Set initial state for GPS if 'run' phase is selected
+
+                const generated = generateWorkoutSteps(workout, DEFAULT_PARAMS, selectedWorkoutPhases);
                 stepsRef.current = generated;
                 setSteps(generated);
 
                 const firstSec = generated.length > 0 ? generated[0].seconds : 0;
                 stepDurRef.current = firstSec;
                 setTime(firstSec);
-            }, [workout, askForRun, includePostWorkoutRun, stopGpsTracking, isGpsActive]);
+            }, [workout, isModeSelectionScreenVisible, selectedWorkoutPhases, stopGpsTracking, isGpsActive]); // Added isGpsActive dependency to ensure re-run if GPS status changes.
 
             // ── Wake lock ────────────────────────────────────────────────────────────
             const releaseWake = useCallback(() => {
@@ -686,34 +821,34 @@
 
             // ── Visibility change ────────────────────────────────────────────────────
             useEffect(() => {
-                const handle = () => {
+                const handleVisibilityChange = () => {
                     if (document.hidden) {
+                        // Screen off / app moved to background
                         if (statusRef.current === 'running' || statusRef.current === 'gps-running') {
                             pausedAtRef.current = Date.now();
-                            if (statusRef.current === 'running') setStatus('paused');
-                            // If in gps-running, don't explicitly pause, but the GPS watch may stop in background.
-                            // We don't have a 'gps-paused' state for simplicity, just let it resume if foreground again.
+                            if (statusRef.current === 'running') setStatus('paused'); // Pause normal workout
+                            // For GPS, we hide controls, but tracking continues in background (best effort)
+                            setShowGpsControls(false); // Hide controls when screen is off
                         }
                         releaseWake();
                     } else {
+                        // Screen on / app moved to foreground
                         if (statusRef.current === 'paused' && pausedAtRef.current !== null) {
-                            // Adjust time origins by the time it was hidden
                             const hiddenMs = Date.now() - pausedAtRef.current;
                             if (workoutStartRef.current !== null) workoutStartRef.current += hiddenMs;
                             if (stepStartRef.current    !== null) stepStartRef.current    += hiddenMs;
                             pausedAtRef.current = null;
                             setStatus('running');
                         } else if (statusRef.current === 'gps-running') {
-                            // If it was gps-running and brought back, attempt to re-acquire GPS fix / resume
-                            // The watchPosition listener should handle re-acquiring on its own
-                            requestWake();
+                            setShowGpsControls(true); // Show controls when screen is on again
                         }
                         requestWake(); // Re-request wake lock
                     }
                 };
-                document.addEventListener('visibilitychange', handle);
-                return () => document.removeEventListener('visibilitychange', handle);
+                document.addEventListener('visibilitychange', handleVisibilityChange);
+                return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
             }, [requestWake, releaseWake]);
+
 
             // ── Speech helper (sin closures stale: recibe valores como params) ───────
             const handleSpeech = useCallback((step, stepIdx, remaining) => {
@@ -757,11 +892,8 @@
 
                     // GPS tracking phase logic
                     if (step.phase === GPS_PHASE_KEY) {
-                        if (!isGpsActive) {
-                            // This is the moment to start GPS tracking
+                        if (!isGpsActive) { // isGpsActive state indicates if GPS watcher is actually running
                             startGpsTracking();
-                            // Do not advance main timer while GPS is active
-                            // The duration of this step is handled by manual termination
                         }
                         // If GPS is active, main timer for step progression is paused
                         return;
@@ -797,50 +929,43 @@
 
 
             // ── Render ───────────────────────────────────────────────────────────────
-            if (!workout || (steps.length === 0 && uiStatus !== 'ready' && !askForRun))
+            if (!workout || (steps.length === 0 && uiStatus !== 'ready' && isModeSelectionScreenVisible))
                 return React.createElement('div', { className: "h-screen flex items-center justify-center bg-slate-950 text-white/50 text-sm italic" }, "Cargando rutina...");
 
-            // Render initial prompt for post-workout run/walk
-            if (askForRun) {
-                return React.createElement('div', { className: "h-screen flex flex-col items-center justify-center bg-slate-950 p-8 text-white text-center" },
-                    React.createElement('h1', { className: "text-4xl font-black italic mb-6 text-orange-500" }, "¿Incluir Caminata/Carrera?"),
-                    React.createElement('p', { className: "text-sm text-slate-400 mb-8" }, "Después del entrenamiento principal y antes de los estiramientos, ¿quieres incluir una caminata o carrera con seguimiento GPS?"),
-                    React.createElement('div', { className: "flex space-x-4 w-full max-w-sm" },
-                        React.createElement('button', {
-                            onClick: () => { setIncludePostWorkoutRun(true); setAskForRun(false); },
-                            className: "flex-1 bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic"
-                        }, "Sí"),
-                        React.createElement('button', {
-                            onClick: () => { setIncludePostWorkoutRun(false); setAskForRun(false); },
-                            className: "flex-1 bg-white/10 text-white py-6 rounded-full font-black uppercase active:scale-95 italic"
-                        }, "No")
-                    )
-                );
+            // NEW: Render initial prompt for workout mode selection
+            if (isModeSelectionScreenVisible) {
+                return React.createElement(ModeSelectionScreen, {
+                    onModeSelected: (phases) => {
+                        setSelectedWorkoutPhases(phases); // Set the selected phases array
+                        setIsModeSelectionScreenVisible(false); // Hide selection screen
+                    },
+                    onCancel: onExit // Go back to workouts screen
+                });
             }
 
             // Render GPS tracking UI when active
-            if (isGpsActive) {
+            if (isGpsActive && uiStatus === 'gps-running') { // Only show GPS screen if GPS is active and uiStatus is gps-running
                 return React.createElement('div', { className: "h-screen flex flex-col items-center justify-center bg-slate-950 text-white p-6" },
-                    React.createElement('div', { className: "absolute inset-0 bg-slate-950 flex flex-col items-center justify-center p-6" }, // "Screen off" effect
-                        React.createElement('h2', { className: "text-3xl font-black uppercase text-orange-500 mb-4" }, "Caminata / Carrera"),
-                        React.createElement('p', { className: "text-6xl font-black tabular-nums mb-2" }, formatDistance(gpsData.distance)),
-                        React.createElement('p', { className: "text-xl font-medium text-slate-400 mb-6" }, "Distancia"),
-
-                        React.createElement('div', { className: "grid grid-cols-2 gap-4 w-full max-w-xs text-center mb-10" },
-                            React.createElement('div', null,
-                                React.createElement('p', { className: "text-4xl font-black tabular-nums" }, formatTime(gpsData.time)),
-                                React.createElement('p', { className: "text-sm font-medium text-slate-400" }, "Tiempo")
-                            ),
-                            React.createElement('div', null,
-                                React.createElement('p', { className: "text-4xl font-black tabular-nums" }, formatSpeed(gpsData.distance, gpsData.time)),
-                                React.createElement('p', { className: "text-sm font-medium text-slate-400" }, "Velocidad Prom.")
-                            )
+                    React.createElement('div', {
+                        className: "absolute inset-0 bg-slate-950 flex flex-col items-center justify-center p-6",
+                        // No specific click handler here, visibility is driven by actual screen state
+                    },
+                        // Content visible when controls are hidden (minimal display, "screen off")
+                        !showGpsControls && React.createElement('div', { className: "text-center" },
+                            React.createElement('h2', { className: "text-xl font-black uppercase text-slate-400 mb-2" }, "GPS ACTIVO"),
+                            React.createElement('p', { className: "text-sm text-slate-600" }, "Presiona botón de encendido para controles")
                         ),
 
-                        React.createElement('button', {
-                            onClick: stopGpsTracking,
-                            className: "w-full max-w-sm bg-red-600/80 text-white py-6 rounded-full font-black uppercase active:scale-95 italic"
-                        }, "TERMINAR CAMINATA / CARRERA")
+                        // Content visible when controls are shown (interactable display)
+                        showGpsControls && React.createElement(React.Fragment, null,
+                            React.createElement('h2', { className: "text-3xl font-black uppercase text-orange-500 mb-4" }, "Caminata / Carrera"),
+                            React.createElement('p', { className: "text-lg text-slate-400 mb-10" }, "Seguimiento GPS Activo. Actualizaciones solo por voz."),
+
+                            React.createElement('button', {
+                                onClick: stopGpsTracking,
+                                className: "w-full max-w-sm bg-red-600/80 text-white py-6 rounded-full font-black uppercase active:scale-95 italic"
+                            }, "TERMINAR CAMINATA / CARRERA")
+                        )
                     )
                 );
             }
@@ -1060,8 +1185,7 @@
                     )
                 ),
                 // Gráfico de avance
-                React.createElement('div', { className: "glass-card p-4" },
-                    React.createElement('div', { style: { height: '200px' } },
+                React.createElement('div', { style: { height: '200px' } },
                         React.createElement('canvas', { ref: chartRef })
                     )
                 )
