@@ -619,10 +619,7 @@
             // ── Avanzar al siguiente step (lógica pura con refs) ─────────────────────
             const advanceToStep = useCallback((nextIdx) => {
                 const s = stepsRef.current;
-                if (nextIdx >= s.length) {
-                    endWorkout(); // If no more steps, finish the workout
-                    return false;
-                }
+                if (nextIdx >= s.length) return false; // sin más steps
                 idxRef.current   = nextIdx;
                 stepDurRef.current = s[nextIdx].seconds;
                 timeLeftRef.current = s[nextIdx].seconds;
@@ -632,7 +629,7 @@
                 setUiIdx(nextIdx);
                 setUiTimeLeft(s[nextIdx].seconds);
                 return true;
-            }, [endWorkout]);
+            }, []);
 
             // ── Saltar step ──────────────────────────────────────────────────────────
             const skipStep = useCallback(() => {
@@ -678,20 +675,17 @@
                     }
                     setIsGpsActive(false);
                     setShowGpsControls(false); // Reset controls visibility
-                    // CRITICAL CHANGE: Instead of skipping to the next step, end the entire workout here.
-                    endWorkout(); // Go directly to the "¡HECHO!" screen
+                    setStatus('running'); // Return to normal running status
+                    // After announcing, skip to the next step (which should be POST_GPS_REST)
+                    skipStep();
                 });
-            }, [endWorkout, announceGpsStats]); // Only depend on endWorkout and announceGpsStats
+            }, [skipStep, announceGpsStats]);
 
             const startGpsTracking = useCallback(() => {
                 if (!('geolocation' in navigator)) {
                     speak('Error: Geolocalización no disponible. No se puede iniciar el seguimiento.');
                     console.error("Geolocation is not supported by this browser.");
-                    // In case of GPS error, skip the GPS step and proceed with the rest of the workout,
-                    // or end if it was the last step.
-                    setIsGpsActive(false); // Explicitly set to false if it failed to start
-                    setStatus('running'); // Revert to running to potentially continue or end workout
-                    skipStep();
+                    skipStep(); // Immediately skip this step if GPS not available
                     return;
                 }
                 if (isGpsActive) return; // Prevent multiple starts
@@ -816,7 +810,9 @@
 
                 // Determine if GPS is part of the selected workout phases
                 const gpsIncluded = selectedWorkoutPhases.includes('run') || selectedWorkoutPhases.includes('walk');
-                setIsGpsActive(gpsIncluded); // Set this only to control the rendering of GPS screen, not its activation.
+                // isGpsActive is ONLY set to true when startGpsTracking() is called, not here.
+                // It should be false initially, so that the timer's GPS_PHASE_KEY check triggers startGpsTracking.
+                // So, no setIsGpsActive(gpsIncluded) here.
 
                 const generated = generateWorkoutSteps(workout, DEFAULT_PARAMS, selectedWorkoutPhases);
                 stepsRef.current = generated;
@@ -827,13 +823,15 @@
                 setTime(firstSec);
 
                 // Automatically start the timer if steps are valid and visible after selection
+                // The `startGpsTracking` will be called by the main timer loop when `GPS_PHASE_KEY` is reached,
+                // and `isGpsActive` is initially false.
                 if (generated.length > 0 && generated[0].phase !== 'error') {
                      workoutStartRef.current = Date.now(); // Initialize workout start time
                      stepStartRef.current = Date.now();   // Initialize current step start time
                      setStatus('running'); // Start the main timer loop
                 }
 
-            }, [workout, isModeSelectionScreenVisible, selectedWorkoutPhases, stopGpsTracking]);
+            }, [workout, isModeSelectionScreenVisible, selectedWorkoutPhases, stopGpsTracking]); // Removed isGpsActive from dependencies as it's meant to be managed internally by start/stopGpsTracking.
 
             // ── Wake lock ────────────────────────────────────────────────────────────
             const releaseWake = useCallback(() => {
