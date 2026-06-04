@@ -168,7 +168,7 @@
             if (interrupt) { window.speechSynthesis.cancel(); voiceQueue.length = 0; voiceBusy = false; }
             if (text) voiceQueue.push(onEnd ? { text, onEnd } : text);
             flushVoice();
-        };
+       };
 
         const startOfDay = (date) => { const d = new Date(date); d.setHours(0, 0, 0, 0); return d; };
         const endOfDay = (date) => { const d = new Date(date); d.setHours(23, 59, 59, 999); return d; };
@@ -234,10 +234,21 @@
             return s;
         };
 
-        const generateGpsRunSegment = (nextPhaseIntro = null) => {
+        // Modified generateGpsRunSegment to not include initial rest and have countdown
+        const generateGpsRunSegment = (activityTypeLabel, nextPhaseIntro = null) => {
             const s = [];
-            s.push({ label: 'DESCANSO (PRE-GPS)', seconds: 20, color: 'bg-indigo-400', phase: 'pre-gps-rest', voiceInitial: `Descanso. Prepárate para iniciar tu caminata o carrera.`, whistleOnStart: false, voiceCountdown: true });
-            s.push({ label: 'INICIAR CAMINATA O CARRERA', seconds: 1, color: 'bg-gray-800', phase: GPS_PHASE_KEY, voiceInitial: 'Iniciando seguimiento de caminata o carrera.', whistleOnStart: true, voiceCountdown: false });
+            const initialVoice = `Comienza ${activityTypeLabel.toLowerCase()}. Tres, dos, uno.`;
+
+            // No 'DESCANSO (PRE-GPS)' as per new requirement, directly start with countdown
+            s.push({
+                label: `INICIAR ${activityTypeLabel.toUpperCase()}`,
+                seconds: 4, // For 3, 2, 1 countdown + 1 sec initial speech
+                color: 'bg-gray-800',
+                phase: GPS_PHASE_KEY,
+                voiceInitial: initialVoice,
+                whistleOnStart: true,
+                voiceCountdown: true // This will make it speak 3, 2, 1
+            });
             const transitionVoice = nextPhaseIntro ? ` ${nextPhaseIntro}` : '';
             s.push({ label: 'DESCANSO (POST-GPS)', seconds: 300, color: 'bg-teal-400', phase: POST_GPS_REST_PHASE_KEY, voiceInitial: `Descanso de 5 minutos.${transitionVoice}`, whistleOnStart: false, voiceCountdown: true });
             return s;
@@ -263,7 +274,8 @@
         const ALL_POSSIBLE_SEGMENTS_DATA = [
             { key: 'warmup', label: 'Calentamiento', generator: generateWarmupSegment },
             { key: 'training', label: 'Ejercicio Principal', generator: generateMainTrainingSegment },
-            { key: 'run', label: 'Caminata o Carrera (GPS)', generator: generateGpsRunSegment },
+            { key: 'walk', label: 'Caminata (GPS)', generator: generateGpsRunSegment }, // Separated Walk option
+            { key: 'run', label: 'Carrera (GPS)', generator: generateGpsRunSegment },   // Separated Run option
             { key: 'stretch', label: 'Estiramientos', generator: generateStretchSegment },
         ];
         // The order of these keys defines the overall flow of the workout
@@ -282,16 +294,20 @@
             const ent = { ...defaultParams.entrenamiento, ...(workout.phases?.entrenamiento || {}) };
             let steps = [];
 
+            // Filter and order the selected phases based on ALL_POSSIBLE_SEGMENTS_ORDERED_KEYS
             const activeSegments = ALL_POSSIBLE_SEGMENTS_DATA.filter(segment =>
                 selectedPhasesKeys.includes(segment.key)
             ).sort((a, b) => ALL_POSSIBLE_SEGMENTS_ORDERED_KEYS.indexOf(a.key) - ALL_POSSIBLE_SEGMENTS_ORDERED_KEYS.indexOf(b.key));
 
-            // Add initial 'PREPÁRATE' if needed
-            if (activeSegments.length > 0 && activeSegments[0].key !== 'warmup') {
+            // Determine if an initial 'PREPÁRATE' is needed
+            // If the first selected segment is NOT 'warmup', and also not 'run'/'walk' (which have their own prep/countdown)
+            const firstActiveKey = activeSegments.length > 0 ? activeSegments[0].key : null;
+            const isGpsFirst = (firstActiveKey === 'run' || firstActiveKey === 'walk');
+
+            if (activeSegments.length > 0 && !isGpsFirst && firstActiveKey !== 'warmup') {
                 let initialVoice = 'Prepárate para tu rutina.';
-                if (activeSegments[0].key === 'training') initialVoice = 'Prepárate para el entrenamiento principal.';
-                else if (activeSegments[0].key === 'run') initialVoice = 'Prepárate para tu caminata o carrera.';
-                else if (activeSegments[0].key === 'stretch') initialVoice = 'Prepárate para los estiramientos.';
+                if (firstActiveKey === 'training') initialVoice = 'Prepárate para el entrenamiento principal.';
+                else if (firstActiveKey === 'stretch') initialVoice = 'Prepárate para los estiramientos.';
                 steps.push({ label: 'PREPÁRATE', seconds: 15, color: 'bg-yellow-400', phase: 'inicio', voiceInitial: initialVoice, whistleOnStart: false, voiceCountdown: true });
             }
 
@@ -306,8 +322,9 @@
                     introForNextInternalSegment = 'Entrenamiento completado.'; // Final message before explicit completion step
                 }
 
-                if (currentSegmentData.key === 'run') {
-                    steps = steps.concat(currentSegmentData.generator(introForNextInternalSegment));
+                if (currentSegmentData.key === 'run' || currentSegmentData.key === 'walk') {
+                    // For GPS segments, pass the specific activity label for voice customization
+                    steps = steps.concat(currentSegmentData.generator(currentSegmentData.label.split(' ')[0], introForNextInternalSegment));
                 } else {
                     steps = steps.concat(currentSegmentData.generator(ent, introForNextInternalSegment));
                 }
@@ -709,7 +726,7 @@
                         lastPosition.current = { latitude, longitude, timestamp: now };
 
                         // Calculate average speed for announcements
-                        const averageSpeedKmH = (gpsTotalDistance.current > 0 && currentGpsTotalTime > 0) // Fixed: used currentGpsTotalTime here.
+                        const averageSpeedKmH = (gpsTotalDistance.current > 0 && currentGpsTotalTime > 0)
                                                 ? (gpsTotalDistance.current / currentGpsTotalTime) * 3.6
                                                 : 0;
 
@@ -793,8 +810,8 @@
 
                 // Determine if GPS is part of the selected workout phases
                 // This state is crucial for conditional rendering of GPS UI and wake lock logic
-                const gpsIncluded = selectedWorkoutPhases.includes('run');
-                setIsGpsActive(gpsIncluded); // Set initial state for GPS if 'run' phase is selected
+                const gpsIncluded = selectedWorkoutPhases.includes('run') || selectedWorkoutPhases.includes('walk');
+                setIsGpsActive(gpsIncluded); // Set initial state for GPS if 'run' or 'walk' phase is selected
 
                 const generated = generateWorkoutSteps(workout, DEFAULT_PARAMS, selectedWorkoutPhases);
                 stepsRef.current = generated;
@@ -803,6 +820,14 @@
                 const firstSec = generated.length > 0 ? generated[0].seconds : 0;
                 stepDurRef.current = firstSec;
                 setTime(firstSec);
+
+                // Automatically start the timer if steps are valid and visible after selection
+                if (generated.length > 0 && generated[0].phase !== 'error') {
+                     workoutStartRef.current = Date.now(); // Initialize workout start time
+                     stepStartRef.current = Date.now();   // Initialize current step start time
+                     setStatus('running'); // Start the main timer loop
+                }
+
             }, [workout, isModeSelectionScreenVisible, selectedWorkoutPhases, stopGpsTracking]); // Removed isGpsActive from dependencies as it's set inside this effect.
 
             // ── Wake lock ────────────────────────────────────────────────────────────
@@ -994,7 +1019,8 @@
                     React.createElement('button', { onClick: onExit, className: "w-full max-w-sm bg-white text-black py-6 rounded-full font-black uppercase" }, "Finalizar")
                 );
 
-            const curr = steps[uiIdx] || steps[0]; // curr is guaranteed to be defined here due to checks above
+            // curr is guaranteed to be defined here due to checks above for steps.length
+            const curr = steps[uiIdx] || { label: 'Cargando...', color: 'bg-slate-950' }; // Provide a fallback if curr somehow becomes undefined
             const showOverlay = uiStatus === 'ready' || uiStatus === 'paused';
 
             return React.createElement('div', { className: `h-screen flex flex-col transition-colors duration-700 ${curr.color || 'bg-slate-950'} text-white` },
