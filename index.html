@@ -691,34 +691,6 @@
             // Tiempo total acumulado (General)
             const totalSec = useMemo(() => history.reduce((a, h) => a + (h.totalTime || 0), 0), [history]);
 
-            // Datos para la semana actual (fixed period)
-            const currentWeekData = useMemo(() => {
-                const today = new Date();
-                const { start, end } = getWeekRange(today, 0);
-                const filtered = history.filter(h => { const d = new Date(h.date); return d >= start && d <= end; });
-                const totalTime = filtered.reduce((a, h) => a + (h.totalTime || 0), 0);
-                return { totalTime, sessionCount: filtered.length };
-            }, [history]);
-
-            // Datos para el mes actual (fixed period)
-            const currentMonthData = useMemo(() => {
-                const today = new Date();
-                const { start, end } = getMonthRange(today, 0);
-                const filtered = history.filter(h => { const d = new Date(h.date); return d >= start && d <= end; });
-                const totalTime = filtered.reduce((a, h) => a + (h.totalTime || 0), 0);
-                return { totalTime, sessionCount: filtered.length };
-            }, [history]);
-
-            // Datos para el año actual (fixed period)
-            const currentYearData = useMemo(() => {
-                const today = new Date();
-                const { start, end } = getYearRange(today, 0);
-                const filtered = history.filter(h => { const d = new Date(h.date); return d >= start && d <= end; });
-                const totalTime = filtered.reduce((a, h) => a + (h.totalTime || 0), 0);
-                return { totalTime, sessionCount: filtered.length };
-            }, [history]);
-
-
             // Rango del período seleccionado actualmente (para el gráfico y resumen interactivo)
             const currentPeriodRange = useMemo(() => {
                 const today = new Date();
@@ -805,8 +777,13 @@
                 return `Año: ${start.getFullYear()}`;
             }, [currentPeriodRange, periodType]);
 
-            const summaryLabel = useMemo(() => {
-                if (periodOffset !== 0) return 'Tiempo en el período seleccionado';
+            // Etiqueta para el resumen del período seleccionado (dinámico)
+            const dynamicPeriodSummaryLabel = useMemo(() => {
+                if (periodOffset !== 0) {
+                    if (periodType === 'semana') return 'Tiempo en la semana seleccionada';
+                    if (periodType === 'mes') return 'Tiempo en el mes seleccionado';
+                    if (periodType === 'año') return 'Tiempo en el año seleccionado';
+                }
                 if (periodType === 'semana') return 'Tiempo en esta semana';
                 if (periodType === 'mes')    return 'Tiempo en este mes';
                 return 'Tiempo en este año';
@@ -817,31 +794,6 @@
                 React.createElement('div', { className: "glass-card p-6 text-center" },
                     React.createElement('span', { className: "text-[9px] opacity-40 block mb-1 uppercase" }, "Tiempo Total Acumulado"),
                     React.createElement('span', { className: "text-3xl font-black text-orange-500" }, formatTimeHnM(totalSec))
-                ),
-
-                // Nuevas tarjetas de resumen por períodos fijos (semana, mes, año actuales)
-                React.createElement('div', { className: "grid grid-cols-1 sm:grid-cols-3 gap-4" },
-                    // Tarjeta de Esta Semana
-                    React.createElement('div', { className: "glass-card p-5 text-center" },
-                        React.createElement('span', { className: "text-[9px] opacity-40 block mb-1 uppercase" }, "Esta Semana"),
-                        React.createElement('span', { className: "text-2xl font-black text-sky-400 block" }, formatTimeHnM(currentWeekData.totalTime)),
-                        React.createElement('span', { className: "text-[9px] opacity-40 uppercase" }, "Sesiones: "),
-                        React.createElement('span', { className: "text-base font-black text-emerald-400" }, currentWeekData.sessionCount)
-                    ),
-                    // Tarjeta de Este Mes
-                    React.createElement('div', { className: "glass-card p-5 text-center" },
-                        React.createElement('span', { className: "text-[9px] opacity-40 block mb-1 uppercase" }, "Este Mes"),
-                        React.createElement('span', { className: "text-2xl font-black text-sky-400 block" }, formatTimeHnM(currentMonthData.totalTime)),
-                        React.createElement('span', { className: "text-[9px] opacity-40 uppercase" }, "Sesiones: "),
-                        React.createElement('span', { className: "text-base font-black text-emerald-400" }, currentMonthData.sessionCount)
-                    ),
-                    // Tarjeta de Este Año
-                    React.createElement('div', { className: "glass-card p-5 text-center" },
-                        React.createElement('span', { className: "text-[9px] opacity-40 block mb-1 uppercase" }, "Este Año"),
-                        React.createElement('span', { className: "text-2xl font-black text-sky-400 block" }, formatTimeHnM(currentYearData.totalTime)),
-                        React.createElement('span', { className: "text-[9px] opacity-40 uppercase" }, "Sesiones: "),
-                        React.createElement('span', { className: "text-base font-black text-emerald-400" }, currentYearData.sessionCount)
-                    )
                 ),
 
                 // Selector de tipo de período (Semana, Mes, Año)
@@ -861,7 +813,7 @@
                 // Resumen del período seleccionado (interactivo)
                 React.createElement('div', { className: "glass-card p-5 flex justify-between items-center" },
                     React.createElement('div', { className: "text-left" },
-                        React.createElement('span', { className: "text-[9px] opacity-40 uppercase block" }, summaryLabel),
+                        React.createElement('span', { className: "text-[9px] opacity-40 uppercase block" }, dynamicPeriodSummaryLabel),
                         React.createElement('span', { className: "text-2xl font-black text-sky-400" }, formatTimeHnM(periodSec))
                     ),
                     React.createElement('div', { className: "text-right" },

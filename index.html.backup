@@ -680,15 +680,58 @@
             const chartRef = useRef(null);
             const chartInst = useRef(null);
             const PERIOD_TYPES = ['semana', 'mes', 'año'];
+
+            // Helper para formatear tiempo en horas y minutos
+            const formatTimeHnM = useCallback((seconds) => {
+                const h = Math.floor(seconds / 3600);
+                const m = Math.floor((seconds % 3600) / 60);
+                return `${h}h ${m}m`;
+            }, []);
+
+            // Tiempo total acumulado (General)
             const totalSec = useMemo(() => history.reduce((a, h) => a + (h.totalTime || 0), 0), [history]);
+
+            // Datos para la semana actual (fixed period)
+            const currentWeekData = useMemo(() => {
+                const today = new Date();
+                const { start, end } = getWeekRange(today, 0);
+                const filtered = history.filter(h => { const d = new Date(h.date); return d >= start && d <= end; });
+                const totalTime = filtered.reduce((a, h) => a + (h.totalTime || 0), 0);
+                return { totalTime, sessionCount: filtered.length };
+            }, [history]);
+
+            // Datos para el mes actual (fixed period)
+            const currentMonthData = useMemo(() => {
+                const today = new Date();
+                const { start, end } = getMonthRange(today, 0);
+                const filtered = history.filter(h => { const d = new Date(h.date); return d >= start && d <= end; });
+                const totalTime = filtered.reduce((a, h) => a + (h.totalTime || 0), 0);
+                return { totalTime, sessionCount: filtered.length };
+            }, [history]);
+
+            // Datos para el año actual (fixed period)
+            const currentYearData = useMemo(() => {
+                const today = new Date();
+                const { start, end } = getYearRange(today, 0);
+                const filtered = history.filter(h => { const d = new Date(h.date); return d >= start && d <= end; });
+                const totalTime = filtered.reduce((a, h) => a + (h.totalTime || 0), 0);
+                return { totalTime, sessionCount: filtered.length };
+            }, [history]);
+
+
+            // Rango del período seleccionado actualmente (para el gráfico y resumen interactivo)
             const currentPeriodRange = useMemo(() => {
                 const today = new Date();
                 if (periodType === 'semana') return getWeekRange(today, periodOffset);
                 if (periodType === 'mes')    return getMonthRange(today, periodOffset);
                 if (periodType === 'año')    return getYearRange(today, periodOffset);
-                return { start: new Date(0), end: new Date() };
+                return { start: new Date(0), end: new Date() }; // Fallback
             }, [periodType, periodOffset]);
+
+            // Historial filtrado para el período seleccionado
             const filteredHistory = useMemo(() => history.filter(h => { const d = new Date(h.date); return d >= currentPeriodRange.start && d <= currentPeriodRange.end; }), [history, currentPeriodRange]);
+
+            // Tiempo total del período seleccionado
             const periodSec = useMemo(() => filteredHistory.reduce((a, h) => a + (h.totalTime || 0), 0), [filteredHistory]);
 
             useEffect(() => {
@@ -697,19 +740,26 @@
                 if (chartInst.current) chartInst.current.destroy();
                 let labels = [], data = [];
                 const agg = new Map();
+
                 if (periodType === 'semana') {
                     for (let d = new Date(currentPeriodRange.start); d <= currentPeriodRange.end; d.setDate(d.getDate() + 1))
                         labels.push(d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }));
                     filteredHistory.forEach(h => { const k = new Date(h.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }); agg.set(k, (agg.get(k) || 0) + (h.totalTime || 0)); });
                     data = labels.map(l => Math.floor((agg.get(l) || 0) / 60));
                 } else if (periodType === 'mes') {
+                    // Adaptado para mostrar semanas dentro del mes, si el rango es un mes
                     let cur = startOfDay(new Date(currentPeriodRange.start));
-                    cur = startOfDay(new Date(cur.setDate(cur.getDate() - (cur.getDay() === 0 ? 6 : cur.getDay() - 1))));
+                    // Ajustar al inicio de la primera semana visible para el mes, que puede empezar en el mes anterior
+                    cur = startOfDay(new Date(cur.setDate(cur.getDate() - (cur.getDay() === 0 ? 6 : cur.getDay() - 1)))); // Lunes de la semana
                     let wn = 1;
                     while (cur <= currentPeriodRange.end) {
-                        const ws = new Date(cur), we = endOfDay(new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 6));
+                        const ws = new Date(cur);
+                        const we = endOfDay(new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 6));
+
+                        // Limitar la semana al rango del mes actual para el conteo de tiempo
                         const es = startOfDay(new Date(Math.max(ws.getTime(), currentPeriodRange.start.getTime())));
                         const ee = endOfDay(new Date(Math.min(we.getTime(), currentPeriodRange.end.getTime())));
+
                         if (es <= ee) {
                             labels.push(`Sem ${wn} (${es.getDate()}/${es.getMonth() + 1})`);
                             let wt = 0;
@@ -717,14 +767,15 @@
                             data.push(Math.floor(wt / 60));
                             wn++;
                         }
-                        cur.setDate(cur.getDate() + 7);
-                        if (cur > currentPeriodRange.end) break;
+                        cur.setDate(cur.getDate() + 7); // Siguiente semana
+                        if (cur > currentPeriodRange.end && cur.getMonth() !== currentPeriodRange.end.getMonth()) break; // Si ya salimos del mes
                     }
-                } else {
+                } else { // periodType === 'año'
                     for (let i = 0; i < 12; i++) labels.push(new Date(currentPeriodRange.start.getFullYear(), i, 1).toLocaleDateString('es-ES', { month: 'short' }));
                     filteredHistory.forEach(h => { const k = new Date(h.date).toLocaleDateString('es-ES', { month: 'short' }); agg.set(k, (agg.get(k) || 0) + (h.totalTime || 0)); });
                     data = labels.map(l => Math.floor((agg.get(l) || 0) / 60));
                 }
+
                 chartInst.current = new Chart(ctx, {
                     type: 'bar',
                     data: { labels, datasets: [{ label: 'Minutos', data, backgroundColor: '#f97316', borderRadius: 8 }] },
@@ -762,13 +813,42 @@
             }, [periodOffset, periodType]);
 
             return React.createElement('div', { className: "flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4 pb-28" },
+                // Tarjeta de Tiempo Total Acumulado (General)
                 React.createElement('div', { className: "glass-card p-6 text-center" },
                     React.createElement('span', { className: "text-[9px] opacity-40 block mb-1 uppercase" }, "Tiempo Total Acumulado"),
-                    React.createElement('span', { className: "text-3xl font-black text-orange-500" }, Math.floor(totalSec / 3600), "h ", Math.floor((totalSec % 3600) / 60), "m")
+                    React.createElement('span', { className: "text-3xl font-black text-orange-500" }, formatTimeHnM(totalSec))
                 ),
+
+                // Nuevas tarjetas de resumen por períodos fijos (semana, mes, año actuales)
+                React.createElement('div', { className: "grid grid-cols-1 sm:grid-cols-3 gap-4" },
+                    // Tarjeta de Esta Semana
+                    React.createElement('div', { className: "glass-card p-5 text-center" },
+                        React.createElement('span', { className: "text-[9px] opacity-40 block mb-1 uppercase" }, "Esta Semana"),
+                        React.createElement('span', { className: "text-2xl font-black text-sky-400 block" }, formatTimeHnM(currentWeekData.totalTime)),
+                        React.createElement('span', { className: "text-[9px] opacity-40 uppercase" }, "Sesiones: "),
+                        React.createElement('span', { className: "text-base font-black text-emerald-400" }, currentWeekData.sessionCount)
+                    ),
+                    // Tarjeta de Este Mes
+                    React.createElement('div', { className: "glass-card p-5 text-center" },
+                        React.createElement('span', { className: "text-[9px] opacity-40 block mb-1 uppercase" }, "Este Mes"),
+                        React.createElement('span', { className: "text-2xl font-black text-sky-400 block" }, formatTimeHnM(currentMonthData.totalTime)),
+                        React.createElement('span', { className: "text-[9px] opacity-40 uppercase" }, "Sesiones: "),
+                        React.createElement('span', { className: "text-base font-black text-emerald-400" }, currentMonthData.sessionCount)
+                    ),
+                    // Tarjeta de Este Año
+                    React.createElement('div', { className: "glass-card p-5 text-center" },
+                        React.createElement('span', { className: "text-[9px] opacity-40 block mb-1 uppercase" }, "Este Año"),
+                        React.createElement('span', { className: "text-2xl font-black text-sky-400 block" }, formatTimeHnM(currentYearData.totalTime)),
+                        React.createElement('span', { className: "text-[9px] opacity-40 uppercase" }, "Sesiones: "),
+                        React.createElement('span', { className: "text-base font-black text-emerald-400" }, currentYearData.sessionCount)
+                    )
+                ),
+
+                // Selector de tipo de período (Semana, Mes, Año)
                 React.createElement('div', { className: "flex gap-2" },
                     PERIOD_TYPES.map(p => React.createElement('button', { key: p, onClick: () => { setPeriodType(p); setPeriodOffset(0); }, className: `flex-1 py-3 rounded-xl font-black uppercase text-[10px] transition-all ${periodType === p ? 'bg-orange-500 text-white' : 'bg-white/5 text-slate-400'}` }, p))
                 ),
+                // Navegación de período y título
                 React.createElement('div', { className: "flex items-center justify-between glass-card p-4" },
                     React.createElement('button', { onClick: () => setPeriodOffset(p => p - 1), className: "p-2 bg-white/5 text-slate-400 rounded-lg" },
                         React.createElement('svg', { width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" }))
@@ -778,16 +858,18 @@
                         React.createElement('svg', { width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" }))
                     )
                 ),
+                // Resumen del período seleccionado (interactivo)
                 React.createElement('div', { className: "glass-card p-5 flex justify-between items-center" },
                     React.createElement('div', { className: "text-left" },
                         React.createElement('span', { className: "text-[9px] opacity-40 uppercase block" }, summaryLabel),
-                        React.createElement('span', { className: "text-2xl font-black text-sky-400" }, Math.floor(periodSec / 3600), "h ", Math.floor((periodSec % 3600) / 60), "m")
+                        React.createElement('span', { className: "text-2xl font-black text-sky-400" }, formatTimeHnM(periodSec))
                     ),
                     React.createElement('div', { className: "text-right" },
                         React.createElement('span', { className: "text-[9px] opacity-40 uppercase block" }, "Sesiones"),
                         React.createElement('span', { className: "text-2xl font-black text-emerald-400" }, filteredHistory.length)
                     )
                 ),
+                // Gráfico de avance
                 React.createElement('div', { className: "glass-card p-4" },
                     React.createElement('div', { style: { height: '200px' } },
                         React.createElement('canvas', { ref: chartRef })
