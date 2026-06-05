@@ -25,6 +25,10 @@
         body {
             font-family: 'Inter', sans-serif; background-color: #020617; color: white;
             margin: 0; padding: 0; overflow: hidden; -webkit-tap-highlight-color: transparent;
+            /* Using position: fixed with width/height 100% for full viewport coverage,
+               especially useful with viewport-fit=cover on iOS.
+               Be mindful that `overflow: hidden` on body means no content can scroll if it overflows this root container.
+               Ensure content within #root correctly uses `overflow-y-auto` for scrolling. */
             position: fixed; width: 100%; height: 100%;
         }
         #root { height: 100%; width: 100%; display: flex; flex-direction: column; }
@@ -70,6 +74,12 @@
             messagingSenderId: "198872357236",
             appId: "1:198872357236:web:c3cd2a7f5caff197847421"
         };
+        // CRÍTICO: La API Key de Firebase está expuesta en el cliente.
+        // Para una aplicación de producción, es INDISPENSABLE configurar correctamente las
+        // Reglas de Seguridad de Firebase Firestore para asegurar que cada usuario
+        // solo pueda leer y escribir sus propios datos (workouts e historial).
+        // Sin reglas de seguridad adecuadas, esta API Key pública permitiría el acceso
+        // y modificación de datos de cualquier usuario.
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
@@ -267,7 +277,7 @@
             const transitionVoice = nextPhaseIntro ? ` ${nextPhaseIntro}` : '';
             // Add a post-GPS rest, but it's okay to make it short as the user might want to see the map directly after stopping.
             // The actual stopping and showing map is handled by stopGpsTracking and the PlayerView logic flow.
-            s.push({ label: 'DESCANSO (POST-GPS)', seconds: 10, color: 'bg-teal-400', phase: POST_GPS_REST_PHASE_KEY, voiceInitial: `Descanso.`, whistleOnStart: false, voiceCountdown: true });
+            s.push({ label: 'DESCANSO (POST-GPS)', seconds: 10, color: 'bg-teal-400', phase: POST_GPS_REST_PHASE_KEY, voiceInitial: `Descanso.${transitionVoice}`, whistleOnStart: false, voiceCountdown: true });
             return s;
         };
 
@@ -282,7 +292,8 @@
             }
             const lastStepOfStretch = s[s.length -1];
             if (lastStepOfStretch && nextPhaseIntro) {
-                lastStepOfStretch.voiceInitial += ` ${nextPhaseIntro}`;
+                // Append the next phase intro to the last stretch voice if it exists
+                lastStepOfStretch.voiceInitial = `${lastStepOfStretch.voiceInitial}.${nextPhaseIntro}`;
             }
             return s;
         };
@@ -540,11 +551,11 @@
                 ),
                 React.createElement('div', { className: "flex gap-4 mb-4" },
                     React.createElement('button', {
-                        onClick: handleSave,
+                        onClick: handleSave, // Use the internal handleSave
                         className: "flex-1 bg-white/10 text-white py-4 rounded-full font-black uppercase italic active:scale-95 text-xs flex items-center justify-center"
                     }, React.createElement(IconSave, { className: "mr-2" }), "GUARDAR MAPA"),
                     React.createElement('button', {
-                        onClick: handleShare,
+                        onClick: handleShare, // Use the internal handleShare
                         className: "flex-1 bg-white/10 text-white py-4 rounded-full font-black uppercase italic active:scale-95 text-xs flex items-center justify-center"
                     }, React.createElement(IconShare, { className: "mr-2" }), "COMPARTIR")
                 ),
@@ -583,6 +594,8 @@
 
             const handleStartWorkout = useCallback((w) => {
                 if (window.speechSynthesis) {
+                    // This is a common workaround to initialize SpeechSynthesis in iOS.
+                    // iOS often requires user interaction to enable speech, and a silent utterance can 'wake it up'.
                     const silent = new SpeechSynthesisUtterance(' ');
                     silent.volume = 0;
                     window.speechSynthesis.speak(silent);
@@ -636,15 +649,17 @@
                 } catch (err) { alert("Error: " + err.message); }
             }, [isReg, email, pass]);
             return React.createElement('div', { className: "h-screen flex flex-col items-center bg-slate-950 p-10 pt-20 text-center" },
-                React.createElement('div', { className: "text-7xl mb-6" }, "🏃‍♂️"),
-                React.createElement('h1', { className: "text-4xl font-black italic uppercase text-white" }, APP_TITLE),
-                React.createElement('p', { className: "text-[8px] text-slate-600 uppercase mb-8" }, "V ", APP_VERSION),
-                React.createElement('form', { onSubmit: handle, className: "space-y-4 w-full max-w-sm" },
-                    React.createElement('input', { type: "email", placeholder: "EMAIL", className: "w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value: email, onChange: e => setEmail(e.target.value), required: true }),
-                    React.createElement('input', { type: "password", placeholder: "CLAVE", className: "w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value: pass, onChange: e => setPass(e.target.value), required: true }),
-                    React.createElement('button', { type: "submit", className: "w-full bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic" }, isReg ? 'REGISTRARSE' : 'ENTRAR')
-                ),
-                React.createElement('button', { onClick: () => setIsReg(!isReg), className: "mt-8 text-slate-500 text-[10px] uppercase font-black" }, isReg ? 'YA TENGO CUENTA' : 'CREAR CUENTA NUEVA')
+                React.createElement(React.Fragment, null,
+                    React.createElement('div', { className: "text-7xl mb-6" }, "🏃‍♂️"),
+                    React.createElement('h1', { className: "text-4xl font-black italic uppercase text-white" }, APP_TITLE),
+                    React.createElement('p', { className: "text-[8px] text-slate-600 uppercase mb-8" }, "V ", APP_VERSION),
+                    React.createElement('form', { onSubmit: handle, className: "space-y-4 w-full max-w-sm" },
+                        React.createElement('input', { type: "email", placeholder: "EMAIL", className: "w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value: email, onChange: e => setEmail(e.target.value), required: true }),
+                        React.createElement('input', { type: "password", placeholder: "CLAVE", className: "w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value: pass, onChange: e => setPass(e.target.value), required: true }),
+                        React.createElement('button', { type: "submit", className: "w-full bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic" }, isReg ? 'REGISTRARSE' : 'ENTRAR')
+                    ),
+                    React.createElement('button', { onClick: () => setIsReg(!isReg), className: "mt-8 text-slate-500 text-[10px] uppercase font-black" }, isReg ? 'YA TENGO CUENTA' : 'CREAR CUENTA NUEVA')
+                )
             );
         }
 
@@ -837,7 +852,7 @@
                 } else {
                     endWorkout();
                 }
-            }, [endWorkout, advanceToStep, isGpsActive, stopGpsTracking]); // Added stopGpsTracking
+            }, [endWorkout, advanceToStep, isGpsActive, stopGpsTracking, handleSpeech]); // Added handleSpeech to dependencies
 
             // ── GPS Tracking functions ───────────────────────────────────────────────
             const announceGpsStats = useCallback((distance, timeSec) => {
@@ -1201,8 +1216,8 @@
                 return React.createElement(GpsMapSummary, {
                     gpsCoordinates,
                     finalGpsSummary,
-                    onSave: () => {}, // Handled internally by GpsMapSummary
-                    onShare: () => {}, // Handled internally by GpsMapSummary
+                    onSave: () => {}, // Handled internally by GpsMapSummary, passing empty func is fine.
+                    onShare: () => {}, // Handled internally by GpsMapSummary, passing empty func is fine.
                     onClose: () => {
                         // Once map is viewed/shared, finalize workout and go back
                         if (!savedRef.current && workout) {
@@ -1217,7 +1232,7 @@
             // Render GPS tracking UI when active
             // `isGpsActive` will be true if 'run' or 'walk' was selected AND `startGpsTracking` has been called.
             // `uiStatus === 'gps-running'` confirms the app state is specifically in GPS tracking mode.
-            if (isGpsActive && uiStatus === 'gps-running') { 
+            if (isGpsActive && uiStatus === 'gps-running') {
                 return React.createElement('div', { className: "h-screen flex flex-col items-center justify-center bg-slate-950 text-white p-6" },
                     React.createElement('div', {
                         className: "absolute inset-0 bg-slate-950 flex flex-col items-center justify-center p-6",
