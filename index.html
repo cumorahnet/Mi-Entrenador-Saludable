@@ -86,7 +86,7 @@
 
         const APP_ID = "mientrenador-v3";
         const APP_TITLE = "Mi Entrenador Saludable";
-        const APP_VERSION = "1.0.3";
+        const APP_VERSION = "1.0.5"; // <--- VERSIÓN ACTUALIZADA
 
         const WARMUP_STEPS = [
             { label: 'TOBILLO DERECHO', voice: 'Tobillo derecho' },
@@ -994,12 +994,12 @@
                     // Por ahora, se asume que 'gps-running' es un estado continuo.
                     speak('No se puede pausar durante el seguimiento GPS. Presiona el botón de encendido del celular para ver el botón de finalizar.', true);
                 }
-            }, [workout]);
+            }, [workout]); // togglePlay needs access to `workout`
 
             // ── Inicialización cuando cambia workout o el modo de entrenamiento ────
             useEffect(() => {
                 // Reset all states and refs
-                setStatus('ready');
+                setStatus('ready'); // Aseguramos que el estado inicial es 'ready' para mostrar el overlay
                 setIdx(0);
                 setElap(0);
                 savedRef.current = false;
@@ -1030,14 +1030,29 @@
                 stepDurRef.current = firstSec;
                 setTime(firstSec);
 
-                // Automatically start the timer if steps are valid and visible after selection
+                let timeoutId;
+                // Auto-start the timer after a short delay
                 if (generated.length > 0 && generated[0].phase !== 'error') {
-                     workoutStartRef.current = Date.now(); // Initialize workout start time
-                     stepStartRef.current = Date.now();   // Initialize current step start time
-                     setStatus('running'); // Start the main timer loop
+                    // Usamos setTimeout para dar tiempo a React a renderizar los cambios de estado iniciales (steps, timeLeft)
+                    // antes de intentar cambiar el uiStatus a 'running' y ocultar el overlay.
+                    timeoutId = setTimeout(() => {
+                        // Solo si el usuario no ha interactuado (el estado sigue siendo 'ready')
+                        if (statusRef.current === 'ready') {
+                            togglePlay(); // Llama a togglePlay para iniciar el workout
+                        }
+                    }, 50); // Pequeño retraso de 50ms
                 }
 
-            }, [workout, isModeSelectionScreenVisible, selectedWorkoutPhases, stopGpsTracking, isGpsActive, setHasGpsDataAndRef]);
+                return () => {
+                    if (timeoutId) clearTimeout(timeoutId);
+                    // Aseguramos que el watcher de GPS se limpie al desmontar el componente o reinicializar.
+                    if (gpsWatcherId.current) {
+                        navigator.geolocation.clearWatch(gpsWatcherId.current);
+                        gpsWatcherId.current = null;
+                    }
+                };
+
+            }, [workout, isModeSelectionScreenVisible, selectedWorkoutPhases, stopGpsTracking, isGpsActive, setHasGpsDataAndRef, togglePlay]);
 
             // ── Wake lock ────────────────────────────────────────────────────────────
             const releaseWake = useCallback(() => {
