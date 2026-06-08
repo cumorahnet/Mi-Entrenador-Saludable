@@ -25,10 +25,6 @@
         body {
             font-family: 'Inter', sans-serif; background-color: #020617; color: white;
             margin: 0; padding: 0; overflow: hidden; -webkit-tap-highlight-color: transparent;
-            /* Using position: fixed with width/height 100% for full viewport coverage,
-               especially useful with viewport-fit=cover on iOS.
-               Be mindful that `overflow: hidden` on body means no content can scroll if it overflows this root container.
-               Ensure content within #root correctly uses `overflow-y-auto` for scrolling. */
             position: fixed; width: 100%; height: 100%;
         }
         #root { height: 100%; width: 100%; display: flex; flex-direction: column; }
@@ -42,7 +38,6 @@
             letter-spacing: -0.06em; pointer-events: none;
         }
         @media (orientation: landscape) { .timer-huge { font-size: 75vh; } }
-        /* Style for Leaflet map container */
         .leaflet-container {
             width: 100%;
             height: 100%;
@@ -58,13 +53,19 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
     <script>
+        // Global error handler for uncaught JavaScript errors
+        window.onerror = function(message, source, lineno, colno, error) {
+            console.error('GLOBAL JS ERROR:', { message, source, lineno, colno, error });
+            alert('Ha ocurrido un error inesperado en la aplicación. Por favor, revisa la consola para más detalles.');
+            return true;
+        };
+
         const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
         const IconPlay = () => React.createElement('svg', { width: "40", height: "40", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M8 5v14l11-7z" }));
         const IconPause = () => React.createElement('svg', { width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M6 19h4V5H6v14zm8-14v14h4V5h-4z" }));
         const IconShare = () => React.createElement('svg', { width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.52.47 1.2.77 1.96.77 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L7.94 12.03c-.52-.47-1.2-.77-1.96-.77-1.66 0-3 1.34-3 3s1.34 3 3 3c.76 0 1.44-.3 1.96-.77l7.05 4.11c-.05.23-.09.46-.09.7 0 1.66 1.34 3 3 3s3-1.34 3-3-1.34-3-3-3z" }));
         const IconSave = () => React.createElement('svg', { width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" }));
-
 
         const firebaseConfig = {
             apiKey: "AIzaSyDg0nohFAprIYta3Z3IvFGms55PehyxGIM",
@@ -74,19 +75,14 @@
             messagingSenderId: "198872357236",
             appId: "1:198872357236:web:c3cd2a7f5caff197847421"
         };
-        // CRÍTICO: La API Key de Firebase está expuesta en el cliente.
-        // Para una aplicación de producción, es INDISPENSABLE configurar correctamente las
-        // Reglas de Seguridad de Firebase Firestore para asegurar que cada usuario
-        // solo pueda leer y escribir sus propios datos (workouts e historial).
-        // Sin reglas de seguridad adecuadas, esta API Key pública permitiría el acceso
-        // y modificación de datos de cualquier usuario.
+        
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
 
         const APP_ID = "mientrenador-v3";
         const APP_TITLE = "Mi Entrenador Saludable";
-        const APP_VERSION = "1.0.5"; // <--- VERSIÓN ACTUALIZADA
+        const APP_VERSION = "1.0.5";
 
         const WARMUP_STEPS = [
             { label: 'TOBILLO DERECHO', voice: 'Tobillo derecho' },
@@ -110,13 +106,11 @@
         };
         const formatTime = (s) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
 
-        // GPS specific phases
         const GPS_PHASE_KEY = 'gps-tracking';
         const POST_GPS_REST_PHASE_KEY = 'post-gps-rest';
 
-        // ─── GPS Utility Functions ──────────────────────────────────────────────────
         const getDistance = (lat1, lon1, lat2, lon2) => {
-            const R = 6371e3; // metres
+            const R = 6371e3;
             const φ1 = lat1 * Math.PI/180;
             const φ2 = lat2 * Math.PI/180;
             const Δφ = (lat2-lat1) * Math.PI/180;
@@ -127,7 +121,7 @@
                       Math.sin(Δλ/2) * Math.sin(Δλ/2);
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 
-            return R * c; // in metres
+            return R * c;
         };
 
         const formatPace = (totalDistanceMeters, totalTimeSeconds) => {
@@ -189,11 +183,15 @@
             window.speechSynthesis.speak(msg);
         };
         const speak = (text, interrupt = false, onEnd = null) => {
-            if (!window.speechSynthesis) return;
+            if (!window.speechSynthesis) {
+                console.warn("SpeechSynthesis not available.");
+                if (onEnd) onEnd();
+                return;
+            }
             if (interrupt) { window.speechSynthesis.cancel(); voiceQueue.length = 0; voiceBusy = false; }
             if (text) voiceQueue.push(onEnd ? { text, onEnd } : text);
             flushVoice();
-       };
+        };
 
         const startOfDay = (date) => { const d = new Date(date); d.setHours(0, 0, 0, 0); return d; };
         const endOfDay = (date) => { const d = new Date(date); d.setHours(23, 59, 59, 999); return d; };
@@ -221,7 +219,6 @@
             return { start, end };
         };
 
-        // --- Helper functions for generating specific workout segments ---
         const generateWarmupSegment = (ent, nextPhaseIntro = null) => {
             const s = [];
             s.push({ label: 'PREPÁRATE', seconds: 15, color: 'bg-yellow-400', phase: 'inicio', voiceInitial: 'Prepárate para el calentamiento', whistleOnStart: false, voiceCountdown: true });
@@ -259,24 +256,19 @@
             return s;
         };
 
-        // Modified generateGpsRunSegment to not include initial rest and have countdown
         const generateGpsRunSegment = (activityTypeLabel, nextPhaseIntro = null) => {
             const s = [];
             const initialVoice = `Comienza ${activityTypeLabel.toLowerCase()}. Tres, dos, uno.`;
-
-            // No 'DESCANSO (PRE-GPS)' as per new requirement, directly start with countdown
             s.push({
                 label: `INICIAR ${activityTypeLabel.toUpperCase()}`,
-                seconds: 4, // For 3, 2, 1 countdown + 1 sec initial speech
+                seconds: 4,
                 color: 'bg-gray-800',
                 phase: GPS_PHASE_KEY,
                 voiceInitial: initialVoice,
                 whistleOnStart: true,
-                voiceCountdown: true // This will make it speak 3, 2, 1
+                voiceCountdown: true
             });
             const transitionVoice = nextPhaseIntro ? ` ${nextPhaseIntro}` : '';
-            // Add a post-GPS rest, but it's okay to make it short as the user might want to see the map directly after stopping.
-            // The actual stopping and showing map is handled by stopGpsTracking and the PlayerView logic flow.
             s.push({ label: 'DESCANSO (POST-GPS)', seconds: 10, color: 'bg-teal-400', phase: POST_GPS_REST_PHASE_KEY, voiceInitial: `Descanso.${transitionVoice}`, whistleOnStart: false, voiceCountdown: true });
             return s;
         };
@@ -292,43 +284,37 @@
             }
             const lastStepOfStretch = s[s.length -1];
             if (lastStepOfStretch && nextPhaseIntro) {
-                // Append the next phase intro to the last stretch voice if it exists
                 lastStepOfStretch.voiceInitial = `${lastStepOfStretch.voiceInitial}.${nextPhaseIntro}`;
             }
             return s;
         };
 
-        // Define all possible segments with their keys, labels, and generator functions
         const ALL_POSSIBLE_SEGMENTS_DATA = [
             { key: 'warmup', label: 'Calentamiento', generator: generateWarmupSegment },
             { key: 'training', label: 'Ejercicio Principal', generator: generateMainTrainingSegment },
-            { key: 'walk', label: 'Caminata (GPS)', generator: generateGpsRunSegment }, // Separated Walk option
-            { key: 'run', label: 'Carrera (GPS)', generator: generateGpsRunSegment },   // Separated Run option
+            { key: 'walk', label: 'Caminata (GPS)', generator: generateGpsRunSegment },
+            { key: 'run', label: 'Carrera (GPS)', generator: generateGpsRunSegment },
             { key: 'stretch', label: 'Estiramientos', generator: generateStretchSegment },
         ];
-        // The order of these keys defines the overall flow of the workout
         const ALL_POSSIBLE_SEGMENTS_ORDERED_KEYS = ALL_POSSIBLE_SEGMENTS_DATA.map(s => s.key);
 
-
         const generateWorkoutSteps = (workout, defaultParams, selectedPhasesKeys) => {
-            // Safety check: if no phases selected, return a single "No phases" step
             if (!selectedPhasesKeys || selectedPhasesKeys.length === 0) {
+                console.warn('generateWorkoutSteps: No phases selected. Returning error step.');
                 return [{ label: 'NO HAY FASES', seconds: 5, color: 'bg-red-500', phase: 'error', voiceInitial: 'No se seleccionó ninguna fase. Por favor, cancela.', whistleOnStart: false, voiceCountdown: false }];
             }
-            if (!workout) { // Should not happen if a workout is always passed to PlayerView
+            if (!workout) {
+                console.error('generateWorkoutSteps: Workout object is null. Returning error step.');
                  return [{ label: 'ERROR DE RUTINA', seconds: 5, color: 'bg-red-500', phase: 'error', voiceInitial: 'Error: Rutina no encontrada. Por favor, cancela.', whistleOnStart: false, voiceCountdown: false }];
             }
 
             const ent = { ...defaultParams.entrenamiento, ...(workout.phases?.entrenamiento || {}) };
             let steps = [];
 
-            // Filter and order the selected phases based on ALL_POSSIBLE_SEGMENTS_ORDERED_KEYS
             const activeSegments = ALL_POSSIBLE_SEGMENTS_DATA.filter(segment =>
                 selectedPhasesKeys.includes(segment.key)
             ).sort((a, b) => ALL_POSSIBLE_SEGMENTS_ORDERED_KEYS.indexOf(a.key) - ALL_POSSIBLE_SEGMENTS_ORDERED_KEYS.indexOf(b.key));
 
-            // Determine if an initial 'PREPÁRATE' is needed
-            // If the first selected segment is NOT 'warmup', and also not 'run'/'walk' (which have their own prep/countdown)
             const firstActiveKey = activeSegments.length > 0 ? activeSegments[0].key : null;
             const isGpsFirst = (firstActiveKey === 'run' || firstActiveKey === 'walk');
 
@@ -347,29 +333,26 @@
                 if (nextSegmentData) {
                     introForNextInternalSegment = `A continuación, ${nextSegmentData.label.toLowerCase()}.`;
                 } else {
-                    introForNextInternalSegment = 'Entrenamiento completado.'; // Final message before explicit completion step
+                    introForNextInternalSegment = 'Entrenamiento completado.';
                 }
 
                 if (currentSegmentData.key === 'run' || currentSegmentData.key === 'walk') {
-                    // For GPS segments, pass the specific activity label (e.g., "Carrera" or "Caminata") for voice customization
                     steps = steps.concat(currentSegmentData.generator(currentSegmentData.label.split(' ')[0], introForNextInternalSegment));
                 } else {
                     steps = steps.concat(currentSegmentData.generator(ent, introForNextInternalSegment));
                 }
             }
 
-            // Ensure steps is not empty before adding final completion (should be caught by initial check but extra safe)
             if (steps.length === 0) {
+                console.error('generateWorkoutSteps: Steps array is empty after generation, adding generic error.');
                  return [{ label: 'ERROR DE GENERACIÓN', seconds: 5, color: 'bg-red-500', phase: 'error', voiceInitial: 'Error al generar los pasos de la rutina. Por favor, cancela.', whistleOnStart: false, voiceCountdown: false }];
             }
 
             steps.push({ label: 'FINAL DE LA RUTINA', seconds: 10, color: 'bg-green-500', phase: 'finished', voiceInitial: 'Rutina finalizada. ¡Buen trabajo!', whistleOnStart: false, voiceCountdown: false });
-
+            console.log('generateWorkoutSteps: Successfully generated steps. Count:', steps.length);
             return steps;
         };
 
-
-        // ─── ModeSelectionScreen Component ──────────────────────────────────────────────
         function ModeSelectionScreen({ onModeSelected, onCancel }) {
             const [selectedPhases, setSelectedPhases] = useState([]);
 
@@ -386,6 +369,7 @@
                     speak('Por favor, selecciona al menos una fase de entrenamiento.', true);
                     return;
                 }
+                console.log('ModeSelectionScreen: Phases selected. Starting workout with:', selectedPhases);
                 onModeSelected(selectedPhases);
             };
 
@@ -393,7 +377,7 @@
                 React.createElement('h1', { className: "text-4xl font-black italic mb-6 text-orange-500" }, "Configura tu Sesión"),
                 React.createElement('p', { className: "text-sm text-slate-400 mb-8" }, "Elige las fases de entrenamiento que deseas realizar:"),
                 React.createElement('div', { className: "flex flex-col space-y-4 w-full max-w-sm mb-10" },
-                    ALL_POSSIBLE_SEGMENTS_DATA.map(phase => // Use the ordered list for rendering checkboxes
+                    ALL_POSSIBLE_SEGMENTS_DATA.map(phase =>
                         React.createElement('label', { key: phase.key, className: "flex items-center p-4 glass-card cursor-pointer" },
                             React.createElement('input', {
                                 type: "checkbox",
@@ -416,16 +400,14 @@
             );
         }
 
-        // ─── GpsMapSummary Component ────────────────────────────────────────────────
         function GpsMapSummary({ gpsCoordinates, finalGpsSummary, onSave, onShare, onClose }) {
             const mapRef = useRef(null);
             const mapInstance = useRef(null);
-            const mapContainerRef = useRef(null); // Ref for the div to capture for screenshot
+            const mapContainerRef = useRef(null);
 
             useEffect(() => {
                 if (!gpsCoordinates || gpsCoordinates.length === 0 || !mapRef.current) return;
 
-                // Initialize map
                 if (mapInstance.current) {
                     mapInstance.current.remove();
                 }
@@ -435,14 +417,10 @@
                     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 }).addTo(mapInstance.current);
 
-                // Draw polyline
                 const latLngs = gpsCoordinates.map(coord => [coord.lat, coord.lng]);
                 const polyline = L.polyline(latLngs, { color: '#f97316', weight: 5 }).addTo(mapInstance.current);
-
-                // Fit bounds to polyline
                 mapInstance.current.fitBounds(polyline.getBounds());
 
-                // Add start and end markers
                 if (gpsCoordinates.length > 0) {
                     L.marker([gpsCoordinates[0].lat, gpsCoordinates[0].lng]).addTo(mapInstance.current)
                         .bindPopup('Inicio').openPopup();
@@ -511,7 +489,7 @@
                             speak('Mapa compartido con éxito.');
                         } catch (err) {
                             console.error('Error al compartir:', err);
-                            if (err.name !== 'AbortError') { // User closed share dialog
+                            if (err.name !== 'AbortError') {
                                 alert('No se pudo compartir el mapa. Inténtalo de nuevo.');
                             }
                         }
@@ -522,7 +500,7 @@
                 });
             }, [finalGpsSummary]);
 
-            if (!finalGpsSummary) return null; // Should not happen if rendered correctly
+            if (!finalGpsSummary) return null;
 
             return React.createElement('div', { className: "h-screen flex flex-col bg-slate-950 text-white p-6" },
                 React.createElement('h2', { className: "text-3xl font-black italic text-orange-500 mb-4 text-center" }, "Tu Ruta GPS"),
@@ -551,11 +529,11 @@
                 ),
                 React.createElement('div', { className: "flex gap-4 mb-4" },
                     React.createElement('button', {
-                        onClick: handleSave, // Use the internal handleSave
+                        onClick: handleSave,
                         className: "flex-1 bg-white/10 text-white py-4 rounded-full font-black uppercase italic active:scale-95 text-xs flex items-center justify-center"
                     }, React.createElement(IconSave, { className: "mr-2" }), "GUARDAR MAPA"),
                     React.createElement('button', {
-                        onClick: handleShare, // Use the internal handleShare
+                        onClick: handleShare,
                         className: "flex-1 bg-white/10 text-white py-4 rounded-full font-black uppercase italic active:scale-95 text-xs flex items-center justify-center"
                     }, React.createElement(IconShare, { className: "mr-2" }), "COMPARTIR")
                 ),
@@ -566,8 +544,774 @@
             );
         }
 
+        function PlayerView({ workout, onExit, onComplete }) {
+            const [uiStatus, setUiStatus] = useState('ready');
+            const [uiIdx, setUiIdx] = useState(0);
+            const [uiTimeLeft, setUiTimeLeft] = useState(0);
+            const [uiElapsed, setUiElapsed] = useState(0);
+            const [steps, setSteps] = useState([]);
+            const [isModeSelectionScreenVisible, setIsModeSelectionScreenVisible] = useState(true);
+            const [selectedWorkoutPhases, setSelectedWorkoutPhases] = useState(null);
+            const [showPostWorkoutMap, setShowPostWorkoutMap] = useState(false);
+            const [isGpsActive, setIsGpsActive] = useState(false);
+            const [showGpsControls, setShowGpsControls] = useState(false);
+            const [gpsCoordinates, setGpsCoordinates] = useState([]);
+            const [hasGpsData, setHasGpsData] = useState(false);
+            const [finalGpsSummary, setFinalGpsSummary] = useState(null);
 
-        // ─── App ────────────────────────────────────────────────────────────────────
+            const statusRef = useRef(uiStatus);
+            const idxRef = useRef(uiIdx);
+            const timeLeftRef = useRef(uiTimeLeft);
+            const elapsedRef = useRef(uiElapsed);
+            const stepsRef = useRef([]);
+            const stepDurRef = useRef(0);
+            const stepStartRef = useRef(null);
+            const workoutStartRef = useRef(null);
+            const pausedAtRef = useRef(null);
+            const savedRef = useRef(false);
+            const spokenInit = useRef({});
+            const lastSpokenKey = useRef('');
+            const wakeLockRef = useRef(null);
+            const videoRef = useRef(null);
+            const gpsWatcherId = useRef(null);
+            const lastPosition = useRef(null);
+            const gpsStartTime = useRef(null);
+            const gpsAnnounceLastTime = useRef(0);
+            const gpsTotalDistance = useRef(0);
+            const gpsTotalTime = useRef(0);
+            const hasGpsDataRef = useRef(false);
+
+            console.log('PlayerView: Render. Status:', uiStatus, 'Idx:', uiIdx, 'TimeLeft:', uiTimeLeft, 'Elapsed:', uiElapsed, 'ModeScreen:', isModeSelectionScreenVisible, 'Phases:', selectedWorkoutPhases?.length || 0, 'Steps:', steps.length);
+
+            useEffect(() => { statusRef.current = uiStatus; }, [uiStatus]);
+            useEffect(() => { idxRef.current = uiIdx; }, [uiIdx]);
+            useEffect(() => { timeLeftRef.current = uiTimeLeft; }, [uiTimeLeft]);
+            useEffect(() => { elapsedRef.current = uiElapsed; }, [uiElapsed]);
+            useEffect(() => { hasGpsDataRef.current = hasGpsData; }, [hasGpsData]);
+
+            const setTime = useCallback((t) => {
+                if (isNaN(t)) { console.error('PlayerView: setTime received NaN. Resetting to 0.'); setUiTimeLeft(0); }
+                else { setUiTimeLeft(t); }
+            }, []);
+            const setElap = useCallback((e) => {
+                if (isNaN(e)) { console.error('PlayerView: setElap received NaN. Resetting to 0.'); setUiElapsed(0); }
+                else { setUiElapsed(e); }
+            }, []);
+
+            const announceGpsStats = useCallback((distance, timeSec) => {
+                const formattedDistance = formatDistance(distance);
+                const formattedSpeed = formatSpeed(distance, timeSec);
+                const formattedPace = formatPace(distance, timeSec);
+                speak(`Distancia: ${formattedDistance}. Velocidad promedio: ${formattedSpeed}. Ritmo promedio: ${formattedPace}.`);
+            }, []);
+
+            const handleSpeech = useCallback((step, stepIdx, remaining) => {
+                if (statusRef.current !== 'running' && statusRef.current !== 'gps-running') return;
+
+                const initKey = `${stepIdx}_init`;
+                if (remaining === step.seconds && step.voiceInitial && !spokenInit.current[initKey] && statusRef.current === 'running') {
+                    speak(step.voiceInitial, true);
+                    if (step.whistleOnStart) navigator.vibrate(150);
+                    spokenInit.current[initKey] = true;
+                }
+                if (step.voiceMidpoint && remaining === step.voiceMidpoint.time) {
+                    const k = `${stepIdx}_mid_${remaining}`;
+                    if (lastSpokenKey.current !== k) { speak(step.voiceMidpoint.text); lastSpokenKey.current = k; }
+                }
+                if (step.voiceCountdown && remaining > 0 && remaining <= 3) {
+                    const k = `${stepIdx}_cd_${remaining}`;
+                    if (lastSpokenKey.current !== k) { speak(String(remaining)); lastSpokenKey.current = k; }
+                }
+                if (step.whistleOnStart && remaining === step.seconds && statusRef.current === 'running' && step.phase !== GPS_PHASE_KEY && !spokenInit.current[initKey + '_whistle']) {
+                    whistle();
+                    spokenInit.current[initKey + '_whistle'] = true;
+                }
+            }, []);
+
+            const endWorkout = useCallback(() => {
+                console.log('PlayerView: endWorkout called. Current elapsed:', elapsedRef.current);
+                setUiStatus('finished');
+                speak('Entrenamiento finalizado. ¡Buen trabajo!', true, () => {
+                    if (hasGpsDataRef.current && finalGpsSummary) {
+                        console.log('PlayerView: Showing post-workout map.');
+                        setShowPostWorkoutMap(true);
+                    } else {
+                        if (!savedRef.current && workout) {
+                            console.log('PlayerView: Completing workout without GPS data.');
+                            onComplete(workout.name, elapsedRef.current, null);
+                            savedRef.current = true;
+                        }
+                        onExit();
+                    }
+                });
+            }, [workout, onComplete, onExit, finalGpsSummary, setUiStatus]);
+
+            const advanceToStep = useCallback((nextIdx) => {
+                const s = stepsRef.current;
+                if (nextIdx >= s.length) {
+                    console.log('PlayerView: No more steps to advance to. Ending workout.');
+                    endWorkout();
+                    return false;
+                }
+                console.log('PlayerView: Advancing to step', nextIdx, 'Label:', s[nextIdx].label);
+                idxRef.current = nextIdx;
+                stepDurRef.current = s[nextIdx].seconds;
+                timeLeftRef.current = s[nextIdx].seconds;
+                stepStartRef.current = Date.now();
+                lastSpokenKey.current = '';
+                spokenInit.current = {};
+                setUiIdx(nextIdx);
+                setTime(s[nextIdx].seconds);
+                return true;
+            }, [endWorkout, setUiIdx, setTime]);
+
+            const stopGpsTracking = useCallback((isSkip = false) => {
+                console.log('PlayerView: stopGpsTracking called. isSkip:', isSkip);
+                if (gpsWatcherId.current) {
+                    navigator.geolocation.clearWatch(gpsWatcherId.current);
+                    gpsWatcherId.current = null;
+                    console.log('PlayerView: GPS watch cleared.');
+                }
+
+                const finalDistance = gpsTotalDistance.current;
+                const finalTime = gpsTotalTime.current;
+
+                if (finalDistance > 0 && finalTime > 0 && gpsCoordinates.length > 1) {
+                    setHasGpsData(true);
+                    setFinalGpsSummary({
+                        distance: finalDistance,
+                        time: finalTime,
+                        pace: formatPace(finalDistance, finalTime),
+                        speed: formatSpeed(finalDistance, finalTime)
+                    });
+                    console.log('PlayerView: GPS data collected and summarized:', { finalDistance, finalTime });
+                } else {
+                    setHasGpsData(false);
+                    setFinalGpsSummary(null);
+                    console.log('PlayerView: No significant GPS data collected.');
+                }
+
+                speak('Seguimiento de caminata o carrera finalizado.', true, () => {
+                    if (finalDistance > 0 && finalTime > 0) {
+                        announceGpsStats(finalDistance, finalTime);
+                    } else {
+                        speak('No se registró distancia significativa.');
+                    }
+                    setIsGpsActive(false);
+                    setShowGpsControls(false);
+                    setUiStatus('running');
+                    if (!isSkip) {
+                        console.log('PlayerView: Auto-skipping to next step after GPS phase.');
+                        const next = idxRef.current + 1;
+                        advanceToStep(next);
+                    }
+                });
+            }, [advanceToStep, announceGpsStats, gpsCoordinates, setHasGpsData, setFinalGpsSummary, setUiStatus, setIsGpsActive, setShowGpsControls]);
+
+            const skipStep = useCallback(() => {
+                if (statusRef.current === 'finished' || stepsRef.current.length === 0) {
+                    console.log('PlayerView: Skip request ignored. Status:', statusRef.current, 'Steps length:', stepsRef.current.length);
+                    return;
+                }
+                console.log('PlayerView: Skip step requested.');
+                const currentStep = stepsRef.current[idxRef.current];
+                if (currentStep.phase === GPS_PHASE_KEY && isGpsActive) {
+                    console.log('PlayerView: Stopping GPS tracking due to skip.');
+                    stopGpsTracking(true);
+                    return;
+                }
+
+                const next = idxRef.current + 1;
+                if (advanceToStep(next)) {
+                    speak('Saltando. Siguiente.', true);
+                    if (stepsRef.current[next] && stepsRef.current[next].phase !== GPS_PHASE_KEY) {
+                        handleSpeech(stepsRef.current[next], next, stepsRef.current[next].seconds);
+                    }
+                } else {
+                    endWorkout();
+                }
+            }, [endWorkout, advanceToStep, isGpsActive, stopGpsTracking, handleSpeech]);
+
+            const startGpsTracking = useCallback(() => {
+                console.log('PlayerView: startGpsTracking called.');
+                if (!('geolocation' in navigator)) {
+                    speak('Error: Geolocalización no disponible. No se puede iniciar el seguimiento.');
+                    console.error("Geolocation is not supported by this browser. Skipping GPS tracking.");
+                    setIsGpsActive(false);
+                    setUiStatus('running');
+                    skipStep();
+                    return;
+                }
+                if (isGpsActive) {
+                    console.warn('PlayerView: GPS is already active, preventing multiple starts.');
+                    return;
+                }
+
+                speak('Iniciando seguimiento de caminata o carrera. Las actualizaciones serán por audio cada diez minutos. Presiona el botón de encendido del celular para ver el botón de finalizar.', true);
+                setIsGpsActive(true);
+                setShowGpsControls(false);
+
+                gpsStartTime.current = Date.now();
+                lastPosition.current = null;
+                gpsTotalDistance.current = 0;
+                gpsTotalTime.current = 0;
+                setGpsCoordinates([]);
+                setHasGpsData(false);
+                setFinalGpsSummary(null);
+                gpsAnnounceLastTime.current = gpsStartTime.current;
+                console.log('PlayerView: GPS tracking initialized. Requesting watchPosition.');
+
+                const options = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
+
+                gpsWatcherId.current = navigator.geolocation.watchPosition(
+                    (position) => {
+                        const { latitude, longitude } = position.coords;
+                        const now = Date.now();
+                        const timeElapsedMs = now - gpsStartTime.current;
+                        const currentGpsTotalTime = Math.floor(timeElapsedMs / 1000);
+                        gpsTotalTime.current = currentGpsTotalTime;
+
+                        let currentDistance = gpsTotalDistance.current;
+                        if (lastPosition.current) {
+                            const dist = getDistance(
+                                lastPosition.current.latitude,
+                                lastPosition.current.longitude,
+                                latitude,
+                                longitude
+                            );
+                            currentDistance += dist;
+                            gpsTotalDistance.current = currentDistance;
+                        }
+                        lastPosition.current = { latitude, longitude, timestamp: now };
+                        setGpsCoordinates(prev => [...prev, { lat: latitude, lng: longitude, timestamp: now }]);
+
+                        if (statusRef.current === 'gps-running' && currentGpsTotalTime > 0 && (now - gpsAnnounceLastTime.current) >= (10 * 60 * 1000)) {
+                            console.log('PlayerView: Announcing GPS stats.');
+                            announceGpsStats(gpsTotalDistance.current, currentGpsTotalTime);
+                            gpsAnnounceLastTime.current = now;
+                        }
+                    },
+                    (error) => {
+                        console.error("PlayerView: GPS Error:", error);
+                        speak(`Error de GPS: ${error.message}. Deteniendo seguimiento.`);
+                        stopGpsTracking();
+                    },
+                    options
+                );
+            }, [skipStep, announceGpsStats, isGpsActive, stopGpsTracking, setHasGpsData, setUiStatus, setIsGpsActive, setShowGpsControls]);
+
+            const togglePlay = useCallback(() => {
+                if (!workout || stepsRef.current.length === 0) {
+                    console.warn('togglePlay: Cannot toggle play, workout or steps missing. Workout:', workout, 'Steps length:', stepsRef.current.length);
+                    speak('No se puede iniciar la rutina. Verifica la configuración.', true);
+                    return;
+                }
+                const current = statusRef.current;
+                console.log('togglePlay called. Current status (from ref):', current);
+
+                if (current === 'ready') {
+                    const now = Date.now();
+                    workoutStartRef.current = now;
+                    stepStartRef.current = now;
+                    setUiStatus('running');
+                    console.log('togglePlay: Transitioned from ready to running.');
+                } else if (current === 'running') {
+                    pausedAtRef.current = Date.now();
+                    setUiStatus('paused');
+                    console.log('togglePlay: Transitioned from running to paused.');
+                } else if (current === 'paused') {
+                    const now = Date.now();
+                    const pausedMs = pausedAtRef.current ? now - pausedAtRef.current : 0;
+                    console.log('togglePlay: Resuming from pause. Paused time (ms):', pausedMs);
+
+                    workoutStartRef.current = (workoutStartRef.current !== null && !isNaN(workoutStartRef.current)) ? workoutStartRef.current + pausedMs : now;
+                    stepStartRef.current = (stepStartRef.current !== null && !isNaN(stepStartRef.current)) ? stepStartRef.current + pausedMs : now;
+
+                    if (isNaN(workoutStartRef.current)) workoutStartRef.current = now;
+                    if (isNaN(stepStartRef.current)) stepStartRef.current = now;
+
+                    pausedAtRef.current = null;
+                    setUiStatus('running');
+                    console.log('togglePlay: Transitioned from paused to running. New workoutStartRef:', workoutStartRef.current, 'stepStartRef:', stepStartRef.current);
+                } else if (current === 'gps-running') {
+                    speak('No se puede pausar durante el seguimiento GPS. Presiona el botón de encendido del celular para ver el botón de finalizar.', true);
+                    console.log('togglePlay: Attempted pause during GPS, ignored.');
+                }
+            }, [workout, setUiStatus]);
+
+            const releaseWake = useCallback(() => {
+                if (videoRef.current) videoRef.current.pause();
+                if (wakeLockRef.current) {
+                    console.log('PlayerView: Releasing wake lock.');
+                    wakeLockRef.current.release().then(() => wakeLockRef.current = null)
+                                       .catch((e) => console.warn("PlayerView: Error releasing wake lock:", e));
+                }
+            }, []);
+
+            const requestWake = useCallback(async () => {
+                try {
+                    if (videoRef.current) videoRef.current.play().catch(() => {});
+                    if ('wakeLock' in navigator && !wakeLockRef.current) {
+                        wakeLockRef.current = await navigator.wakeLock.request('screen');
+                        console.log('PlayerView: Wake lock requested.');
+                    }
+                } catch (e) {
+                    console.warn("PlayerView: WakeLock failed:", e);
+                    if (statusRef.current === 'gps-running' && e.message.includes("not allowed")) {
+                        speak('Para el seguimiento GPS, mantén la pantalla encendida.');
+                    }
+                }
+            }, []);
+
+            useEffect(() => {
+                if (uiStatus === 'running' || uiStatus === 'gps-running') requestWake(); else releaseWake();
+                return releaseWake;
+            }, [uiStatus, requestWake, releaseWake]);
+
+            useEffect(() => {
+                const handleVisibilityChange = () => {
+                    console.log('PlayerView: Visibility changed to', document.hidden ? 'hidden' : 'visible', 'Current UI Status:', uiStatus);
+                    if (document.hidden) {
+                        if (statusRef.current === 'running') {
+                            pausedAtRef.current = Date.now();
+                            setUiStatus('paused');
+                        } else if (statusRef.current === 'gps-running') {
+                            setShowGpsControls(false);
+                        }
+                        releaseWake();
+                    } else {
+                        if (statusRef.current === 'paused' && pausedAtRef.current !== null) {
+                            const hiddenMs = Date.now() - pausedAtRef.current;
+                            workoutStartRef.current = (workoutStartRef.current !== null && !isNaN(workoutStartRef.current)) ? workoutStartRef.current + hiddenMs : Date.now();
+                            stepStartRef.current = (stepStartRef.current !== null && !isNaN(stepStartRef.current)) ? stepStartRef.current + hiddenMs : Date.now();
+                            pausedAtRef.current = null;
+                            setUiStatus('running');
+                        } else if (statusRef.current === 'gps-running') {
+                            setShowGpsControls(true);
+                        }
+                        requestWake();
+                    }
+                };
+                document.addEventListener('visibilitychange', handleVisibilityChange);
+                return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+            }, [requestWake, releaseWake, uiStatus, setUiStatus, setShowGpsControls]);
+
+            useEffect(() => {
+                console.log('PlayerView: Init useEffect running for dependencies change.');
+                setUiStatus('ready');
+                setUiIdx(0);
+                setElap(0);
+                setTime(0);
+                savedRef.current = false;
+                spokenInit.current = {};
+                lastSpokenKey.current = '';
+                workoutStartRef.current = null;
+                stepStartRef.current = null;
+                pausedAtRef.current = null;
+                setShowPostWorkoutMap(false);
+                setGpsCoordinates([]);
+                setHasGpsData(false);
+                setFinalGpsSummary(null);
+
+                if (gpsWatcherId.current) {
+                    navigator.geolocation.clearWatch(gpsWatcherId.current);
+                    gpsWatcherId.current = null;
+                    console.log('PlayerView: Init useEffect cleanup: GPS watch cleared during re-init.');
+                }
+                setIsGpsActive(false);
+
+                if (isModeSelectionScreenVisible || !workout || !selectedWorkoutPhases) {
+                    console.log('PlayerView: Init useEffect: Mode selection screen visible OR workout/phases not selected yet. Skipping step generation.');
+                    setSteps([]);
+                    return;
+                }
+
+                console.log('PlayerView: Init useEffect: Generating workout steps based on selected phases:', selectedWorkoutPhases);
+                const generated = generateWorkoutSteps(workout, DEFAULT_PARAMS, selectedWorkoutPhases);
+                stepsRef.current = generated;
+                setSteps(generated);
+
+                if (generated.length === 0) {
+                    console.error("PlayerView: Init useEffect: Generated steps array is empty, cannot set initial step details.");
+                    return;
+                }
+
+                const firstStep = generated[0];
+                stepDurRef.current = firstStep.seconds;
+                setTime(firstStep.seconds);
+                setUiIdx(0);
+
+                let timeoutId;
+                if (firstStep.phase !== 'error') {
+                    console.log('PlayerView: Init useEffect: Scheduling auto-start (timeout).');
+                    timeoutId = setTimeout(() => {
+                        if (statusRef.current === 'ready') {
+                            console.log('PlayerView: Init useEffect: setTimeout triggered. Auto-calling togglePlay.');
+                            togglePlay();
+                        } else {
+                            console.log('PlayerView: Init useEffect: setTimeout triggered, but status is not "ready" (it is:', statusRef.current, '). Skipping auto-play.');
+                        }
+                    }, 50);
+                }
+
+                return () => {
+                    console.log('PlayerView: Init useEffect cleanup on re-run or unmount.');
+                    if (timeoutId) clearTimeout(timeoutId);
+                };
+            }, [workout, isModeSelectionScreenVisible, selectedWorkoutPhases, setUiStatus, setUiIdx, setElap, setTime, setHasGpsData, setIsGpsActive, setShowGpsControls, setFinalGpsSummary, setGpsCoordinates, setShowPostWorkoutMap, endWorkout, togglePlay, stopGpsTracking]);
+
+            useEffect(() => {
+                if (uiStatus !== 'running' && uiStatus !== 'gps-running') {
+                    console.log('PlayerView: Timer useEffect skipped. Status is not running/gps-running:', uiStatus);
+                    return;
+                }
+                console.log('PlayerView: Timer useEffect activated. Status:', uiStatus);
+
+                const interval = setInterval(() => {
+                    const now = Date.now();
+                    const s = stepsRef.current;
+                    const ci = idxRef.current;
+                    const step = s[ci];
+
+                    if (!step) {
+                        console.error("PlayerView: Timer: No step found at current index (", ci, "). Steps array:", s, ". Ending workout.");
+                        endWorkout();
+                        return;
+                    }
+
+                    const currentWorkoutStart = workoutStartRef.current;
+                    const totalElap = Math.floor((now - (currentWorkoutStart !== null && !isNaN(currentWorkoutStart) ? currentWorkoutStart : now)) / 1000);
+                    if (!isNaN(totalElap)) {
+                        elapsedRef.current = totalElap;
+                        setElap(totalElap);
+                    } else {
+                        console.error('PlayerView: Timer: Calculated totalElap is NaN. Resetting to 0. Debug values: now=', now, 'workoutStartRef.current=', workoutStartRef.current);
+                        elapsedRef.current = 0;
+                        setElap(0);
+                    }
+
+                    if (statusRef.current === 'gps-running') {
+                        return;
+                    }
+
+                    if (statusRef.current !== 'running') {
+                        console.log('PlayerView: Timer: Current status ref is not "running" (was', statusRef.current, '), pausing interval processing.');
+                        return;
+                    }
+
+                    const currentStepStart = stepStartRef.current;
+                    const passed = Math.floor((now - (currentStepStart !== null && !isNaN(currentStepStart) ? currentStepStart : now)) / 1000);
+                    const remaining = Math.max(0, stepDurRef.current - passed);
+
+                    if (!isNaN(remaining)) {
+                        timeLeftRef.current = remaining;
+                        setTime(remaining);
+                    } else {
+                        console.error('PlayerView: Timer: Calculated remaining is NaN. Resetting to 0. Debug values: remaining=', remaining, 'stepDurRef.current=', stepDurRef.current, 'passed=', passed, 'now=', now, 'stepStartRef.current=', stepStartRef.current);
+                        timeLeftRef.current = 0;
+                        setTime(0);
+                    }
+
+                    handleSpeech(step, ci, remaining);
+
+                    if (remaining === 0) {
+                        if (step.phase === GPS_PHASE_KEY) {
+                            console.log('PlayerView: Timer: GPS countdown finished. Initiating GPS tracking.');
+                            startGpsTracking();
+                            setUiStatus('gps-running');
+                            return;
+                        }
+
+                        const next = ci + 1;
+                        if (next < s.length) {
+                            advanceToStep(next);
+                            if (s[next].phase !== GPS_PHASE_KEY) {
+                                handleSpeech(s[next], next, s[next].seconds);
+                            }
+                        } else {
+                            endWorkout();
+                        }
+                    }
+                }, 250);
+
+                return () => {
+                    console.log('PlayerView: Timer useEffect cleanup. Clearing interval.');
+                    clearInterval(interval);
+                };
+            }, [uiStatus, endWorkout, setElap, setTime, startGpsTracking, setUiStatus, advanceToStep, handleSpeech]);
+
+            if (!workout) {
+                console.log('PlayerView: Rendering error: Workout not selected.');
+                return React.createElement('div', { className: "h-screen flex items-center justify-center bg-slate-950 text-white/50 text-sm italic" }, "Error: Rutina no seleccionada. Por favor, vuelve a la lista.");
+            }
+
+            if (isModeSelectionScreenVisible) {
+                console.log('PlayerView: Rendering ModeSelectionScreen.');
+                return React.createElement(ModeSelectionScreen, {
+                    onModeSelected: (phases) => {
+                        setSelectedWorkoutPhases(phases);
+                        setIsModeSelectionScreenVisible(false);
+                        console.log('PlayerView: Mode selected, hiding selection screen.');
+                    },
+                    onCancel: onExit
+                });
+            }
+
+            if (steps.length === 0 && !isModeSelectionScreenVisible) {
+                console.log('PlayerView: Rendering error: No steps generated.');
+                return React.createElement('div', { className: "h-screen flex flex-col items-center justify-center bg-slate-950 text-white/50 text-sm italic p-4" },
+                    React.createElement('p', { className: "mb-4" }, "Error: No se pudieron generar los pasos de la rutina con las fases seleccionadas."),
+                    React.createElement('p', { className: "mb-8" }, "Por favor, vuelve a la lista de rutinas e inténtalo de nuevo seleccionando al menos una fase."),
+                    React.createElement('button', { onClick: onExit, className: "w-full max-w-sm bg-white/10 text-white py-4 rounded-full font-black uppercase active:scale-95 italic text-xs" }, "Volver a Rutinas")
+                );
+            }
+
+            if (showPostWorkoutMap) {
+                console.log('PlayerView: Rendering GpsMapSummary.');
+                return React.createElement(GpsMapSummary, {
+                    gpsCoordinates,
+                    finalGpsSummary,
+                    onSave: () => {},
+                    onShare: () => {},
+                    onClose: () => {
+                        if (!savedRef.current && workout) {
+                            console.log('PlayerView: GpsMapSummary closed. Completing workout with GPS data.');
+                            onComplete(workout.name, elapsedRef.current, { coordinates: gpsCoordinates, summary: finalGpsSummary });
+                            savedRef.current = true;
+                        }
+                        onExit();
+                    }
+                });
+            }
+
+            if (isGpsActive && uiStatus === 'gps-running') {
+                console.log('PlayerView: Rendering GPS tracking UI. Show controls:', showGpsControls);
+                return React.createElement('div', { className: "h-screen flex flex-col items-center justify-center bg-slate-950 text-white p-6" },
+                    React.createElement('div', {
+                        className: "absolute inset-0 bg-slate-950 flex flex-col items-center justify-center p-6",
+                    },
+                        !showGpsControls && React.createElement('div', { className: "text-center" },
+                            React.createElement('h2', { className: "text-xl font-black uppercase text-slate-400 mb-2" }, "GPS ACTIVO"),
+                            React.createElement('p', { className: "text-sm text-slate-600" }, "Presiona botón de encendido para controles")
+                        ),
+                        showGpsControls && React.createElement(React.Fragment, null,
+                            React.createElement('h2', { className: "text-3xl font-black uppercase text-orange-500 mb-4" }, "Caminata / Carrera"),
+                            React.createElement('p', { className: "text-lg text-slate-400 mb-10" }, "Seguimiento GPS Activo. Actualizaciones solo por voz."),
+                            React.createElement('button', {
+                                onClick: () => stopGpsTracking(),
+                                className: "w-full max-w-sm bg-red-600/80 text-white py-6 rounded-full font-black uppercase active:scale-95 italic"
+                            }, "TERMINAR CAMINATA / CARRERA")
+                        )
+                    )
+                );
+            }
+
+            if (uiStatus === 'finished') {
+                console.log('PlayerView: Rendering Finished screen.');
+                return React.createElement('div', { className: "h-screen flex flex-col items-center justify-center p-8 bg-slate-950 text-white text-center" },
+                    React.createElement('h1', { className: "text-5xl font-black italic mb-4" }, "¡HECHO!"),
+                    React.createElement('button', { onClick: onExit, className: "w-full max-w-sm bg-white text-black py-6 rounded-full font-black uppercase" }, "Finalizar")
+                );
+            }
+
+            const curr = steps[uiIdx] || { label: 'Cargando...', color: 'bg-slate-950' };
+            const showOverlay = uiStatus === 'ready' || uiStatus === 'paused';
+
+            console.log('PlayerView: Rendering main UI. Status:', uiStatus, 'Current Step Label:', curr.label, 'Time Left:', uiTimeLeft, 'Elapsed:', uiElapsed);
+            return React.createElement('div', { className: `h-screen flex flex-col transition-colors duration-700 ${curr.color || 'bg-slate-950'} text-white` },
+                React.createElement('div', { style: { position: 'absolute', top: 0, left: 0, color: 'red', zIndex: 9999, fontSize: '10px', padding: '5px', backgroundColor: 'rgba(0,0,0,0.5)' } },
+                    `Status: ${uiStatus}, Idx: ${uiIdx}, Phases: ${selectedWorkoutPhases?.length || 0}, Steps: ${steps.length}, Label: ${curr.label || 'N/A'}, TimeLeft: ${uiTimeLeft}`
+                ),
+                React.createElement('video', { ref: videoRef, loop: true, muted: true, playsInline: true, style: { position: 'absolute', width: '1px', height: '1px', opacity: 0.01 } },
+                    React.createElement('source', { src: "https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/one-second-loop.mp4", type: "video/mp4" })
+                ),
+                React.createElement('div', { className: "bg-black/10 p-4 pt-10 flex justify-between items-center shrink-0 z-10" },
+                    React.createElement('div', { className: "leading-none text-left" },
+                        React.createElement('span', { className: "text-[10px] font-black text-orange-500 uppercase" }, "Tiempo Total"),
+                        React.createElement('p', { className: "text-xl font-black italic" }, formatTime(uiElapsed))
+                    ),
+                    React.createElement('div', { className: "text-center" },
+                        React.createElement('h2', { className: "text-[10px] font-black uppercase italic truncate max-w-[120px] tracking-tight" }, workout.name || 'Rutina')
+                    ),
+                    React.createElement('button', { onClick: onExit, className: "opacity-40 text-xl font-black px-2" }, "✕")
+                ),
+                React.createElement('div', { className: "flex-1 flex flex-col items-center justify-center text-center px-4 min-h-0 relative" },
+                    showOverlay && React.createElement('div', { className: "absolute inset-0 z-40 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center" },
+                        React.createElement('button', { onClick: togglePlay, className: "bg-orange-500 p-10 rounded-full shadow-2xl active:scale-90" },
+                            React.createElement(IconPlay, null)
+                        )
+                    ),
+                    React.createElement('h2', { className: "text-[11vw] font-black uppercase italic text-white/80 leading-none mb-2" }, curr.label || 'LISTO'),
+                    React.createElement('div', { className: "timer-huge tabular-nums text-white" }, uiTimeLeft)
+                ),
+                React.createElement('div', { className: "bg-slate-950 p-6 pb-10 flex flex-col items-center shrink-0" },
+                    React.createElement('div', { className: "w-full max-w-md grid grid-cols-3 items-center mb-6 text-center italic" },
+                        React.createElement('button', { onClick: skipStep, className: "bg-slate-800/40 py-4 rounded-xl text-[10px] font-black uppercase text-white/70 active:scale-95" }, "Saltar"),
+                        React.createElement('div', { className: "flex justify-center" },
+                            uiStatus !== 'ready' && React.createElement('button', {
+                                onClick: togglePlay,
+                                className: "w-20 h-20 rounded-full border-4 border-yellow-400 flex items-center justify-center active:scale-90"
+                            },
+                                uiStatus === 'running' ? React.createElement(IconPause, null) : React.createElement(IconPlay, null)
+                            )
+                        ),
+                        React.createElement('button', { onClick: endWorkout, className: "bg-red-500/20 py-4 rounded-xl text-[10px] font-black uppercase text-red-400 active:scale-95" }, "Finalizar")
+                    ),
+                    React.createElement('div', { className: "w-full max-w-md grid grid-cols-2 items-center text-center italic" },
+                        React.createElement('div', { className: "flex flex-col" },
+                            React.createElement('span', { className: "text-[14vw] font-black text-sky-400 leading-none" }, curr.tr ? curr.tr - (curr.r || 0) + 1 : '-'),
+                            React.createElement('span', { className: "text-[8px] opacity-40" }, "Rondas Restantes")
+                        ),
+                        React.createElement('div', { className: "flex flex-col" },
+                            React.createElement('span', { className: "text-[14vw] font-black text-yellow-400 leading-none" }, curr.tc ? curr.tc - (curr.cy || 0) + 1 : '-'),
+                            React.createElement('span', { className: "text-[8px] opacity-40" }, "Ciclos Restantes")
+                        )
+                    )
+                )
+            );
+        }
+
+        function AvanceView({ history }) {
+            const [periodType, setPeriodType] = useState('semana');
+            const [periodOffset, setPeriodOffset] = useState(0);
+            const chartRef = useRef(null);
+            const chartInst = useRef(null);
+            const PERIOD_TYPES = ['semana', 'mes', 'año'];
+
+            const formatTimeHnM = useCallback((seconds) => {
+                const h = Math.floor(seconds / 3600);
+                const m = Math.floor((seconds % 3600) / 60);
+                return `${h}h ${m}m`;
+            }, []);
+
+            const totalSec = useMemo(() => history.reduce((a, h) => a + (h.totalTime || 0), 0), [history]);
+
+            const currentPeriodRange = useMemo(() => {
+                const today = new Date();
+                if (periodType === 'semana') return getWeekRange(today, periodOffset);
+                if (periodType === 'mes')    return getMonthRange(today, periodOffset);
+                if (periodType === 'año')    return getYearRange(today, periodOffset);
+                return { start: new Date(0), end: new Date() };
+            }, [periodType, periodOffset]);
+
+            const filteredHistory = useMemo(() => history.filter(h => { const d = new Date(h.date); return d >= currentPeriodRange.start && d <= currentPeriodRange.end; }), [history, currentPeriodRange]);
+
+            const periodSec = useMemo(() => filteredHistory.reduce((a, h) => a + (h.totalTime || 0), 0), [filteredHistory]);
+
+            useEffect(() => {
+                const ctx = chartRef.current?.getContext('2d');
+                if (!ctx) return;
+                if (chartInst.current) chartInst.current.destroy();
+                let labels = [], data = [];
+                const agg = new Map();
+
+                if (periodType === 'semana') {
+                    for (let d = new Date(currentPeriodRange.start); d <= currentPeriodRange.end; d.setDate(d.getDate() + 1))
+                        labels.push(d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }));
+                    filteredHistory.forEach(h => { const k = new Date(h.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }); agg.set(k, (agg.get(k) || 0) + (h.totalTime || 0)); });
+                    data = labels.map(l => Math.floor((agg.get(l) || 0) / 60));
+                } else if (periodType === 'mes') {
+                    let cur = startOfDay(new Date(currentPeriodRange.start));
+                    cur = startOfDay(new Date(cur.setDate(cur.getDate() - (cur.getDay() === 0 ? 6 : cur.getDay() - 1))));
+                    let wn = 1;
+                    while (cur <= currentPeriodRange.end) {
+                        const ws = new Date(cur);
+                        const we = endOfDay(new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 6));
+
+                        const es = startOfDay(new Date(Math.max(ws.getTime(), currentPeriodRange.start.getTime())));
+                        const ee = endOfDay(new Date(Math.min(we.getTime(), currentPeriodRange.end.getTime())));
+
+                        if (es <= ee) {
+                            labels.push(`Sem ${wn} (${es.getDate()}/${es.getMonth() + 1})`);
+                            let wt = 0;
+                            filteredHistory.forEach(h => { const d = new Date(h.date); if (d >= es && d <= ee) wt += (h.totalTime || 0); });
+                            data.push(Math.floor(wt / 60));
+                            wn++;
+                        }
+                        cur.setDate(cur.getDate() + 7);
+                        if (cur > currentPeriodRange.end && cur.getMonth() !== currentPeriodRange.end.getMonth()) break;
+                    }
+                } else {
+                    for (let i = 0; i < 12; i++) labels.push(new Date(currentPeriodRange.start.getFullYear(), i, 1).toLocaleDateString('es-ES', { month: 'short' }));
+                    filteredHistory.forEach(h => { const k = new Date(h.date).toLocaleDateString('es-ES', { month: 'short' }); agg.set(k, (agg.get(k) || 0) + (h.totalTime || 0)); });
+                    data = labels.map(l => Math.floor((agg.get(l) || 0) / 60));
+                }
+
+                chartInst.current = new Chart(ctx, {
+                    type: 'bar',
+                    data: { labels, datasets: [{ label: 'Minutos', data, backgroundColor: '#f97316', borderRadius: 8 }] },
+                    options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b' } }, x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } } } }
+                });
+                return () => chartInst.current?.destroy();
+            }, [filteredHistory, periodType, currentPeriodRange]);
+
+            const periodTitle = useMemo(() => {
+                const { start, end } = currentPeriodRange;
+                const sf = { day: 'numeric', month: 'short' };
+                if (periodType === 'semana') {
+                    const cw = getWeekRange(new Date(), 0);
+                    if (start.getTime() === cw.start.getTime()) return 'Semana Actual';
+                    if (start.getTime() === getWeekRange(new Date(), -1).start.getTime()) return 'Semana Anterior';
+                    return start.getMonth() === end.getMonth()
+                        ? `Semana: ${start.getDate()} - ${end.toLocaleDateString('es-ES', { day: 'numeric' })}`
+                        : `Semana: ${start.toLocaleDateString('es-ES', sf)} - ${end.toLocaleDateString('es-ES', sf)}`;
+                }
+                if (periodType === 'mes') {
+                    if (start.getTime() === getMonthRange(new Date(), 0).start.getTime()) return 'Mes Actual';
+                    if (start.getTime() === getMonthRange(new Date(), -1).start.getTime()) return 'Mes Anterior';
+                    return `Mes: ${start.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}`;
+                }
+                if (start.getTime() === getYearRange(new Date(), 0).start.getTime()) return 'Año Actual';
+                if (start.getTime() === getYearRange(new Date(), -1).start.getTime()) return 'Año Anterior';
+                return `Año: ${start.getFullYear()}`;
+            }, [currentPeriodRange, periodType]);
+
+            const dynamicPeriodSummaryLabel = useMemo(() => {
+                if (periodOffset !== 0) {
+                    if (periodType === 'semana') return 'Tiempo en la semana seleccionada';
+                    if (periodType === 'mes') return 'Tiempo en el mes seleccionado';
+                    if (periodType === 'año') return 'Tiempo en el año seleccionado';
+                }
+                if (periodType === 'semana') return 'Tiempo en esta semana';
+                if (periodType === 'mes')    return 'Tiempo en este mes';
+                return 'Tiempo en este año';
+            }, [periodOffset, periodType]);
+
+            return React.createElement('div', { className: "flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4 pb-28" },
+                React.createElement('div', { className: "glass-card p-6 text-center" },
+                    React.createElement('span', { className: "text-[9px] opacity-40 block mb-1 uppercase" }, "Tiempo Total Acumulado"),
+                    React.createElement('span', { className: "text-3xl font-black text-orange-500" }, formatTimeHnM(totalSec))
+                ),
+                React.createElement('div', { className: "flex gap-2" },
+                    PERIOD_TYPES.map(p => React.createElement('button', { key: p, onClick: () => { setPeriodType(p); setPeriodOffset(0); }, className: `flex-1 py-3 rounded-xl font-black uppercase text-[10px] transition-all ${periodType === p ? 'bg-orange-500 text-white' : 'bg-white/5 text-slate-400'}` }, p))
+                ),
+                React.createElement('div', { className: "flex items-center justify-between glass-card p-4" },
+                    React.createElement('button', { onClick: () => setPeriodOffset(p => p - 1), className: "p-2 bg-white/5 text-slate-400 rounded-lg" },
+                        React.createElement('svg', { width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" }))
+                    ),
+                    React.createElement('span', { className: "text-sm font-black uppercase italic text-orange-400" }, periodTitle),
+                    React.createElement('button', { onClick: () => setPeriodOffset(p => p + 1), disabled: periodOffset >= 0, className: `p-2 rounded-lg ${periodOffset >= 0 ? 'bg-white/10 text-slate-600 cursor-not-allowed' : 'bg-white/5 text-slate-400'}` },
+                        React.createElement('svg', { width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" }))
+                    )
+                ),
+                React.createElement('div', { className: "glass-card p-5 flex justify-between items-center" },
+                    React.createElement('div', { className: "text-left" },
+                        React.createElement('span', { className: "text-[9px] opacity-40 uppercase block" }, dynamicPeriodSummaryLabel),
+                        React.createElement('span', { className: "text-2xl font-black text-sky-400" }, formatTimeHnM(periodSec))
+                    ),
+                    React.createElement('div', { className: "text-right" },
+                        React.createElement('span', { className: "text-[9px] opacity-40 uppercase block" }, "Sesiones"),
+                        React.createElement('span', { className: "text-2xl font-black text-emerald-400" }, filteredHistory.length)
+                    )
+                ),
+                React.createElement('div', { className: "glass-card p-4" },
+                    React.createElement('div', { style: { height: '200px' } },
+                        React.createElement('canvas', { ref: chartRef })
+                    )
+                )
+            );
+        }
+
         function App() {
             const [user, setUser] = useState(null);
             const [view, setView] = useState('workouts');
@@ -594,14 +1338,13 @@
 
             const handleStartWorkout = useCallback((w) => {
                 if (window.speechSynthesis) {
-                    // This is a common workaround to initialize SpeechSynthesis in iOS.
-                    // iOS often requires user interaction to enable speech, and a silent utterance can 'wake it up'.
                     const silent = new SpeechSynthesisUtterance(' ');
                     silent.volume = 0;
                     window.speechSynthesis.speak(silent);
                 }
                 setSelectedWorkout(w);
                 setView('play');
+                console.log('App: Starting workout in PlayerView with workout:', w?.name);
             }, []);
 
             if (loading) return React.createElement('div', { className: "h-full w-full flex items-center justify-center bg-slate-950" }, React.createElement('div', { className: "animate-spin w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full" }));
@@ -621,10 +1364,11 @@
                     view === 'create'   && React.createElement(CreateView, { user, workoutToEdit: selectedWorkout, onCancel: () => setView('workouts') }),
                     view === 'play'     && React.createElement(PlayerView, {
                         workout: selectedWorkout,
-                        onExit: () => setView('workouts'),
-                        onComplete: (name, time, gpsData) => { // Added gpsData parameter
+                        onExit: () => { console.log('PlayerView: Exiting.'); setView('workouts'); },
+                        onComplete: (name, time, gpsData) => {
+                            console.log('PlayerView: Workout completed. Saving history.');
                             db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid)
-                              .collection('history').add({ workoutName: name, totalTime: time, date: new Date().toISOString(), gpsData: gpsData || null }); // Save GPS data
+                              .collection('history').add({ workoutName: name, totalTime: time, date: new Date().toISOString(), gpsData: gpsData || null });
                             setView('workouts');
                         }
                     })
@@ -636,7 +1380,6 @@
             );
         }
 
-        // ─── AuthView ────────────────────────────────────────────────────────────────
         function AuthView({ APP_TITLE, APP_VERSION }) {
             const [isReg, setIsReg] = useState(false);
             const [email, setEmail] = useState('');
@@ -646,7 +1389,8 @@
                 try {
                     if (isReg) await auth.createUserWithEmailAndPassword(email.trim(), pass);
                     else await auth.signInWithEmailAndPassword(email.trim(), pass);
-                } catch (err) { alert("Error: " + err.message); }
+                    console.log('AuthView: User logged in/registered.');
+                } catch (err) { alert("Error: " + err.message); console.error('Auth Error:', err); }
             }, [isReg, email, pass]);
             return React.createElement('div', { className: "h-screen flex flex-col items-center bg-slate-950 p-10 pt-20 text-center" },
                 React.createElement(React.Fragment, null,
@@ -663,7 +1407,6 @@
             );
         }
 
-        // ─── WorkoutsView ────────────────────────────────────────────────────────────
         function WorkoutsView({ workouts, user, onStart, onEdit, onCreate }) {
             return React.createElement('div', { className: "flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4 pb-32" },
                 workouts.length === 0
@@ -682,7 +1425,6 @@
             );
         }
 
-        // ─── CreateView ──────────────────────────────────────────────────────────────
         function CreateView({ user, workoutToEdit, onCancel }) {
             const initialPhases = workoutToEdit?.phases
                 ? { ...DEFAULT_PARAMS, ...workoutToEdit.phases, entrenamiento: { ...DEFAULT_PARAMS.entrenamiento, ...(workoutToEdit.phases.entrenamiento || {}) } }
@@ -738,761 +1480,6 @@
             return React.createElement('div', { className: "flex flex-col items-center" },
                 React.createElement('span', { className: "text-[8px] opacity-40 mb-2 uppercase" }, label),
                 React.createElement('input', { type: "number", className: "w-full bg-slate-800/40 p-4 rounded-xl text-center font-black text-white border border-white/5 outline-none", value: val, onChange: e => set(e.target.value) })
-            );
-        }
-
-        // ─── PlayerView ──────────────────────────────────────────────────────────────
-        function PlayerView({ workout, onExit, onComplete }) {
-            // ── UI state (solo para render) ──────────────────────────────────────────
-            const [uiStatus, setUiStatus]     = useState('ready');  // 'ready'|'running'|'paused'|'finished'|'gps-running'
-            const [uiIdx, setUiIdx]           = useState(0);
-            const [uiTimeLeft, setUiTimeLeft] = useState(0);
-            const [uiElapsed, setUiElapsed]   = useState(0);
-            const [steps, setSteps]           = useState([]);
-
-            // Post-workout mode selection states
-            const [isModeSelectionScreenVisible, setIsModeSelectionScreenVisible] = useState(true); // Controls visibility of mode selection screen
-            const [selectedWorkoutPhases, setSelectedWorkoutPhases]               = useState(null); // User's chosen workout structure (array of phase keys)
-            const [showPostWorkoutMap, setShowPostWorkoutMap]                     = useState(false); // Controls visibility of the post-workout map
-
-            // GPS specific states
-            const [isGpsActive, setIsGpsActive]           = useState(false); // If GPS tracker is currently running
-            const [showGpsControls, setShowGpsControls]   = useState(false); // Controls visibility for GPS screen content (e.g. stop button)
-            const [gpsCoordinates, setGpsCoordinates]     = useState([]);    // Stores collected GPS points
-            const [hasGpsData, setHasGpsData]             = useState(false); // True if at least some GPS data was collected
-            const [finalGpsSummary, setFinalGpsSummary]   = useState(null);  // Summary data for map display
-
-            // ── Refs internos del timer (NO disparan re-render) ──────────────────────
-            const statusRef       = useRef('ready');
-            const idxRef          = useRef(0);
-            const timeLeftRef     = useRef(0);
-            const elapsedRef      = useRef(0);
-            const stepsRef        = useRef([]);
-
-            const stepDurRef      = useRef(0);     // duración del step actual
-            const stepStartRef    = useRef(null);  // cuándo empezó el step actual (ms)
-            const workoutStartRef = useRef(null);  // cuándo empezó el workout (ms, ajustado por pausa)
-            const pausedAtRef     = useRef(null);  // cuándo se pausó (ms)
-
-            const savedRef        = useRef(false);
-            const spokenInit      = useRef({});
-            const lastSpokenKey   = useRef('');
-            const wakeLockRef     = useRef(null);
-            const videoRef        = useRef(null);
-
-            // GPS specific refs
-            const gpsWatcherId            = useRef(null); // Geolocation watch ID
-            const lastPosition            = useRef(null); // Last known GPS position
-            const gpsStartTime            = useRef(null); // When GPS tracking actually started
-            const gpsAnnounceLastTime     = useRef(0); // Timestamp of last voice announcement
-            const gpsTotalDistance        = useRef(0); // Accumulated distance for the current segment
-            const gpsTotalTime            = useRef(0); // Accumulated time for the current segment
-            const hasGpsDataRef           = useRef(false); // Ref for hasGpsData to avoid stale closure in callbacks
-
-            // ── Sincroniza refs de estado con state para uso en interval ────────────
-            const setStatus = (s) => { statusRef.current = s; setUiStatus(s); };
-            const setIdx    = (i) => { idxRef.current = i;    setUiIdx(i); };
-            const setTime   = (t) => { timeLeftRef.current = t; setUiTimeLeft(t); };
-            const setElap   = (e) => { elapsedRef.current = e; setUiElapsed(e); };
-            const setHasGpsDataAndRef = (val) => { hasGpsDataRef.current = val; setHasGpsData(val); };
-
-
-            // ── Finalizar workout ────────────────────────────────────────────────────
-            const endWorkout = useCallback(() => {
-                setStatus('finished');
-                speak('Entrenamiento finalizado. ¡Buen trabajo!', true, () => {
-                    if (hasGpsDataRef.current && finalGpsSummary) {
-                        setShowPostWorkoutMap(true); // Show map summary if GPS data exists
-                    } else {
-                        // No GPS data or not a GPS workout, proceed to onComplete directly
-                        if (!savedRef.current && workout) {
-                            onComplete(workout.name, elapsedRef.current, null); // Pass null for GPS data if none
-                            savedRef.current = true;
-                        }
-                        onExit(); // Go back to workouts after simple finish
-                    }
-                });
-            }, [workout, onComplete, onExit, finalGpsSummary]);
-
-            // ── Avanzar al siguiente step (lógica pura con refs) ─────────────────────
-            const advanceToStep = useCallback((nextIdx) => {
-                const s = stepsRef.current;
-                if (nextIdx >= s.length) {
-                    endWorkout(); // If no more steps, end the workout
-                    return false;
-                }
-                idxRef.current   = nextIdx;
-                stepDurRef.current = s[nextIdx].seconds;
-                timeLeftRef.current = s[nextIdx].seconds;
-                stepStartRef.current = Date.now();
-                lastSpokenKey.current = '';
-                spokenInit.current = {};
-                setUiIdx(nextIdx);
-                setUiTimeLeft(s[nextIdx].seconds);
-                return true;
-            }, [endWorkout]);
-
-            // ── Saltar step ──────────────────────────────────────────────────────────
-            const skipStep = useCallback(() => {
-                if (statusRef.current === 'finished' || stepsRef.current.length === 0) return;
-                const currentStep = stepsRef.current[idxRef.current];
-                // If currently in a GPS phase and user skips, stop GPS first
-                if (currentStep.phase === GPS_PHASE_KEY && isGpsActive) {
-                    stopGpsTracking(true); // Stop GPS and then proceed to next step
-                    return;
-                }
-
-                const next = idxRef.current + 1;
-                if (advanceToStep(next)) {
-                    speak('Saltando. Siguiente.', true);
-                    // Disparar speech inicial del siguiente step en el mismo tick
-                    if (stepsRef.current[next].phase !== GPS_PHASE_KEY) {
-                         handleSpeech(stepsRef.current[next], next, stepsRef.current[next].seconds);
-                    }
-                } else {
-                    endWorkout();
-                }
-            }, [endWorkout, advanceToStep, isGpsActive, stopGpsTracking, handleSpeech]); // Added handleSpeech to dependencies
-
-            // ── GPS Tracking functions ───────────────────────────────────────────────
-            const announceGpsStats = useCallback((distance, timeSec) => {
-                const formattedDistance = formatDistance(distance);
-                const formattedSpeed = formatSpeed(distance, timeSec);
-                const formattedPace = formatPace(distance, timeSec);
-                speak(`Distancia: ${formattedDistance}. Velocidad promedio: ${formattedSpeed}. Ritmo promedio: ${formattedPace}.`);
-            }, []);
-
-            const stopGpsTracking = useCallback((isSkip = false) => {
-                if (gpsWatcherId.current) {
-                    navigator.geolocation.clearWatch(gpsWatcherId.current);
-                    gpsWatcherId.current = null;
-                }
-
-                const finalDistance = gpsTotalDistance.current;
-                const finalTime = gpsTotalTime.current;
-
-                if (finalDistance > 0 && finalTime > 0 && gpsCoordinates.length > 1) {
-                    setHasGpsDataAndRef(true);
-                    setFinalGpsSummary({
-                        distance: finalDistance,
-                        time: finalTime,
-                        pace: formatPace(finalDistance, finalTime),
-                        speed: formatSpeed(finalDistance, finalTime)
-                    });
-                } else {
-                    setHasGpsDataAndRef(false);
-                    setFinalGpsSummary(null);
-                }
-
-                speak('Seguimiento de caminata o carrera finalizado.', true, () => {
-                    if (finalDistance > 0 && finalTime > 0) {
-                        announceGpsStats(finalDistance, finalTime);
-                    } else {
-                        speak('No se registró distancia significativa.');
-                    }
-                    setIsGpsActive(false);
-                    setShowGpsControls(false); // Reset controls visibility
-                    setStatus('running'); // Return to normal running status so skipStep can proceed
-                    // After announcing, skip to the next step (which should be POST_GPS_REST)
-                    if (!isSkip) { // Only auto-skip if it wasn't triggered by a user skip action
-                        skipStep();
-                    }
-                });
-            }, [skipStep, announceGpsStats, gpsCoordinates, setHasGpsDataAndRef, finalGpsSummary]);
-
-            const startGpsTracking = useCallback(() => {
-                if (!('geolocation' in navigator)) {
-                    speak('Error: Geolocalización no disponible. No se puede iniciar el seguimiento.');
-                    console.error("Geolocation is not supported by this browser.");
-                    // If GPS is not available, immediately skip this step.
-                    setIsGpsActive(false); // Make sure it's not considered active
-                    setStatus('running'); // Back to normal state for skip
-                    skipStep(); // Skip to next phase (POST_GPS_REST)
-                    return;
-                }
-                if (isGpsActive) return; // Prevent multiple starts if already active somehow
-
-                speak('Iniciando seguimiento de caminata o carrera. Las actualizaciones serán por audio cada diez minutos. Presiona el botón de encendido del celular para ver el botón de finalizar.', true);
-                setIsGpsActive(true); // Indicate GPS is active for UI
-                setShowGpsControls(false); // Initially hide controls
-
-                gpsStartTime.current = Date.now();
-                lastPosition.current = null;
-                gpsTotalDistance.current = 0;
-                gpsTotalTime.current = 0;
-                setGpsCoordinates([]); // Clear previous GPS data
-                setHasGpsDataAndRef(false);
-                setFinalGpsSummary(null);
-                gpsAnnounceLastTime.current = gpsStartTime.current; // Initialize last announcement time
-
-                const options = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
-
-                gpsWatcherId.current = navigator.geolocation.watchPosition(
-                    (position) => {
-                        const { latitude, longitude } = position.coords;
-                        const now = Date.now();
-                        const timeElapsedMs = now - gpsStartTime.current;
-                        const currentGpsTotalTime = Math.floor(timeElapsedMs / 1000); // Total time in seconds
-                        gpsTotalTime.current = currentGpsTotalTime;
-
-                        let currentDistance = gpsTotalDistance.current;
-                        if (lastPosition.current) {
-                            const dist = getDistance(
-                                lastPosition.current.latitude,
-                                lastPosition.current.longitude,
-                                latitude,
-                                longitude
-                            );
-                            currentDistance += dist;
-                            gpsTotalDistance.current = currentDistance;
-                        }
-                        lastPosition.current = { latitude, longitude, timestamp: now };
-                        setGpsCoordinates(prev => [...prev, { lat: latitude, lng: longitude, timestamp: now }]);
-
-                        // Announce every 10 minutes (600 seconds)
-                        // Only announce if currently in 'gps-running' status
-                        if (statusRef.current === 'gps-running' && currentGpsTotalTime > 0 && (now - gpsAnnounceLastTime.current) >= (10 * 60 * 1000)) {
-                            announceGpsStats(gpsTotalDistance.current, currentGpsTotalTime);
-                            gpsAnnounceLastTime.current = now;
-                        }
-                    },
-                    (error) => {
-                        console.error("GPS Error:", error);
-                        speak(`Error de GPS: ${error.message}. Deteniendo seguimiento.`);
-                        stopGpsTracking(); // Automatically stop on error
-                    },
-                    options
-                );
-            }, [skipStep, announceGpsStats, isGpsActive, stopGpsTracking, setHasGpsDataAndRef, statusRef]);
-
-
-            // ── Toggle play/pause ────────────────────────────────────────────────────
-            const togglePlay = useCallback(() => {
-                if (!workout || stepsRef.current.length === 0) return;
-                const current = statusRef.current;
-                if (current === 'ready') {
-                    // Primera vez: inicializar timestamps
-                    const now = Date.now();
-                    workoutStartRef.current = now;
-                    stepStartRef.current    = now;
-                    setStatus('running');
-                } else if (current === 'running') {
-                    // Pausar: guardar momento de pausa
-                    pausedAtRef.current = Date.now();
-                    setStatus('paused');
-                } else if (current === 'paused') {
-                    // Reanudar: ajustar timestamps por el tiempo pausado
-                    const now = Date.now();
-                    const pausedMs = pausedAtRef.current ? now - pausedAtRef.current : 0;
-                    if (workoutStartRef.current !== null) workoutStartRef.current += pausedMs;
-                    if (stepStartRef.current    !== null) stepStartRef.current    += pausedMs;
-                    pausedAtRef.current = null;
-                    setStatus('running');
-                } else if (current === 'gps-running') {
-                    // No hay pausa en gps-running para no interrumpir el seguimiento.
-                    // Si se desea una pausa para GPS, se necesitaría lógica adicional.
-                    // Por ahora, se asume que 'gps-running' es un estado continuo.
-                    speak('No se puede pausar durante el seguimiento GPS. Presiona el botón de encendido del celular para ver el botón de finalizar.', true);
-                }
-            }, [workout]); // togglePlay needs access to `workout`
-
-            // ── Inicialización cuando cambia workout o el modo de entrenamiento ────
-            useEffect(() => {
-                // Reset all states and refs
-                setStatus('ready'); // Aseguramos que el estado inicial es 'ready' para mostrar el overlay
-                setIdx(0);
-                setElap(0);
-                savedRef.current = false;
-                spokenInit.current = {};
-                lastSpokenKey.current = '';
-                workoutStartRef.current = null;
-                stepStartRef.current = null;
-                pausedAtRef.current = null;
-                setShowPostWorkoutMap(false);
-                setGpsCoordinates([]);
-                setHasGpsDataAndRef(false);
-                setFinalGpsSummary(null);
-
-                // Stop any GPS tracking if component re-initializes
-                if (isGpsActive) stopGpsTracking();
-
-                // Only generate steps once selectedWorkoutPhases is decided AND mode selection is no longer visible
-                if (isModeSelectionScreenVisible || !workout || !selectedWorkoutPhases) {
-                    setSteps([]); // Clear steps while asking or if mode not set
-                    return;
-                }
-
-                const generated = generateWorkoutSteps(workout, DEFAULT_PARAMS, selectedWorkoutPhases);
-                stepsRef.current = generated;
-                setSteps(generated);
-
-                const firstSec = generated.length > 0 ? generated[0].seconds : 0;
-                stepDurRef.current = firstSec;
-                setTime(firstSec);
-
-                let timeoutId;
-                // Auto-start the timer after a short delay
-                if (generated.length > 0 && generated[0].phase !== 'error') {
-                    // Usamos setTimeout para dar tiempo a React a renderizar los cambios de estado iniciales (steps, timeLeft)
-                    // antes de intentar cambiar el uiStatus a 'running' y ocultar el overlay.
-                    timeoutId = setTimeout(() => {
-                        // Solo si el usuario no ha interactuado (el estado sigue siendo 'ready')
-                        if (statusRef.current === 'ready') {
-                            togglePlay(); // Llama a togglePlay para iniciar el workout
-                        }
-                    }, 50); // Pequeño retraso de 50ms
-                }
-
-                return () => {
-                    if (timeoutId) clearTimeout(timeoutId);
-                    // Aseguramos que el watcher de GPS se limpie al desmontar el componente o reinicializar.
-                    if (gpsWatcherId.current) {
-                        navigator.geolocation.clearWatch(gpsWatcherId.current);
-                        gpsWatcherId.current = null;
-                    }
-                };
-
-            }, [workout, isModeSelectionScreenVisible, selectedWorkoutPhases, stopGpsTracking, isGpsActive, setHasGpsDataAndRef, togglePlay]);
-
-            // ── Wake lock ────────────────────────────────────────────────────────────
-            const releaseWake = useCallback(() => {
-                if (videoRef.current) videoRef.current.pause();
-                if (wakeLockRef.current) { wakeLockRef.current.release(); wakeLockRef.current = null; }
-            }, []);
-
-            const requestWake = useCallback(async () => {
-                try {
-                    if (videoRef.current) videoRef.current.play().catch(() => {});
-                    if ('wakeLock' in navigator && !wakeLockRef.current)
-                        wakeLockRef.current = await navigator.wakeLock.request('screen');
-                } catch (e) { console.warn("WakeLock:", e); e.message.includes("not allowed") && speak('Para el seguimiento GPS, mantén la pantalla encendida.'); }
-            }, []);
-
-            useEffect(() => {
-                // Keep screen on during running or GPS tracking
-                if (uiStatus === 'running' || uiStatus === 'gps-running') requestWake(); else releaseWake();
-                return releaseWake;
-            }, [uiStatus, requestWake, releaseWake]);
-
-            // ── Visibility change (for screen off during GPS) ────────────────────────────────────────────────────
-            useEffect(() => {
-                const handleVisibilityChange = () => {
-                    if (document.hidden) {
-                        // Screen off / app moved to background
-                        if (statusRef.current === 'running') {
-                            pausedAtRef.current = Date.now();
-                            setStatus('paused'); // Pause normal workout
-                        } else if (statusRef.current === 'gps-running') {
-                            // For GPS, we hide controls, but tracking continues in background (best effort)
-                            setShowGpsControls(false); // Hide controls when screen is off
-                        }
-                        releaseWake();
-                    } else {
-                        // Screen on / app moved to foreground
-                        if (statusRef.current === 'paused' && pausedAtRef.current !== null) {
-                            const hiddenMs = Date.now() - pausedAtRef.current;
-                            if (workoutStartRef.current !== null) workoutStartRef.current += hiddenMs;
-                            if (stepStartRef.current    !== null) stepStartRef.current    += hiddenMs;
-                            pausedAtRef.current = null;
-                            setStatus('running');
-                        } else if (statusRef.current === 'gps-running') {
-                            setShowGpsControls(true); // Show controls when screen is on again
-                        }
-                        requestWake(); // Re-request wake lock
-                    }
-                };
-                document.addEventListener('visibilitychange', handleVisibilityChange);
-                return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-            }, [requestWake, releaseWake]);
-
-
-            // ── Speech helper (sin closures stale: recibe valores como params) ───────
-            const handleSpeech = useCallback((step, stepIdx, remaining) => {
-                // Only speak for standard running phase, not when GPS is the primary focus
-                if (statusRef.current !== 'running' && statusRef.current !== 'gps-running') return; // Only process speech if running or gps-running
-
-                const initKey = `${stepIdx}_init`;
-                // If it's the GPS_PHASE_KEY and status is 'running', this is the initial countdown
-                // If status is 'gps-running', we do not want initial voice for a step, only for GPS stats (handled separately)
-                if (remaining === step.seconds && step.voiceInitial && !spokenInit.current[initKey] && statusRef.current === 'running') {
-                    speak(step.voiceInitial, true);
-                    if (step.whistleOnStart) navigator.vibrate(150); // Whistle is loud, vibrate is better for countdown
-                    spokenInit.current[initKey] = true;
-                }
-                if (step.voiceMidpoint && remaining === step.voiceMidpoint.time) {
-                    const k = `${stepIdx}_mid_${remaining}`;
-                    if (lastSpokenKey.current !== k) { speak(step.voiceMidpoint.text); lastSpokenKey.current = k; }
-                }
-                if (step.voiceCountdown && remaining > 0 && remaining <= 3) {
-                    const k = `${stepIdx}_cd_${remaining}`;
-                    if (lastSpokenKey.current !== k) { speak(String(remaining)); lastSpokenKey.current = k; }
-                }
-                // Whistle is only for the very start of an *action* step, not countdown
-                if (step.whistleOnStart && remaining === step.seconds && statusRef.current === 'running' && step.phase !== GPS_PHASE_KEY && !spokenInit.current[initKey + '_whistle']) {
-                    whistle();
-                    spokenInit.current[initKey + '_whistle'] = true;
-                }
-            }, []);
-
-            // ── TIMER PRINCIPAL ──────────────────────────────────────────────────────
-            useEffect(() => {
-                if (uiStatus !== 'running' && uiStatus !== 'gps-running') return;
-
-                const interval = setInterval(() => {
-                    const now = Date.now();
-                    const s = stepsRef.current;
-                    const ci = idxRef.current;
-                    const step = s[ci];
-
-                    if (!step) {
-                        endWorkout(); // No more steps
-                        return;
-                    }
-
-                    // Always update total elapsed time
-                    const totalElap = Math.floor((now - workoutStartRef.current) / 1000);
-                    elapsedRef.current = totalElap;
-                    setUiElapsed(totalElap);
-
-                    // If currently in a GPS tracking phase (after its initial countdown)
-                    // and not paused, we don't count down for THIS step.
-                    // The step's actual duration is controlled by stopGpsTracking.
-                    if (statusRef.current === 'gps-running') {
-                        // Keep elapsed time ticking, but UI for this step's countdown is irrelevant.
-                        return; // Exit here for the GPS tracking *duration* itself
-                    }
-
-                    // Standard step logic (for all phases, including the 4-second GPS countdown)
-                    if (statusRef.current !== 'running') return; // Ensure actual running state for normal steps
-
-                    const passed   = Math.floor((now - stepStartRef.current) / 1000);
-                    const remaining = Math.max(0, stepDurRef.current - passed);
-                    timeLeftRef.current = remaining;
-                    setUiTimeLeft(remaining);
-
-                    handleSpeech(step, ci, remaining);
-
-                    if (remaining === 0) {
-                        // Step finished → advance
-                        // Special handling for GPS_PHASE_KEY when its countdown finishes
-                        if (step.phase === GPS_PHASE_KEY) {
-                            startGpsTracking(); // Now, start the actual GPS tracking
-                            setStatus('gps-running'); // Change status to reflect active GPS tracking
-                            // No advanceToStep here, as the GPS phase is of indefinite duration
-                            // The `stopGpsTracking` or `skipStep` will handle the advance.
-                            return; // Stop processing this step's countdown, now in GPS tracking mode.
-                        }
-
-                        const next = ci + 1;
-                        if (next < s.length) {
-                            advanceToStep(next);
-                            // Disparar speech inicial del siguiente step en el mismo tick
-                            if (s[next].phase !== GPS_PHASE_KEY) {
-                                handleSpeech(s[next], next, s[next].seconds);
-                            }
-                        } else {
-                            endWorkout();
-                        }
-                    }
-                }, 250);
-
-                return () => clearInterval(interval);
-            }, [uiStatus, workout, onComplete, handleSpeech, advanceToStep, startGpsTracking, endWorkout]);
-
-
-            // ── Render ───────────────────────────────────────────────────────────────
-            // Add a check for workout being null here as well, in case onStart(null) was somehow called
-            if (!workout) {
-                return React.createElement('div', { className: "h-screen flex items-center justify-center bg-slate-950 text-white/50 text-sm italic" }, "Error: Rutina no seleccionada. Por favor, vuelve a la lista.");
-            }
-
-            // Render initial prompt for workout mode selection
-            if (isModeSelectionScreenVisible) {
-                return React.createElement(ModeSelectionScreen, {
-                    onModeSelected: (phases) => {
-                        setSelectedWorkoutPhases(phases); // Set the selected phases array
-                        setIsModeSelectionScreenVisible(false); // Hide selection screen
-                    },
-                    onCancel: onExit // Go back to workouts screen
-                });
-            }
-
-            // If steps are empty after mode selection (and mode selection is no longer visible)
-            if (steps.length === 0 && !isModeSelectionScreenVisible) {
-                return React.createElement('div', { className: "h-screen flex flex-col items-center justify-center bg-slate-950 text-white/50 text-sm italic p-4" },
-                    React.createElement('p', { className: "mb-4" }, "Error: No se pudieron generar los pasos de la rutina con las fases seleccionadas."),
-                    React.createElement('p', { className: "mb-8" }, "Por favor, vuelve a la lista de rutinas e inténtalo de nuevo seleccionando al menos una fase."),
-                    React.createElement('button', { onClick: onExit, className: "w-full max-w-sm bg-white/10 text-white py-4 rounded-full font-black uppercase active:scale-95 italic text-xs" }, "Volver a Rutinas")
-                );
-            }
-
-            // Render post-workout map summary screen
-            if (showPostWorkoutMap) {
-                return React.createElement(GpsMapSummary, {
-                    gpsCoordinates,
-                    finalGpsSummary,
-                    onSave: () => {}, // Handled internally by GpsMapSummary, passing empty func is fine.
-                    onShare: () => {}, // Handled internally by GpsMapSummary, passing empty func is fine.
-                    onClose: () => {
-                        // Once map is viewed/shared, finalize workout and go back
-                        if (!savedRef.current && workout) {
-                            onComplete(workout.name, elapsedRef.current, { coordinates: gpsCoordinates, summary: finalGpsSummary });
-                            savedRef.current = true;
-                        }
-                        onExit();
-                    }
-                });
-            }
-
-            // Render GPS tracking UI when active
-            // `isGpsActive` will be true if 'run' or 'walk' was selected AND `startGpsTracking` has been called.
-            // `uiStatus === 'gps-running'` confirms the app state is specifically in GPS tracking mode.
-            if (isGpsActive && uiStatus === 'gps-running') {
-                return React.createElement('div', { className: "h-screen flex flex-col items-center justify-center bg-slate-950 text-white p-6" },
-                    React.createElement('div', {
-                        className: "absolute inset-0 bg-slate-950 flex flex-col items-center justify-center p-6",
-                    },
-                        // Content visible when controls are hidden (minimal display, "screen off")
-                        !showGpsControls && React.createElement('div', { className: "text-center" },
-                            React.createElement('h2', { className: "text-xl font-black uppercase text-slate-400 mb-2" }, "GPS ACTIVO"),
-                            React.createElement('p', { className: "text-sm text-slate-600" }, "Presiona botón de encendido para controles")
-                        ),
-
-                        // Content visible when controls are shown (interactable display)
-                        showGpsControls && React.createElement(React.Fragment, null,
-                            React.createElement('h2', { className: "text-3xl font-black uppercase text-orange-500 mb-4" }, "Caminata / Carrera"),
-                            React.createElement('p', { className: "text-lg text-slate-400 mb-10" }, "Seguimiento GPS Activo. Actualizaciones solo por voz."),
-
-                            React.createElement('button', {
-                                onClick: () => stopGpsTracking(), // Explicitly call stopGpsTracking when button is pressed
-                                className: "w-full max-w-sm bg-red-600/80 text-white py-6 rounded-full font-black uppercase active:scale-95 italic"
-                            }, "TERMINAR CAMINATA / CARRERA")
-                        )
-                    )
-                );
-            }
-
-
-            if (uiStatus === 'finished')
-                return React.createElement('div', { className: "h-screen flex flex-col items-center justify-center p-8 bg-slate-950 text-white text-center" },
-                    React.createElement('h1', { className: "text-5xl font-black italic mb-4" }, "¡HECHO!"),
-                    React.createElement('button', { onClick: onExit, className: "w-full max-w-sm bg-white text-black py-6 rounded-full font-black uppercase" }, "Finalizar")
-                );
-
-            // curr is guaranteed to be defined here due to checks above for steps.length
-            const curr = steps[uiIdx] || { label: 'Cargando...', color: 'bg-slate-950' }; // Provide a fallback if curr somehow becomes undefined
-            const showOverlay = uiStatus === 'ready' || uiStatus === 'paused';
-
-            return React.createElement('div', { className: `h-screen flex flex-col transition-colors duration-700 ${curr.color || 'bg-slate-950'} text-white` },
-                React.createElement('video', { ref: videoRef, loop: true, muted: true, playsInline: true, style: { position: 'absolute', width: '1px', height: '1px', opacity: 0.01 } },
-                    React.createElement('source', { src: "https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/one-second-loop.mp4", type: "video/mp4" })
-                ),
-
-                // Header
-                React.createElement('div', { className: "bg-black/10 p-4 pt-10 flex justify-between items-center shrink-0 z-10" },
-                    React.createElement('div', { className: "leading-none text-left" },
-                        React.createElement('span', { className: "text-[10px] font-black text-orange-500 uppercase" }, "Tiempo Total"),
-                        React.createElement('p', { className: "text-xl font-black italic" }, formatTime(uiElapsed))
-                    ),
-                    React.createElement('div', { className: "text-center" },
-                        React.createElement('h2', { className: "text-[10px] font-black uppercase italic truncate max-w-[120px] tracking-tight" }, workout.name || 'Rutina')
-                    ),
-                    React.createElement('button', { onClick: onExit, className: "opacity-40 text-xl font-black px-2" }, "✕")
-                ),
-
-                // Centro: label + temporizador
-                React.createElement('div', { className: "flex-1 flex flex-col items-center justify-center text-center px-4 min-h-0 relative" },
-                    showOverlay && React.createElement('div', { className: "absolute inset-0 z-40 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center" },
-                        React.createElement('button', { onClick: togglePlay, className: "bg-orange-500 p-10 rounded-full shadow-2xl active:scale-90" },
-                            React.createElement(IconPlay, null)
-                        )
-                    ),
-                    React.createElement('h2', { className: "text-[11vw] font-black uppercase italic text-white/80 leading-none mb-2" }, curr.label || 'LISTO'),
-                    React.createElement('div', { className: "timer-huge tabular-nums text-white" }, uiTimeLeft)
-                ),
-
-                // Footer: controles
-                React.createElement('div', { className: "bg-slate-950 p-6 pb-10 flex flex-col items-center shrink-0" },
-                    React.createElement('div', { className: "w-full max-w-md grid grid-cols-3 items-center mb-6 text-center italic" },
-                        React.createElement('button', { onClick: skipStep, className: "bg-slate-800/40 py-4 rounded-xl text-[10px] font-black uppercase text-white/70 active:scale-95" }, "Saltar"),
-                        React.createElement('div', { className: "flex justify-center" },
-                            uiStatus !== 'ready' && React.createElement('button', {
-                                onClick: togglePlay,
-                                className: "w-20 h-20 rounded-full border-4 border-yellow-400 flex items-center justify-center active:scale-90"
-                            },
-                                uiStatus === 'running' ? React.createElement(IconPause, null) : React.createElement(IconPlay, null)
-                            )
-                        ),
-                        React.createElement('button', { onClick: endWorkout, className: "bg-red-500/20 py-4 rounded-xl text-[10px] font-black uppercase text-red-400 active:scale-95" }, "Finalizar")
-                    ),
-                    React.createElement('div', { className: "w-full max-w-md grid grid-cols-2 items-center text-center italic" },
-                        React.createElement('div', { className: "flex flex-col" },
-                            React.createElement('span', { className: "text-[14vw] font-black text-sky-400 leading-none" }, curr.tr ? curr.tr - (curr.r || 0) + 1 : '-'),
-                            React.createElement('span', { className: "text-[8px] opacity-40" }, "Rondas Restantes")
-                        ),
-                        React.createElement('div', { className: "flex flex-col" },
-                            React.createElement('span', { className: "text-[14vw] font-black text-yellow-400 leading-none" }, curr.tc ? curr.tc - (curr.cy || 0) + 1 : '-'),
-                            React.createElement('span', { className: "text-[8px] opacity-40" }, "Ciclos Restantes")
-                        )
-                    )
-                )
-            );
-        }
-
-        // ─── AvanceView ──────────────────────────────────────────────────────────────
-        function AvanceView({ history }) {
-            const [periodType, setPeriodType] = useState('semana');
-            const [periodOffset, setPeriodOffset] = useState(0);
-            const chartRef = useRef(null);
-            const chartInst = useRef(null);
-            const PERIOD_TYPES = ['semana', 'mes', 'año'];
-
-            // Helper para formatear tiempo en horas y minutos
-            const formatTimeHnM = useCallback((seconds) => {
-                const h = Math.floor(seconds / 3600);
-                const m = Math.floor((seconds % 3600) / 60);
-                return `${h}h ${m}m`;
-            }, []);
-
-            // Tiempo total acumulado (General)
-            const totalSec = useMemo(() => history.reduce((a, h) => a + (h.totalTime || 0), 0), [history]);
-
-            // Rango del período seleccionado actualmente (para el gráfico y resumen interactivo)
-            const currentPeriodRange = useMemo(() => {
-                const today = new Date();
-                if (periodType === 'semana') return getWeekRange(today, periodOffset);
-                if (periodType === 'mes')    return getMonthRange(today, periodOffset);
-                if (periodType === 'año')    return getYearRange(today, periodOffset);
-                return { start: new Date(0), end: new Date() }; // Fallback
-            }, [periodType, periodOffset]);
-
-            // Historial filtrado para el período seleccionado
-            const filteredHistory = useMemo(() => history.filter(h => { const d = new Date(h.date); return d >= currentPeriodRange.start && d <= currentPeriodRange.end; }), [history, currentPeriodRange]);
-
-            // Tiempo total del período seleccionado
-            const periodSec = useMemo(() => filteredHistory.reduce((a, h) => a + (h.totalTime || 0), 0), [filteredHistory]);
-
-            useEffect(() => {
-                const ctx = chartRef.current?.getContext('2d');
-                if (!ctx) return;
-                if (chartInst.current) chartInst.current.destroy();
-                let labels = [], data = [];
-                const agg = new Map();
-
-                if (periodType === 'semana') {
-                    for (let d = new Date(currentPeriodRange.start); d <= currentPeriodRange.end; d.setDate(d.getDate() + 1))
-                        labels.push(d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }));
-                    filteredHistory.forEach(h => { const k = new Date(h.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }); agg.set(k, (agg.get(k) || 0) + (h.totalTime || 0)); });
-                    data = labels.map(l => Math.floor((agg.get(l) || 0) / 60));
-                } else if (periodType === 'mes') {
-                    // Adaptado para mostrar semanas dentro del mes, si el rango es un mes
-                    let cur = startOfDay(new Date(currentPeriodRange.start));
-                    // Ajustar al inicio de la primera semana visible para el mes, que puede empezar en el mes anterior
-                    cur = startOfDay(new Date(cur.setDate(cur.getDate() - (cur.getDay() === 0 ? 6 : cur.getDay() - 1)))); // Lunes de la semana
-                    let wn = 1;
-                    while (cur <= currentPeriodRange.end) {
-                        const ws = new Date(cur);
-                        const we = endOfDay(new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 6));
-
-                        // Limitar la semana al rango del mes actual para el conteo de tiempo
-                        const es = startOfDay(new Date(Math.max(ws.getTime(), currentPeriodRange.start.getTime())));
-                        const ee = endOfDay(new Date(Math.min(we.getTime(), currentPeriodRange.end.getTime())));
-
-                        if (es <= ee) {
-                            labels.push(`Sem ${wn} (${es.getDate()}/${es.getMonth() + 1})`);
-                            let wt = 0;
-                            filteredHistory.forEach(h => { const d = new Date(h.date); if (d >= es && d <= ee) wt += (h.totalTime || 0); });
-                            data.push(Math.floor(wt / 60));
-                            wn++;
-                        }
-                        cur.setDate(cur.getDate() + 7); // Siguiente semana
-                        if (cur > currentPeriodRange.end && cur.getMonth() !== currentPeriodRange.end.getMonth()) break; // If already out of month range
-                    }
-                } else { // periodType === 'año'
-                    for (let i = 0; i < 12; i++) labels.push(new Date(currentPeriodRange.start.getFullYear(), i, 1).toLocaleDateString('es-ES', { month: 'short' }));
-                    filteredHistory.forEach(h => { const k = new Date(h.date).toLocaleDateString('es-ES', { month: 'short' }); agg.set(k, (agg.get(k) || 0) + (h.totalTime || 0)); });
-                    data = labels.map(l => Math.floor((agg.get(l) || 0) / 60));
-                }
-
-                chartInst.current = new Chart(ctx, {
-                    type: 'bar',
-                    data: { labels, datasets: [{ label: 'Minutos', data, backgroundColor: '#f97316', borderRadius: 8 }] },
-                    options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b' } }, x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } } } }
-                });
-                return () => chartInst.current?.destroy();
-            }, [filteredHistory, periodType, currentPeriodRange]);
-
-            const periodTitle = useMemo(() => {
-                const { start, end } = currentPeriodRange;
-                const sf = { day: 'numeric', month: 'short' };
-                if (periodType === 'semana') {
-                    const cw = getWeekRange(new Date(), 0);
-                    if (start.getTime() === cw.start.getTime()) return 'Semana Actual';
-                    if (start.getTime() === getWeekRange(new Date(), -1).start.getTime()) return 'Semana Anterior';
-                    return start.getMonth() === end.getMonth()
-                        ? `Semana: ${start.getDate()} - ${end.toLocaleDateString('es-ES', { day: 'numeric' })}`
-                        : `Semana: ${start.toLocaleDateString('es-ES', sf)} - ${end.toLocaleDateString('es-ES', sf)}`;
-                }
-                if (periodType === 'mes') {
-                    if (start.getTime() === getMonthRange(new Date(), 0).start.getTime()) return 'Mes Actual';
-                    if (start.getTime() === getMonthRange(new Date(), -1).start.getTime()) return 'Mes Anterior';
-                    return `Mes: ${start.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}`;
-                }
-                if (start.getTime() === getYearRange(new Date(), 0).start.getTime()) return 'Año Actual';
-                if (start.getTime() === getYearRange(new Date(), -1).start.getTime()) return 'Año Anterior';
-                return `Año: ${start.getFullYear()}`;
-            }, [currentPeriodRange, periodType]);
-
-            // Etiqueta para el resumen del período seleccionado (dinámico)
-            const dynamicPeriodSummaryLabel = useMemo(() => {
-                if (periodOffset !== 0) {
-                    if (periodType === 'semana') return 'Tiempo en la semana seleccionada';
-                    if (periodType === 'mes') return 'Tiempo en el mes seleccionado';
-                    if (periodType === 'año') return 'Tiempo en el año seleccionado';
-                }
-                if (periodType === 'semana') return 'Tiempo en esta semana';
-                if (periodType === 'mes')    return 'Tiempo en este mes';
-                return 'Tiempo en este año';
-            }, [periodOffset, periodType]);
-
-            return React.createElement('div', { className: "flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4 pb-28" },
-                // Tarjeta de Tiempo Total Acumulado (General)
-                React.createElement('div', { className: "glass-card p-6 text-center" },
-                    React.createElement('span', { className: "text-[9px] opacity-40 block mb-1 uppercase" }, "Tiempo Total Acumulado"),
-                    React.createElement('span', { className: "text-3xl font-black text-orange-500" }, formatTimeHnM(totalSec))
-                ),
-
-                // Selector de tipo de período (Semana, Mes, Año)
-                React.createElement('div', { className: "flex gap-2" },
-                    PERIOD_TYPES.map(p => React.createElement('button', { key: p, onClick: () => { setPeriodType(p); setPeriodOffset(0); }, className: `flex-1 py-3 rounded-xl font-black uppercase text-[10px] transition-all ${periodType === p ? 'bg-orange-500 text-white' : 'bg-white/5 text-slate-400'}` }, p))
-                ),
-                // Navegación de período y título
-                React.createElement('div', { className: "flex items-center justify-between glass-card p-4" },
-                    React.createElement('button', { onClick: () => setPeriodOffset(p => p - 1), className: "p-2 bg-white/5 text-slate-400 rounded-lg" },
-                        React.createElement('svg', { width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" }))
-                    ),
-                    React.createElement('span', { className: "text-sm font-black uppercase italic text-orange-400" }, periodTitle),
-                    React.createElement('button', { onClick: () => setPeriodOffset(p => p + 1), disabled: periodOffset >= 0, className: `p-2 rounded-lg ${periodOffset >= 0 ? 'bg-white/10 text-slate-600 cursor-not-allowed' : 'bg-white/5 text-slate-400'}` },
-                        React.createElement('svg', { width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" }))
-                    )
-                ),
-                // Resumen del período seleccionado (interactivo) - Esta es la tarjeta que cambia
-                React.createElement('div', { className: "glass-card p-5 flex justify-between items-center" },
-                    React.createElement('div', { className: "text-left" },
-                        React.createElement('span', { className: "text-[9px] opacity-40 uppercase block" }, dynamicPeriodSummaryLabel),
-                        React.createElement('span', { className: "text-2xl font-black text-sky-400" }, formatTimeHnM(periodSec))
-                    ),
-                    React.createElement('div', { className: "text-right" },
-                        React.createElement('span', { className: "text-[9px] opacity-40 uppercase block" }, "Sesiones"),
-                        React.createElement('span', { className: "text-2xl font-black text-emerald-400" }, filteredHistory.length)
-                    )
-                ),
-                // Gráfico de avance
-                React.createElement('div', { className: "glass-card p-4" },
-                    React.createElement('div', { style: { height: '200px' } },
-                        React.createElement('canvas', { ref: chartRef })
-                    )
-                )
             );
         }
 
