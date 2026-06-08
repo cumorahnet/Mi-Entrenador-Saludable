@@ -836,7 +836,7 @@
                 console.log('togglePlay called. Current status (from ref):', current);
 
                 if (current === 'ready') {
-                    const now = Date.now();
+                    const now = Date.Date();
                     workoutStartRef.current = now;
                     stepStartRef.current = now;
                     setUiStatus('running');
@@ -926,8 +926,8 @@
                         // When returning from hidden
                         if (statusRef.current === 'paused' && pausedAtRef.current !== null) {
                             const hiddenMs = Date.now() - pausedAtRef.current;
-                            workoutStartRef.current = (workoutStartRef.current !== null && !isNaN(workoutStartRef.current)) ? workoutStartRef.current + hiddenMs : Date.now();
-                            stepStartRef.current = (stepStartRef.current !== null && !isNaN(stepStartRef.current)) ? stepStartRef.current + hiddenMs : Date.now();
+                            workoutStartRef.current = (workoutStartRef.current !== null && !isNaN(workoutStartRef.current)) ? workoutStartRef.current + hiddenMs : Date.Now();
+                            stepStartRef.current = (stepStartRef.current !== null && !isNaN(stepStartRef.current)) ? stepStartRef.current + hiddenMs : Date.Now();
                             pausedAtRef.current = null;
                             setUiStatus('running'); // Resume running
                         } else if (statusRef.current === 'gps-running') {
@@ -1131,6 +1131,26 @@
                 handleSpeech
             ]);
 
+            // --- New function to handle closing GPS summary ---
+            const handleGpsSummaryClosed = useCallback(() => {
+                console.log('PlayerView: GpsMapSummary closed.');
+                setShowPostWorkoutMap(false);
+                // Check if there are more steps in the workout
+                const nextIdx = idxRef.current + 1;
+                if (nextIdx < stepsRef.current.length) {
+                    console.log('PlayerView: More steps remaining after GPS. Advancing to next step.');
+                    advanceToStep(nextIdx); // Advance to the step *after* the GPS step.
+                } else {
+                    console.log('PlayerView: No more steps after GPS. Completing workout.');
+                    if (!savedRef.current && workout) {
+                        onComplete(workout.name, elapsedRef.current, { coordinates: gpsCoordinates, summary: finalGpsSummary });
+                        savedRef.current = true;
+                    }
+                    onExit(); // Exit to main workout list
+                }
+            }, [advanceToStep, workout, onComplete, onExit, gpsCoordinates, finalGpsSummary]);
+
+
             if (!workout) {
                 console.log('PlayerView: Rendering error: Workout not selected.');
                 return React.createElement('div', { className: "h-screen flex items-center justify-center bg-slate-950 text-white/50 text-sm italic" }, "Error: Rutina no seleccionada. Por favor, vuelve a la lista.");
@@ -1164,14 +1184,7 @@
                     finalGpsSummary,
                     onSave: () => {},
                     onShare: () => {},
-                    onClose: () => {
-                        if (!savedRef.current && workout) {
-                            console.log('PlayerView: GpsMapSummary closed. Completing workout with GPS data.');
-                            onComplete(workout.name, elapsedRef.current, { coordinates: gpsCoordinates, summary: finalGpsSummary });
-                            savedRef.current = true;
-                        }
-                        onExit();
-                    }
+                    onClose: handleGpsSummaryClosed // Pass the new handler here
                 });
             }
 
@@ -1181,10 +1194,12 @@
                     React.createElement('div', {
                         className: "absolute inset-0 bg-slate-950 flex flex-col items-center justify-center p-6",
                     },
+                        // Only show the "Press power button" hint if controls are hidden
                         !showGpsControls && React.createElement('div', { className: "text-center" },
                             React.createElement('h2', { className: "text-xl font-black uppercase text-slate-400 mb-2" }, "GPS ACTIVO"),
                             React.createElement('p', { className: "text-sm text-slate-600" }, "Presiona botón de encendido para controles")
                         ),
+                        // Show controls only if showGpsControls is true
                         showGpsControls && React.createElement(React.Fragment, null,
                             React.createElement('h2', { className: "text-3xl font-black uppercase text-orange-500 mb-4" }, "Caminata / Carrera"),
                             React.createElement('p', { className: "text-lg text-slate-400 mb-10" }, "Seguimiento GPS Activo. Actualizaciones solo por voz."),
@@ -1210,7 +1225,6 @@
 
             console.log('PlayerView: Rendering main UI. Status:', uiStatus, 'Current Step Label:', curr.label, 'Time Left:', uiTimeLeft, 'Elapsed:', uiElapsed);
             return React.createElement('div', { className: `h-screen flex flex-col transition-colors duration-700 ${curr.color || 'bg-slate-950'} text-white` },
-                // ELIMINADO: div de depuración
                 React.createElement('video', { ref: videoRef, loop: true, muted: true, playsInline: true, style: { position: 'absolute', width: '1px', height: '1px', opacity: 0.01 } },
                     React.createElement('source', { src: "https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/one-second-loop.mp4", type: "video/mp4" })
                 ),
