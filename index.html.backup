@@ -333,7 +333,7 @@
                 if (nextSegmentData) {
                     introForNextInternalSegment = `A continuación, ${nextSegmentData.label.toLowerCase()}.`;
                 } else {
-                    introForNextInternalSegment = 'Entrenamiento completado.';
+                    introForNextInternalSegment = 'Rutina finalizada.'; // Changed to avoid repeating "Buen trabajo"
                 }
 
                 if (currentSegmentData.key === 'run' || currentSegmentData.key === 'walk') {
@@ -348,7 +348,8 @@
                  return [{ label: 'ERROR DE GENERACIÓN', seconds: 5, color: 'bg-red-500', phase: 'error', voiceInitial: 'Error al generar los pasos de la rutina. Por favor, cancela.', whistleOnStart: false, voiceCountdown: false }];
             }
 
-            steps.push({ label: 'FINAL DE LA RUTINA', seconds: 10, color: 'bg-green-500', phase: 'finished', voiceInitial: 'Rutina finalizada. ¡Buen trabajo!', whistleOnStart: false, voiceCountdown: false });
+            // Modified voiceInitial to avoid repetition with the endWorkout function
+            steps.push({ label: 'FINAL DE LA RUTINA', seconds: 10, color: 'bg-green-500', phase: 'finished', voiceInitial: 'Rutina finalizada.', whistleOnStart: false, voiceCountdown: false });
             console.log('generateWorkoutSteps: Successfully generated steps. Count:', steps.length);
             return steps;
         };
@@ -836,7 +837,7 @@
                 console.log('togglePlay called. Current status (from ref):', current);
 
                 if (current === 'ready') {
-                    const now = Date.Date();
+                    const now = Date.now(); // Corrected Date.Date() to Date.now()
                     workoutStartRef.current = now;
                     stepStartRef.current = now;
                     setUiStatus('running');
@@ -851,7 +852,7 @@
                     console.log('togglePlay: Resuming from pause. Paused time (ms):', pausedMs);
 
                     workoutStartRef.current = (workoutStartRef.current !== null && !isNaN(workoutStartRef.current)) ? workoutStartRef.current + pausedMs : now;
-                    stepStartRef.current = (stepStartRef.current !== null && !isNaN(stepStartRef.current)) ? stepStartRef.current + pausedMs : now;
+                    stepStartRef.current = (stepStartRef.current !== null && !isNaN(stepStartRef.current)) ? stepStartRef.current + pausedMs : now; // Corrected Date.Now() to now
 
                     if (isNaN(workoutStartRef.current)) workoutStartRef.current = now;
                     if (isNaN(stepStartRef.current)) stepStartRef.current = now;
@@ -926,8 +927,8 @@
                         // When returning from hidden
                         if (statusRef.current === 'paused' && pausedAtRef.current !== null) {
                             const hiddenMs = Date.now() - pausedAtRef.current;
-                            workoutStartRef.current = (workoutStartRef.current !== null && !isNaN(workoutStartRef.current)) ? workoutStartRef.current + hiddenMs : Date.Now();
-                            stepStartRef.current = (stepStartRef.current !== null && !isNaN(stepStartRef.current)) ? stepStartRef.current + hiddenMs : Date.Now();
+                            workoutStartRef.current = (workoutStartRef.current !== null && !isNaN(workoutStartRef.current)) ? workoutStartRef.current + hiddenMs : Date.now(); // Corrected Date.Now()
+                            stepStartRef.current = (stepStartRef.current !== null && !isNaN(stepStartRef.current)) ? stepStartRef.current + hiddenMs : Date.now(); // Corrected Date.Now()
                             pausedAtRef.current = null;
                             setUiStatus('running'); // Resume running
                         } else if (statusRef.current === 'gps-running') {
