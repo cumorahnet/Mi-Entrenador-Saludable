@@ -582,6 +582,7 @@
             const gpsTotalTime = useRef(0);
             const hasGpsDataRef = useRef(false);
             const isGpsActiveRef = useRef(isGpsActive); // Ref para el estado de GPS
+            const stopGpsTrackingRef = useRef(); // NUEVO: Ref para la función stopGpsTracking
 
             console.log('PlayerView: Render. Status:', uiStatus, 'Idx:', uiIdx, 'TimeLeft:', uiTimeLeft, 'Elapsed:', uiElapsed, 'ModeScreen:', isModeSelectionScreenVisible, 'Phases:', selectedWorkoutPhases?.length || 0, 'Steps:', steps.length);
 
@@ -712,6 +713,12 @@
                 });
             }, [advanceToStep, announceGpsStats, gpsCoordinates, setHasGpsData, setFinalGpsSummary, setUiStatus, setIsGpsActive, setShowGpsControls]);
 
+            // NUEVO useEffect para mantener la ref de stopGpsTracking actualizada
+            useEffect(() => {
+                stopGpsTrackingRef.current = stopGpsTracking;
+            }, [stopGpsTracking]);
+
+
             const skipStep = useCallback(() => {
                 if (statusRef.current === 'finished' || stepsRef.current.length === 0) {
                     console.log('PlayerView: Skip request ignored. Status:', statusRef.current, 'Steps length:', stepsRef.current.length);
@@ -721,7 +728,7 @@
                 const currentStep = stepsRef.current[idxRef.current];
                 if (currentStep.phase === GPS_PHASE_KEY && isGpsActiveRef.current) {
                     console.log('PlayerView: Stopping GPS tracking due to skip.');
-                    stopGpsTracking(true);
+                    stopGpsTrackingRef.current(true); // Usar la ref aquí
                     return;
                 }
 
@@ -734,7 +741,7 @@
                 } else {
                     endWorkout();
                 }
-            }, [endWorkout, advanceToStep, stopGpsTracking, handleSpeech]);
+            }, [endWorkout, advanceToStep, handleSpeech]); // stopGpsTracking eliminado de las dependencias, ya que se usa la ref
 
             const startGpsTracking = useCallback(() => {
                 console.log('PlayerView: startGpsTracking called.');
@@ -798,11 +805,11 @@
                     (error) => {
                         console.error("PlayerView: GPS Error:", error);
                         speak(`Error de GPS: ${error.message}. Deteniendo seguimiento.`);
-                        stopGpsTracking();
+                        stopGpsTrackingRef.current(); // Usar la ref aquí
                     },
                     options
                 );
-            }, [skipStep, announceGpsStats, stopGpsTracking, setHasGpsData, setUiStatus, setIsGpsActive, setShowGpsControls]);
+            }, [skipStep, announceGpsStats, setHasGpsData, setUiStatus, setIsGpsActive, setShowGpsControls]); // stopGpsTracking eliminado de las dependencias, ya que se usa la ref
 
             const togglePlay = useCallback(() => {
                 if (!workout || stepsRef.current.length === 0) {
@@ -841,7 +848,7 @@
                     speak('No se puede pausar durante el seguimiento GPS. Presiona el botón de encendido del celular para ver el botón de finalizar.', true);
                     console.log('togglePlay: Attempted pause during GPS, ignored.');
                 }
-            }, [workout, setUiStatus]); // workout is a dependency because it's used in the 'if (!workout)' check. setUiStatus is a stable setter.
+            }, [workout, setUiStatus]); 
 
             const releaseWake = useCallback(() => {
                 if (videoRef.current) videoRef.current.pause();
@@ -902,12 +909,9 @@
 
             // Main useEffect for initialization and step generation
             useEffect(() => {
-                console.log('PlayerView: Init useEffect running for dependencies change. Steps length before generation:', stepsRef.current.length);
-                
-                // Reset states ONLY if the key dependencies (workout, phases) actually change
-                // or if we are exiting/entering the mode selection screen.
-                // Do NOT reset UI states or GPS flags here as this effect runs on *any* dependency change
-                // leading to unintended resets.
+                console.log('PlayerView: Init useEffect (main): dependencies changed. ', { workout, isModeSelectionScreenVisible, selectedWorkoutPhases });
+
+                // Reinicia todos los estados relevantes para una nueva sesión.
                 setUiStatus('ready'); 
                 setUiIdx(0);
                 setElap(0);
@@ -922,30 +926,29 @@
                 setGpsCoordinates([]);
                 setHasGpsData(false);
                 setFinalGpsSummary(null);
-                setShouldAutoStart(false); // Reset auto-start flag
+                setShouldAutoStart(false); 
+                setIsGpsActive(false); 
+                setShowGpsControls(false);
 
-                // Clear GPS watcher if active on re-initialization
                 if (gpsWatcherId.current) {
                     navigator.geolocation.clearWatch(gpsWatcherId.current);
                     gpsWatcherId.current = null;
-                    console.log('PlayerView: Init useEffect cleanup: GPS watch cleared during re-init.');
+                    console.log('PlayerView: Init useEffect (main): GPS watch cleared during reset.');
                 }
-                setIsGpsActive(false); // Este setter es seguro aquí porque isGpsActive NO está en las dependencias de este useEffect.
 
                 if (isModeSelectionScreenVisible || !workout || !selectedWorkoutPhases) {
-                    console.log('PlayerView: Init useEffect: Mode selection screen visible OR workout/phases not selected yet. Skipping step generation.');
+                    console.log('PlayerView: Init useEffect (main): Mode selection visible or no workout/phases. Not generating steps.');
                     setSteps([]);
                     return;
                 }
 
-                console.log('PlayerView: Init useEffect: Generating workout steps based on selected phases:', selectedWorkoutPhases, 'for workout:', workout?.name);
+                console.log('PlayerView: Init useEffect (main): Generating workout steps...');
                 const generated = generateWorkoutSteps(workout, DEFAULT_PARAMS, selectedWorkoutPhases);
                 stepsRef.current = generated;
                 setSteps(generated);
 
                 if (generated.length === 0 || generated[0].phase === 'error') {
-                    console.error("PlayerView: Init useEffect: Generated steps array is empty or first step is an error. Cannot auto-start.");
-                    setUiStatus('ready'); // Ensure UI status is ready for error display
+                    console.error("PlayerView: Init useEffect (main): Generated steps are empty or error. Cannot auto-start.");
                     return;
                 }
 
@@ -953,22 +956,23 @@
                 stepDurRef.current = firstStep.seconds;
                 setTime(firstStep.seconds);
                 setUiIdx(0);
+                setShouldAutoStart(true); 
 
-                setShouldAutoStart(true); // Signal that the workout is ready to be auto-started
-
+                // Cleanup function for this effect.
                 return () => {
-                    console.log('PlayerView: Init useEffect cleanup on re-run or unmount.');
-                    // Asegúrate de que el seguimiento GPS se detiene si el componente se desmonta o se re-inicializa
-                    if (isGpsActiveRef.current) { // USES THE REF for current GPS state
-                        console.log('PlayerView: Cleanup calling stopGpsTracking(true)');
-                        stopGpsTracking(true);
+                    console.log('PlayerView: Init useEffect (main) cleanup: Executing cleanup.');
+                    // Usa la ref para llamar a la función stopGpsTracking más reciente.
+                    if (isGpsActiveRef.current && stopGpsTrackingRef.current) { 
+                        console.log('PlayerView: Cleanup calling stopGpsTracking(true) via ref.');
+                        stopGpsTrackingRef.current(true); 
                     }
                 };
             }, [
                 workout,
                 isModeSelectionScreenVisible,
                 selectedWorkoutPhases,
-                stopGpsTracking // Callback itself is stable
+                // Todas las funciones setter son referencias estables y no deben estar aquí como dependencias.
+                // Este efecto debe ejecutarse solo cuando los "inputs" externos de la rutina cambian.
             ]);
 
 
@@ -1120,7 +1124,7 @@
                             React.createElement('h2', { className: "text-3xl font-black uppercase text-orange-500 mb-4" }, "Caminata / Carrera"),
                             React.createElement('p', { className: "text-lg text-slate-400 mb-10" }, "Seguimiento GPS Activo. Actualizaciones solo por voz."),
                             React.createElement('button', {
-                                onClick: () => stopGpsTracking(),
+                                onClick: () => stopGpsTrackingRef.current(), // Usar la ref aquí
                                 className: "w-full max-w-sm bg-red-600/80 text-white py-6 rounded-full font-black uppercase active:scale-95 italic"
                             }, "TERMINAR CAMINATA / CARRERA")
                         )
