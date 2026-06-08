@@ -25,10 +25,6 @@
         body {
             font-family: 'Inter', sans-serif; background-color: #020617; color: white;
             margin: 0; padding: 0; overflow: hidden; -webkit-tap-highlight-color: transparent;
-            /* Using position: fixed with width/height 100% for full viewport coverage,
-               especially useful with viewport-fit=cover on iOS.
-               Be mindful that `overflow: hidden` on body means no content can scroll if it overflows this root container.
-               Ensure content within #root correctly uses `overflow-y-auto` for scrolling. */
             position: fixed; width: 100%; height: 100%;
         }
         #root { height: 100%; width: 100%; display: flex; flex-direction: column; }
@@ -42,7 +38,6 @@
             letter-spacing: -0.06em; pointer-events: none;
         }
         @media (orientation: landscape) { .timer-huge { font-size: 75vh; } }
-        /* Style for Leaflet map container */
         .leaflet-container {
             width: 100%;
             height: 100%;
@@ -62,7 +57,6 @@
         window.onerror = function(message, source, lineno, colno, error) {
             console.error('GLOBAL JS ERROR:', { message, source, lineno, colno, error });
             alert('Ha ocurrido un error inesperado en la aplicación. Por favor, revisa la consola para más detalles.');
-            // Devolver true para evitar que el navegador muestre su propio diálogo de error
             return true;
         };
 
@@ -73,7 +67,6 @@
         const IconShare = () => React.createElement('svg', { width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.52.47 1.2.77 1.96.77 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L7.94 12.03c-.52-.47-1.2-.77-1.96-.77-1.66 0-3 1.34-3 3s1.34 3 3 3c.76 0 1.44-.3 1.96-.77l7.05 4.11c-.05.23-.09.46-.09.7 0 1.66 1.34 3 3 3s3-1.34 3-3-1.34-3-3-3z" }));
         const IconSave = () => React.createElement('svg', { width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" }));
 
-
         const firebaseConfig = {
             apiKey: "AIzaSyDg0nohFAprIYta3Z3IvFGms55PehyxGIM",
             authDomain: "entrenadorpersonal-4e69d.firebaseapp.com",
@@ -82,19 +75,14 @@
             messagingSenderId: "198872357236",
             appId: "1:198872357236:web:c3cd2a7f5caff197847421"
         };
-        // CRÍTICO: La API Key de Firebase está expuesta en el cliente.
-        // Para una aplicación de producción, es INDISPENSABLE configurar correctamente las
-        // Reglas de Seguridad de Firebase Firestore para asegurar que cada usuario
-        // solo pueda leer y escribir sus propios datos (workouts e historial).
-        // Sin reglas de seguridad adecuadas, esta API Key pública permitiría el acceso
-        // y modificación de datos de cualquier usuario.
+        
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
 
         const APP_ID = "mientrenador-v3";
         const APP_TITLE = "Mi Entrenador Saludable";
-        const APP_VERSION = "1.0.5"; // <--- VERSIÓN ACTUALIZADA
+        const APP_VERSION = "1.0.5";
 
         const WARMUP_STEPS = [
             { label: 'TOBILLO DERECHO', voice: 'Tobillo derecho' },
@@ -118,13 +106,11 @@
         };
         const formatTime = (s) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
 
-        // GPS specific phases
         const GPS_PHASE_KEY = 'gps-tracking';
         const POST_GPS_REST_PHASE_KEY = 'post-gps-rest';
 
-        // ─── GPS Utility Functions ──────────────────────────────────────────────────
         const getDistance = (lat1, lon1, lat2, lon2) => {
-            const R = 6371e3; // metres
+            const R = 6371e3;
             const φ1 = lat1 * Math.PI/180;
             const φ2 = lat2 * Math.PI/180;
             const Δφ = (lat2-lat1) * Math.PI/180;
@@ -135,7 +121,7 @@
                       Math.sin(Δλ/2) * Math.sin(Δλ/2);
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 
-            return R * c; // in metres
+            return R * c;
         };
 
         const formatPace = (totalDistanceMeters, totalTimeSeconds) => {
@@ -196,17 +182,16 @@
             msg.onend = msg.onerror = () => { voiceBusy = false; onEndCallback(); flushVoice(); };
             window.speechSynthesis.speak(msg);
         };
-       const speak = (text, interrupt = false, onEnd = null) => {
+        const speak = (text, interrupt = false, onEnd = null) => {
             if (!window.speechSynthesis) {
                 console.warn("SpeechSynthesis not available.");
-                if (onEnd) onEnd(); // Call onEnd immediately if speech is unavailable
+                if (onEnd) onEnd();
                 return;
             }
             if (interrupt) { window.speechSynthesis.cancel(); voiceQueue.length = 0; voiceBusy = false; }
             if (text) voiceQueue.push(onEnd ? { text, onEnd } : text);
             flushVoice();
-       };
-
+        };
 
         const startOfDay = (date) => { const d = new Date(date); d.setHours(0, 0, 0, 0); return d; };
         const endOfDay = (date) => { const d = new Date(date); d.setHours(23, 59, 59, 999); return d; };
@@ -234,7 +219,6 @@
             return { start, end };
         };
 
-        // --- Helper functions for generating specific workout segments ---
         const generateWarmupSegment = (ent, nextPhaseIntro = null) => {
             const s = [];
             s.push({ label: 'PREPÁRATE', seconds: 15, color: 'bg-yellow-400', phase: 'inicio', voiceInitial: 'Prepárate para el calentamiento', whistleOnStart: false, voiceCountdown: true });
@@ -272,24 +256,19 @@
             return s;
         };
 
-        // Modified generateGpsRunSegment to not include initial rest and have countdown
         const generateGpsRunSegment = (activityTypeLabel, nextPhaseIntro = null) => {
             const s = [];
             const initialVoice = `Comienza ${activityTypeLabel.toLowerCase()}. Tres, dos, uno.`;
-
-            // No 'DESCANSO (PRE-GPS)' as per new requirement, directly start with countdown
             s.push({
                 label: `INICIAR ${activityTypeLabel.toUpperCase()}`,
-                seconds: 4, // For 3, 2, 1 countdown + 1 sec initial speech
+                seconds: 4,
                 color: 'bg-gray-800',
                 phase: GPS_PHASE_KEY,
                 voiceInitial: initialVoice,
                 whistleOnStart: true,
-                voiceCountdown: true // This will make it speak 3, 2, 1
+                voiceCountdown: true
             });
             const transitionVoice = nextPhaseIntro ? ` ${nextPhaseIntro}` : '';
-            // Add a post-GPS rest, but it's okay to make it short as the user might want to see the map directly after stopping.
-            // The actual stopping and showing map is handled by stopGpsTracking and the PlayerView logic flow.
             s.push({ label: 'DESCANSO (POST-GPS)', seconds: 10, color: 'bg-teal-400', phase: POST_GPS_REST_PHASE_KEY, voiceInitial: `Descanso.${transitionVoice}`, whistleOnStart: false, voiceCountdown: true });
             return s;
         };
@@ -305,31 +284,26 @@
             }
             const lastStepOfStretch = s[s.length -1];
             if (lastStepOfStretch && nextPhaseIntro) {
-                // Append the next phase intro to the last stretch voice if it exists
                 lastStepOfStretch.voiceInitial = `${lastStepOfStretch.voiceInitial}.${nextPhaseIntro}`;
             }
             return s;
         };
 
-        // Define all possible segments with their keys, labels, and generator functions
         const ALL_POSSIBLE_SEGMENTS_DATA = [
             { key: 'warmup', label: 'Calentamiento', generator: generateWarmupSegment },
             { key: 'training', label: 'Ejercicio Principal', generator: generateMainTrainingSegment },
-            { key: 'walk', label: 'Caminata (GPS)', generator: generateGpsRunSegment }, // Separated Walk option
-            { key: 'run', label: 'Carrera (GPS)', generator: generateGpsRunSegment },   // Separated Run option
+            { key: 'walk', label: 'Caminata (GPS)', generator: generateGpsRunSegment },
+            { key: 'run', label: 'Carrera (GPS)', generator: generateGpsRunSegment },
             { key: 'stretch', label: 'Estiramientos', generator: generateStretchSegment },
         ];
-        // The order of these keys defines the overall flow of the workout
         const ALL_POSSIBLE_SEGMENTS_ORDERED_KEYS = ALL_POSSIBLE_SEGMENTS_DATA.map(s => s.key);
 
-
         const generateWorkoutSteps = (workout, defaultParams, selectedPhasesKeys) => {
-            // Safety check: if no phases selected, return a single "No phases" step
             if (!selectedPhasesKeys || selectedPhasesKeys.length === 0) {
                 console.warn('generateWorkoutSteps: No phases selected. Returning error step.');
                 return [{ label: 'NO HAY FASES', seconds: 5, color: 'bg-red-500', phase: 'error', voiceInitial: 'No se seleccionó ninguna fase. Por favor, cancela.', whistleOnStart: false, voiceCountdown: false }];
             }
-            if (!workout) { // Should not happen if a workout is always passed to PlayerView
+            if (!workout) {
                 console.error('generateWorkoutSteps: Workout object is null. Returning error step.');
                  return [{ label: 'ERROR DE RUTINA', seconds: 5, color: 'bg-red-500', phase: 'error', voiceInitial: 'Error: Rutina no encontrada. Por favor, cancela.', whistleOnStart: false, voiceCountdown: false }];
             }
@@ -337,13 +311,10 @@
             const ent = { ...defaultParams.entrenamiento, ...(workout.phases?.entrenamiento || {}) };
             let steps = [];
 
-            // Filter and order the selected phases based on ALL_POSSIBLE_SEGMENTS_ORDERED_KEYS
             const activeSegments = ALL_POSSIBLE_SEGMENTS_DATA.filter(segment =>
                 selectedPhasesKeys.includes(segment.key)
             ).sort((a, b) => ALL_POSSIBLE_SEGMENTS_ORDERED_KEYS.indexOf(a.key) - ALL_POSSIBLE_SEGMENTS_ORDERED_KEYS.indexOf(b.key));
 
-            // Determine if an initial 'PREPÁRATE' is needed
-            // If the first selected segment is NOT 'warmup', and also not 'run'/'walk' (which have their own prep/countdown)
             const firstActiveKey = activeSegments.length > 0 ? activeSegments[0].key : null;
             const isGpsFirst = (firstActiveKey === 'run' || firstActiveKey === 'walk');
 
@@ -362,18 +333,16 @@
                 if (nextSegmentData) {
                     introForNextInternalSegment = `A continuación, ${nextSegmentData.label.toLowerCase()}.`;
                 } else {
-                    introForNextInternalSegment = 'Entrenamiento completado.'; // Final message before explicit completion step
+                    introForNextInternalSegment = 'Entrenamiento completado.';
                 }
 
                 if (currentSegmentData.key === 'run' || currentSegmentData.key === 'walk') {
-                    // For GPS segments, pass the specific activity label (e.g., "Carrera" or "Caminata") for voice customization
                     steps = steps.concat(currentSegmentData.generator(currentSegmentData.label.split(' ')[0], introForNextInternalSegment));
                 } else {
                     steps = steps.concat(currentSegmentData.generator(ent, introForNextInternalSegment));
                 }
             }
 
-            // Ensure steps is not empty before adding final completion (should be caught by initial check but extra safe)
             if (steps.length === 0) {
                 console.error('generateWorkoutSteps: Steps array is empty after generation, adding generic error.');
                  return [{ label: 'ERROR DE GENERACIÓN', seconds: 5, color: 'bg-red-500', phase: 'error', voiceInitial: 'Error al generar los pasos de la rutina. Por favor, cancela.', whistleOnStart: false, voiceCountdown: false }];
@@ -384,8 +353,6 @@
             return steps;
         };
 
-
-        // ─── ModeSelectionScreen Component ──────────────────────────────────────────────
         function ModeSelectionScreen({ onModeSelected, onCancel }) {
             const [selectedPhases, setSelectedPhases] = useState([]);
 
@@ -410,7 +377,7 @@
                 React.createElement('h1', { className: "text-4xl font-black italic mb-6 text-orange-500" }, "Configura tu Sesión"),
                 React.createElement('p', { className: "text-sm text-slate-400 mb-8" }, "Elige las fases de entrenamiento que deseas realizar:"),
                 React.createElement('div', { className: "flex flex-col space-y-4 w-full max-w-sm mb-10" },
-                    ALL_POSSIBLE_SEGMENTS_DATA.map(phase => // Use the ordered list for rendering checkboxes
+                    ALL_POSSIBLE_SEGMENTS_DATA.map(phase =>
                         React.createElement('label', { key: phase.key, className: "flex items-center p-4 glass-card cursor-pointer" },
                             React.createElement('input', {
                                 type: "checkbox",
@@ -433,16 +400,14 @@
             );
         }
 
-        // ─── GpsMapSummary Component ────────────────────────────────────────────────
         function GpsMapSummary({ gpsCoordinates, finalGpsSummary, onSave, onShare, onClose }) {
             const mapRef = useRef(null);
             const mapInstance = useRef(null);
-            const mapContainerRef = useRef(null); // Ref for the div to capture for screenshot
+            const mapContainerRef = useRef(null);
 
             useEffect(() => {
                 if (!gpsCoordinates || gpsCoordinates.length === 0 || !mapRef.current) return;
 
-                // Initialize map
                 if (mapInstance.current) {
                     mapInstance.current.remove();
                 }
@@ -452,14 +417,10 @@
                     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 }).addTo(mapInstance.current);
 
-                // Draw polyline
                 const latLngs = gpsCoordinates.map(coord => [coord.lat, coord.lng]);
                 const polyline = L.polyline(latLngs, { color: '#f97316', weight: 5 }).addTo(mapInstance.current);
-
-                // Fit bounds to polyline
                 mapInstance.current.fitBounds(polyline.getBounds());
 
-                // Add start and end markers
                 if (gpsCoordinates.length > 0) {
                     L.marker([gpsCoordinates[0].lat, gpsCoordinates[0].lng]).addTo(mapInstance.current)
                         .bindPopup('Inicio').openPopup();
@@ -528,7 +489,7 @@
                             speak('Mapa compartido con éxito.');
                         } catch (err) {
                             console.error('Error al compartir:', err);
-                            if (err.name !== 'AbortError') { // User closed share dialog
+                            if (err.name !== 'AbortError') {
                                 alert('No se pudo compartir el mapa. Inténtalo de nuevo.');
                             }
                         }
@@ -539,7 +500,7 @@
                 });
             }, [finalGpsSummary]);
 
-            if (!finalGpsSummary) return null; // Should not happen if rendered correctly
+            if (!finalGpsSummary) return null;
 
             return React.createElement('div', { className: "h-screen flex flex-col bg-slate-950 text-white p-6" },
                 React.createElement('h2', { className: "text-3xl font-black italic text-orange-500 mb-4 text-center" }, "Tu Ruta GPS"),
@@ -568,11 +529,11 @@
                 ),
                 React.createElement('div', { className: "flex gap-4 mb-4" },
                     React.createElement('button', {
-                        onClick: handleSave, // Use the internal handleSave
+                        onClick: handleSave,
                         className: "flex-1 bg-white/10 text-white py-4 rounded-full font-black uppercase italic active:scale-95 text-xs flex items-center justify-center"
                     }, React.createElement(IconSave, { className: "mr-2" }), "GUARDAR MAPA"),
                     React.createElement('button', {
-                        onClick: handleShare, // Use the internal handleShare
+                        onClick: handleShare,
                         className: "flex-1 bg-white/10 text-white py-4 rounded-full font-black uppercase italic active:scale-95 text-xs flex items-center justify-center"
                     }, React.createElement(IconShare, { className: "mr-2" }), "COMPARTIR")
                 ),
@@ -583,250 +544,52 @@
             );
         }
 
-
-        // ─── App ────────────────────────────────────────────────────────────────────
-        function App() {
-            const [user, setUser] = useState(null);
-            const [view, setView] = useState('workouts');
-            const [workouts, setWorkouts] = useState([]);
-            const [history, setHistory] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const [selectedWorkout, setSelectedWorkout] = useState(null);
-
-            useEffect(() => {
-                const unsub = auth.onAuthStateChanged(u => {
-                    setUser(u && !u.isAnonymous ? u : null);
-                    setTimeout(() => setLoading(false), 500);
-                });
-                return unsub;
-            }, []);
-
-            useEffect(() => {
-                if (!user) return;
-                const base = db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid);
-                const unsubW = base.collection('workouts').onSnapshot(s => setWorkouts(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-                const unsubH = base.collection('history').onSnapshot(s => setHistory(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-                return () => { unsubW(); unsubH(); };
-            }, [user]);
-
-            const handleStartWorkout = useCallback((w) => {
-                if (window.speechSynthesis) {
-                    // This is a common workaround to initialize SpeechSynthesis in iOS.
-                    // iOS often requires user interaction to enable speech, and a silent utterance can 'wake it up'.
-                    const silent = new SpeechSynthesisUtterance(' ');
-                    silent.volume = 0;
-                    window.speechSynthesis.speak(silent);
-                }
-                setSelectedWorkout(w);
-                setView('play');
-                console.log('App: Starting workout in PlayerView with workout:', w?.name);
-            }, []);
-
-            if (loading) return React.createElement('div', { className: "h-full w-full flex items-center justify-center bg-slate-950" }, React.createElement('div', { className: "animate-spin w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full" }));
-            if (!user) return React.createElement(AuthView, { APP_TITLE, APP_VERSION });
-
-            return React.createElement('div', { className: "h-full w-full flex flex-col bg-slate-950 text-white overflow-hidden" },
-                view !== 'play' && React.createElement('header', { className: "p-5 flex justify-between items-center bg-slate-900 border-b border-white/5 shrink-0" },
-                    React.createElement('div', { onClick: () => setView('workouts'), className: "cursor-pointer" },
-                        React.createElement('h1', { className: "text-lg font-black italic uppercase text-orange-500" }, APP_TITLE),
-                        React.createElement('p', { className: "text-[8px] text-slate-500 font-bold uppercase" }, user.email, " | V", APP_VERSION)
-                    ),
-                    React.createElement('button', { onClick: () => auth.signOut(), className: "p-2 bg-red-500/10 rounded-xl text-red-500 font-bold text-[10px] px-4 uppercase italic" }, "Salir")
-                ),
-                React.createElement('main', { className: "flex-1 relative flex flex-col min-h-0" },
-                    view === 'workouts' && React.createElement(WorkoutsView, { workouts, user, onStart: handleStartWorkout, onEdit: w => { setSelectedWorkout(w); setView('create'); }, onCreate: () => { setSelectedWorkout(null); setView('create'); } } ),
-                    view === 'avance'   && React.createElement(AvanceView, { history }),
-                    view === 'create'   && React.createElement(CreateView, { user, workoutToEdit: selectedWorkout, onCancel: () => setView('workouts') }),
-                    view === 'play'     && React.createElement(PlayerView, {
-                        workout: selectedWorkout,
-                        onExit: () => { console.log('PlayerView: Exiting.'); setView('workouts'); },
-                        onComplete: (name, time, gpsData) => { // Added gpsData parameter
-                            console.log('PlayerView: Workout completed. Saving history.');
-                            db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid)
-                              .collection('history').add({ workoutName: name, totalTime: time, date: new Date().toISOString(), gpsData: gpsData || null }); // Save GPS data
-                            setView('workouts');
-                        }
-                    })
-                ),
-                view !== 'play' && React.createElement('nav', { className: "bg-slate-900 border-t border-white/5 p-4 flex justify-around items-center shrink-0" },
-                    React.createElement('button', { onClick: () => setView('workouts'), className: `flex flex-col items-center text-[9px] font-black ${view === 'workouts' ? 'text-orange-500' : 'text-slate-500'}` }, React.createElement('span', { className: "text-xl mb-1" }, "🏋️"), "RUTINAS"),
-                    React.createElement('button', { onClick: () => setView('avance'),   className: `flex flex-col items-center text-[9px] font-black ${view === 'avance'   ? 'text-orange-500' : 'text-slate-500'}` }, React.createElement('span', { className: "text-xl mb-1" }, "📊"), "AVANCE")
-                )
-            );
-        }
-
-        // ─── AuthView ────────────────────────────────────────────────────────────────
-        function AuthView({ APP_TITLE, APP_VERSION }) {
-            const [isReg, setIsReg] = useState(false);
-            const [email, setEmail] = useState('');
-            const [pass, setPass] = useState('');
-            const handle = useCallback(async e => {
-                e.preventDefault();
-                try {
-                    if (isReg) await auth.createUserWithEmailAndPassword(email.trim(), pass);
-                    else await auth.signInWithEmailAndPassword(email.trim(), pass);
-                    console.log('AuthView: User logged in/registered.');
-                } catch (err) { alert("Error: " + err.message); console.error('Auth Error:', err); }
-            }, [isReg, email, pass]);
-            return React.createElement('div', { className: "h-screen flex flex-col items-center bg-slate-950 p-10 pt-20 text-center" },
-                React.createElement(React.Fragment, null,
-                    React.createElement('div', { className: "text-7xl mb-6" }, "🏃‍♂️"),
-                    React.createElement('h1', { className: "text-4xl font-black italic uppercase text-white" }, APP_TITLE),
-                    React.createElement('p', { className: "text-[8px] text-slate-600 uppercase mb-8" }, "V ", APP_VERSION),
-                    React.createElement('form', { onSubmit: handle, className: "space-y-4 w-full max-w-sm" },
-                        React.createElement('input', { type: "email", placeholder: "EMAIL", className: "w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value: email, onChange: e => setEmail(e.target.value), required: true }),
-                        React.createElement('input', { type: "password", placeholder: "CLAVE", className: "w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value: pass, onChange: e => setPass(e.target.value), required: true }),
-                        React.createElement('button', { type: "submit", className: "w-full bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic" }, isReg ? 'REGISTRARSE' : 'ENTRAR')
-                    ),
-                    React.createElement('button', { onClick: () => setIsReg(!isReg), className: "mt-8 text-slate-500 text-[10px] uppercase font-black" }, isReg ? 'YA TENGO CUENTA' : 'CREAR CUENTA NUEVA')
-                )
-            );
-        }
-
-        // ─── WorkoutsView ────────────────────────────────────────────────────────────
-        function WorkoutsView({ workouts, user, onStart, onEdit, onCreate }) {
-            return React.createElement('div', { className: "flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4 pb-32" },
-                workouts.length === 0
-                    ? React.createElement('div', { className: "text-center p-12 opacity-30 italic font-black text-[10px]" }, "Sin rutinas")
-                    : workouts.map(w => React.createElement('div', { key: w.id, className: "glass-card p-6 flex justify-between items-center shadow-lg" },
-                        React.createElement('div', { className: "flex-1 cursor-pointer", onClick: () => onStart(w) },
-                            React.createElement('h3', { className: "font-black uppercase italic text-sm" }, w.name),
-                            React.createElement('span', { className: "text-[10px] text-orange-400 font-black uppercase italic" }, "Activa")
-                        ),
-                        React.createElement('div', { className: "flex gap-2" },
-                            React.createElement('button', { onClick: () => onStart(w), className: "bg-white text-black p-4 rounded-xl" }, React.createElement(IconPlay, null)),
-                            React.createElement('button', { onClick: () => onEdit(w), className: "bg-slate-800/40 p-4 rounded-xl text-[10px] font-black uppercase italic" }, "Edit")
-                        )
-                    )),
-                React.createElement('button', { onClick: onCreate, className: "w-full bg-white/5 border border-white/10 py-6 rounded-full font-black uppercase italic" }, "➕ NUEVA RUTINA")
-            );
-        }
-
-        // ─── CreateView ──────────────────────────────────────────────────────────────
-        function CreateView({ user, workoutToEdit, onCancel }) {
-            const initialPhases = workoutToEdit?.phases
-                ? { ...DEFAULT_PARAMS, ...workoutToEdit.phases, entrenamiento: { ...DEFAULT_PARAMS.entrenamiento, ...(workoutToEdit.phases.entrenamiento || {}) } }
-                : DEFAULT_PARAMS;
-            const [name, setName] = useState(workoutToEdit?.name || '');
-            const [phases, setPhases] = useState(initialPhases);
-            const [saving, setSaving] = useState(false);
-            const update = useCallback((p, f, v) => setPhases(prev => ({ ...prev, [p]: { ...prev[p], [f]: parseInt(v) || 0 } })), []);
-            const save = useCallback(async () => {
-                if (!name.trim() || saving) return;
-                setSaving(true);
-                try {
-                    const col = db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid).collection('workouts');
-                    const dataToSave = { name: name.toUpperCase(), phases: { ...DEFAULT_PARAMS, ...phases, entrenamiento: { ...DEFAULT_PARAMS.entrenamiento, ...phases.entrenamiento } }, updatedAt: new Date().toISOString() };
-                    if (workoutToEdit?.id) await col.doc(workoutToEdit.id).update(dataToSave);
-                    else await col.add({ ...dataToSave, createdAt: new Date().toISOString() });
-                    onCancel();
-                } catch (e) { alert("Error al guardar: " + e.message); setSaving(false); }
-                }, [name, saving, phases, user, workoutToEdit, onCancel]);
-            const ENT_FIELDS = [
-                { f: 'action', label: 'Acción (s)' }, { f: 'change', label: 'Cambio (s)' },
-                { f: 'rounds', label: 'Rondas' }, { f: 'cycles', label: 'Ciclos' },
-                { f: 'rest', label: 'Descanso Ciclo (s)' }, { f: 'zoneRest', label: 'Descanso Zona (s)' }
-            ];
-            const STRETCH_FIELDS = [
-                { f: 'stretchSteps', label: 'Pasos Estiramiento' },
-                { f: 'stretchAction', label: 'Duración Estir. (s)' },
-                { f: 'stretchChange', label: 'Cambio Estir. (s)' }
-            ];
-            return React.createElement('div', { className: "flex-1 flex flex-col bg-slate-950 overflow-hidden text-center italic" },
-                React.createElement('header', { className: "p-6 flex items-center border-b border-white/5 shrink-0" },
-                    React.createElement('button', { onClick: onCancel, className: "p-3 bg-slate-900 rounded-2xl shadow-lg text-white" }, "⬅"),
-                    React.createElement('h2', { className: "text-xl font-black uppercase flex-1" }, "Configurar")
-                ),
-                React.createElement('div', { className: "flex-1 overflow-y-auto scrollbar-hide p-4 space-y-6 pb-28" },
-                    React.createElement('input', { type: "text", placeholder: "NOMBRE DE LA RUTINA", className: "w-full p-6 bg-slate-900 border border-white/10 rounded-[2rem] font-black uppercase text-center text-white outline-none", value: name, onChange: e => setName(e.target.value) }),
-                    React.createElement('div', { className: "glass-card p-6 space-y-4" },
-                        React.createElement('span', { className: "font-black uppercase text-xs text-orange-500 border-b border-white/5 block pb-2" }, "Entrenamiento"),
-                        React.createElement('div', { className: "grid grid-cols-2 gap-4" }, ENT_FIELDS.map(({ f, label }) => React.createElement(InputField, { key: f, label, val: (phases.entrenamiento?.[f] ?? DEFAULT_PARAMS.entrenamiento[f]), set: v => update('entrenamiento', f, v) })))
-                    ),
-                    React.createElement('div', { className: "glass-card p-6 space-y-4" },
-                        React.createElement('span', { className: "font-black uppercase text-xs text-orange-500 border-b border-white/5 block pb-2" }, "Estiramientos"),
-                        React.createElement('div', { className: "grid grid-cols-2 gap-4" }, STRETCH_FIELDS.map(({ f, label }) => React.createElement(InputField, { key: f, label, val: (phases.entrenamiento?.[f] ?? DEFAULT_PARAMS.entrenamiento[f]), set: v => update('entrenamiento', f, v) })))
-                    )
-                ),
-                React.createElement('div', { className: "p-6 bg-slate-950 border-t border-white/5 shrink-0" },
-                    React.createElement('button', { onClick: save, className: "w-full bg-white text-black py-6 rounded-full font-black uppercase", disabled: saving }, saving ? 'GUARDANDO...' : 'GUARDAR')
-                )
-            );
-        }
-
-        function InputField({ label, val, set }) {
-            return React.createElement('div', { className: "flex flex-col items-center" },
-                React.createElement('span', { className: "text-[8px] opacity-40 mb-2 uppercase" }, label),
-                React.createElement('input', { type: "number", className: "w-full bg-slate-800/40 p-4 rounded-xl text-center font-black text-white border border-white/5 outline-none", value: val, onChange: e => set(e.target.value) })
-            );
-        }
-
-        // ─── PlayerView ──────────────────────────────────────────────────────────────
         function PlayerView({ workout, onExit, onComplete }) {
-            // ── UI state (solo para render) ──────────────────────────────────────────
-            const [uiStatus, setUiStatus]     = useState('ready');  // 'ready'|'running'|'paused'|'finished'|'gps-running'
-            const [uiIdx, setUiIdx]           = useState(0);
+            const [uiStatus, setUiStatus] = useState('ready');
+            const [uiIdx, setUiIdx] = useState(0);
             const [uiTimeLeft, setUiTimeLeft] = useState(0);
-            const [uiElapsed, setUiElapsed]   = useState(0);
-            const [steps, setSteps]           = useState([]);
-
-            // Post-workout mode selection states
+            const [uiElapsed, setUiElapsed] = useState(0);
+            const [steps, setSteps] = useState([]);
             const [isModeSelectionScreenVisible, setIsModeSelectionScreenVisible] = useState(true);
-            const [selectedWorkoutPhases, setSelectedWorkoutPhases]               = useState(null);
-            const [showPostWorkoutMap, setShowPostWorkoutMap]                     = useState(false);
+            const [selectedWorkoutPhases, setSelectedWorkoutPhases] = useState(null);
+            const [showPostWorkoutMap, setShowPostWorkoutMap] = useState(false);
+            const [isGpsActive, setIsGpsActive] = useState(false);
+            const [showGpsControls, setShowGpsControls] = useState(false);
+            const [gpsCoordinates, setGpsCoordinates] = useState([]);
+            const [hasGpsData, setHasGpsData] = useState(false);
+            const [finalGpsSummary, setFinalGpsSummary] = useState(null);
+            const [shouldAutoStart, setShouldAutoStart] = useState(false); // Nuevo estado para el auto-inicio
 
-            // GPS specific states
-            const [isGpsActive, setIsGpsActive]           = useState(false);
-            const [showGpsControls, setShowGpsControls]   = useState(false);
-            const [gpsCoordinates, setGpsCoordinates]     = useState([]);
-            const [hasGpsData, setHasGpsData]             = useState(false);
-            const [finalGpsSummary, setFinalGpsSummary]   = useState(null);
+            const statusRef = useRef(uiStatus);
+            const idxRef = useRef(uiIdx);
+            const timeLeftRef = useRef(uiTimeLeft);
+            const elapsedRef = useRef(uiElapsed);
+            const stepsRef = useRef([]);
+            const stepDurRef = useRef(0);
+            const stepStartRef = useRef(null);
+            const workoutStartRef = useRef(null);
+            const pausedAtRef = useRef(null);
+            const savedRef = useRef(false);
+            const spokenInit = useRef({});
+            const lastSpokenKey = useRef('');
+            const wakeLockRef = useRef(null);
+            const videoRef = useRef(null);
+            const gpsWatcherId = useRef(null);
+            const lastPosition = useRef(null);
+            const gpsStartTime = useRef(null);
+            const gpsAnnounceLastTime = useRef(0);
+            const gpsTotalDistance = useRef(0);
+            const gpsTotalTime = useRef(0);
+            const hasGpsDataRef = useRef(false);
 
-            // Console log to trace render cycle and current *render-time* state.
-            // THIS LINE HAS BEEN MOVED TO HERE TO AVOID REFERENCE_ERROR.
             console.log('PlayerView: Render. Status:', uiStatus, 'Idx:', uiIdx, 'TimeLeft:', uiTimeLeft, 'Elapsed:', uiElapsed, 'ModeScreen:', isModeSelectionScreenVisible, 'Phases:', selectedWorkoutPhases?.length || 0, 'Steps:', steps.length);
 
-
-            // ── Refs internos del timer (NO disparan re-render) ──────────────────────
-            // Initialize refs with their corresponding state values for current render cycle
-            const statusRef       = useRef(uiStatus); // Initialize with current state value
-            const idxRef          = useRef(uiIdx);
-            const timeLeftRef     = useRef(uiTimeLeft);
-            const elapsedRef      = useRef(uiElapsed);
-            const stepsRef        = useRef([]); // stepsRef holds the full generated steps array
-
-            const stepDurRef      = useRef(0);
-            const stepStartRef    = useRef(null);
-            const workoutStartRef = useRef(null);
-            const pausedAtRef     = useRef(null);
-
-            const savedRef        = useRef(false);
-            const spokenInit      = useRef({});
-            const lastSpokenKey   = useRef('');
-            const wakeLockRef     = useRef(null);
-            const videoRef        = useRef(null);
-
-            // GPS specific refs
-            const gpsWatcherId            = useRef(null);
-            const lastPosition            = useRef(null);
-            const gpsStartTime            = useRef(null);
-            const gpsAnnounceLastTime     = useRef(0);
-            const gpsTotalDistance        = useRef(0);
-            const gpsTotalTime            = useRef(0);
-            const hasGpsDataRef           = useRef(false);
-
-            // --- Sync Refs with State ---
-            // These useEffects ensure the refs always hold the latest state values
-            // for use in callbacks and intervals, preventing stale closures.
             useEffect(() => { statusRef.current = uiStatus; }, [uiStatus]);
             useEffect(() => { idxRef.current = uiIdx; }, [uiIdx]);
             useEffect(() => { timeLeftRef.current = uiTimeLeft; }, [uiTimeLeft]);
             useEffect(() => { elapsedRef.current = uiElapsed; }, [uiElapsed]);
             useEffect(() => { hasGpsDataRef.current = hasGpsData; }, [hasGpsData]);
-            // --- End Sync Refs with State ---
 
-
-            // --- Defensive Setters for UI State (Checks for NaN) ---
             const setTime = useCallback((t) => {
                 if (isNaN(t)) { console.error('PlayerView: setTime received NaN. Resetting to 0.'); setUiTimeLeft(0); }
                 else { setUiTimeLeft(t); }
@@ -835,82 +598,73 @@
                 if (isNaN(e)) { console.error('PlayerView: setElap received NaN. Resetting to 0.'); setUiElapsed(0); }
                 else { setUiElapsed(e); }
             }, []);
-            // --- End Defensive Setters ---
 
-            // ── Finalizar workout ────────────────────────────────────────────────────
-            const endWorkout = useCallback(() => {
-                console.log('PlayerView: endWorkout called. Current elapsed:', elapsedRef.current);
-                setUiStatus('finished'); // Use setter for UI state
-                speak('Entrenamiento finalizado. ¡Buen trabajo!', true, () => {
-                    if (hasGpsDataRef.current && finalGpsSummary) {
-                        console.log('PlayerView: Showing post-workout map.');
-                        setShowPostWorkoutMap(true); // Show map summary if GPS data exists
-                    } else {
-                        // No GPS data or not a GPS workout, proceed to onComplete directly
-                        if (!savedRef.current && workout) {
-                            console.log('PlayerView: Completing workout without GPS data.');
-                            onComplete(workout.name, elapsedRef.current, null); // Pass null for GPS data if none
-                            savedRef.current = true;
-                        }
-                        onExit(); // Go back to workouts after simple finish
-                    }
-                });
-            }, [workout, onComplete, onExit, finalGpsSummary, setUiStatus]);
-
-            // ── Avanzar al siguiente step (lógica pura con refs) ─────────────────────
-            const advanceToStep = useCallback((nextIdx) => {
-                const s = stepsRef.current;
-                if (nextIdx >= s.length) {
-                    console.log('PlayerView: No more steps to advance to. Ending workout.');
-                    endWorkout(); // If no more steps, end the workout
-                    return false;
-                }
-                console.log('PlayerView: Advancing to step', nextIdx, 'Label:', s[nextIdx].label);
-                idxRef.current   = nextIdx;
-                stepDurRef.current = s[nextIdx].seconds;
-                timeLeftRef.current = s[nextIdx].seconds; // Update ref
-                stepStartRef.current = Date.now();
-                lastSpokenKey.current = '';
-                spokenInit.current = {};
-                setUiIdx(nextIdx); // Update state
-                setTime(s[nextIdx].seconds); // Use defensive setter for UI state
-                return true;
-            }, [endWorkout, setUiIdx, setTime]);
-
-            // ── Saltar step ──────────────────────────────────────────────────────────
-            const skipStep = useCallback(() => {
-                if (statusRef.current === 'finished' || stepsRef.current.length === 0) {
-                    console.log('PlayerView: Skip request ignored. Status:', statusRef.current, 'Steps length:', stepsRef.current.length);
-                    return;
-                }
-                console.log('PlayerView: Skip step requested.');
-                const currentStep = stepsRef.current[idxRef.current];
-                // If currently in a GPS phase and user skips, stop GPS first
-                if (currentStep.phase === GPS_PHASE_KEY && isGpsActive) {
-                    console.log('PlayerView: Stopping GPS tracking due to skip.');
-                    stopGpsTracking(true); // Stop GPS and then proceed to next step
-                    return;
-                }
-
-                const next = idxRef.current + 1;
-                if (advanceToStep(next)) {
-                    speak('Saltando. Siguiente.', true);
-                    // Disparar speech inicial del siguiente step en el mismo tick
-                    if (stepsRef.current[next].phase !== GPS_PHASE_KEY) {
-                         handleSpeech(stepsRef.current[next], next, stepsRef.current[next].seconds);
-                    }
-                } else {
-                    endWorkout();
-                }
-            }, [endWorkout, advanceToStep, isGpsActive, stopGpsTracking, handleSpeech]);
-
-            // ── GPS Tracking functions ───────────────────────────────────────────────
             const announceGpsStats = useCallback((distance, timeSec) => {
                 const formattedDistance = formatDistance(distance);
                 const formattedSpeed = formatSpeed(distance, timeSec);
                 const formattedPace = formatPace(distance, timeSec);
                 speak(`Distancia: ${formattedDistance}. Velocidad promedio: ${formattedSpeed}. Ritmo promedio: ${formattedPace}.`);
             }, []);
+
+            const handleSpeech = useCallback((step, stepIdx, remaining) => {
+                if (statusRef.current !== 'running' && statusRef.current !== 'gps-running') return;
+
+                const initKey = `${stepIdx}_init`;
+                if (remaining === step.seconds && step.voiceInitial && !spokenInit.current[initKey] && statusRef.current === 'running') {
+                    speak(step.voiceInitial, true);
+                    if (step.whistleOnStart) navigator.vibrate(150);
+                    spokenInit.current[initKey] = true;
+                }
+                if (step.voiceMidpoint && remaining === step.voiceMidpoint.time) {
+                    const k = `${stepIdx}_mid_${remaining}`;
+                    if (lastSpokenKey.current !== k) { speak(step.voiceMidpoint.text); lastSpokenKey.current = k; }
+                }
+                if (step.voiceCountdown && remaining > 0 && remaining <= 3) {
+                    const k = `${stepIdx}_cd_${remaining}`;
+                    if (lastSpokenKey.current !== k) { speak(String(remaining)); lastSpokenKey.current = k; }
+                }
+                if (step.whistleOnStart && remaining === step.seconds && statusRef.current === 'running' && step.phase !== GPS_PHASE_KEY && !spokenInit.current[initKey + '_whistle']) {
+                    whistle();
+                    spokenInit.current[initKey + '_whistle'] = true;
+                }
+            }, []);
+
+            const endWorkout = useCallback(() => {
+                console.log('PlayerView: endWorkout called. Current elapsed:', elapsedRef.current);
+                setUiStatus('finished');
+                speak('Entrenamiento finalizado. ¡Buen trabajo!', true, () => {
+                    if (hasGpsDataRef.current && finalGpsSummary) {
+                        console.log('PlayerView: Showing post-workout map.');
+                        setShowPostWorkoutMap(true);
+                    } else {
+                        if (!savedRef.current && workout) {
+                            console.log('PlayerView: Completing workout without GPS data.');
+                            onComplete(workout.name, elapsedRef.current, null);
+                            savedRef.current = true;
+                        }
+                        onExit();
+                    }
+                });
+            }, [workout, onComplete, onExit, finalGpsSummary, setUiStatus]);
+
+            const advanceToStep = useCallback((nextIdx) => {
+                const s = stepsRef.current;
+                if (nextIdx >= s.length) {
+                    console.log('PlayerView: No more steps to advance to. Ending workout.');
+                    endWorkout();
+                    return false;
+                }
+                console.log('PlayerView: Advancing to step', nextIdx, 'Label:', s[nextIdx].label);
+                idxRef.current = nextIdx;
+                stepDurRef.current = s[nextIdx].seconds;
+                timeLeftRef.current = s[nextIdx].seconds;
+                stepStartRef.current = Date.now();
+                lastSpokenKey.current = '';
+                spokenInit.current = {};
+                setUiIdx(nextIdx);
+                setTime(s[nextIdx].seconds);
+                return true;
+            }, [endWorkout, setUiIdx, setTime]);
 
             const stopGpsTracking = useCallback((isSkip = false) => {
                 console.log('PlayerView: stopGpsTracking called. isSkip:', isSkip);
@@ -924,7 +678,7 @@
                 const finalTime = gpsTotalTime.current;
 
                 if (finalDistance > 0 && finalTime > 0 && gpsCoordinates.length > 1) {
-                    setHasGpsData(true); // Update state directly
+                    setHasGpsData(true);
                     setFinalGpsSummary({
                         distance: finalDistance,
                         time: finalTime,
@@ -933,7 +687,7 @@
                     });
                     console.log('PlayerView: GPS data collected and summarized:', { finalDistance, finalTime });
                 } else {
-                    setHasGpsData(false); // Update state directly
+                    setHasGpsData(false);
                     setFinalGpsSummary(null);
                     console.log('PlayerView: No significant GPS data collected.');
                 }
@@ -945,15 +699,39 @@
                         speak('No se registró distancia significativa.');
                     }
                     setIsGpsActive(false);
-                    setShowGpsControls(false); // Reset controls visibility
-                    setUiStatus('running'); // Return to normal running status so skipStep can proceed
-                    // After announcing, skip to the next step (which should be POST_GPS_REST)
-                    if (!isSkip) { // Only auto-skip if it wasn't triggered by a user skip action
+                    setShowGpsControls(false);
+                    setUiStatus('running');
+                    if (!isSkip) {
                         console.log('PlayerView: Auto-skipping to next step after GPS phase.');
-                        skipStep();
+                        const next = idxRef.current + 1;
+                        advanceToStep(next);
                     }
                 });
-            }, [skipStep, announceGpsStats, gpsCoordinates, setHasGpsData, finalGpsSummary, setUiStatus, setIsGpsActive, setShowGpsControls]);
+            }, [advanceToStep, announceGpsStats, gpsCoordinates, setHasGpsData, setFinalGpsSummary, setUiStatus, setIsGpsActive, setShowGpsControls]);
+
+            const skipStep = useCallback(() => {
+                if (statusRef.current === 'finished' || stepsRef.current.length === 0) {
+                    console.log('PlayerView: Skip request ignored. Status:', statusRef.current, 'Steps length:', stepsRef.current.length);
+                    return;
+                }
+                console.log('PlayerView: Skip step requested.');
+                const currentStep = stepsRef.current[idxRef.current];
+                if (currentStep.phase === GPS_PHASE_KEY && isGpsActive) {
+                    console.log('PlayerView: Stopping GPS tracking due to skip.');
+                    stopGpsTracking(true);
+                    return;
+                }
+
+                const next = idxRef.current + 1;
+                if (advanceToStep(next)) {
+                    speak('Saltando. Siguiente.', true);
+                    if (stepsRef.current[next] && stepsRef.current[next].phase !== GPS_PHASE_KEY) {
+                        handleSpeech(stepsRef.current[next], next, stepsRef.current[next].seconds);
+                    }
+                } else {
+                    endWorkout();
+                }
+            }, [endWorkout, advanceToStep, isGpsActive, stopGpsTracking, handleSpeech]);
 
             const startGpsTracking = useCallback(() => {
                 console.log('PlayerView: startGpsTracking called.');
@@ -1023,8 +801,6 @@
                 );
             }, [skipStep, announceGpsStats, isGpsActive, stopGpsTracking, setHasGpsData, setUiStatus, setIsGpsActive, setShowGpsControls]);
 
-
-            // ── Toggle play/pause ────────────────────────────────────────────────────
             const togglePlay = useCallback(() => {
                 if (!workout || stepsRef.current.length === 0) {
                     console.warn('togglePlay: Cannot toggle play, workout or steps missing. Workout:', workout, 'Steps length:', stepsRef.current.length);
@@ -1037,12 +813,12 @@
                 if (current === 'ready') {
                     const now = Date.now();
                     workoutStartRef.current = now;
-                    stepStartRef.current    = now;
-                    setUiStatus('running'); // Update state
+                    stepStartRef.current = now;
+                    setUiStatus('running');
                     console.log('togglePlay: Transitioned from ready to running.');
                 } else if (current === 'running') {
                     pausedAtRef.current = Date.now();
-                    setUiStatus('paused'); // Update state
+                    setUiStatus('paused');
                     console.log('togglePlay: Transitioned from running to paused.');
                 } else if (current === 'paused') {
                     const now = Date.now();
@@ -1050,13 +826,13 @@
                     console.log('togglePlay: Resuming from pause. Paused time (ms):', pausedMs);
 
                     workoutStartRef.current = (workoutStartRef.current !== null && !isNaN(workoutStartRef.current)) ? workoutStartRef.current + pausedMs : now;
-                    stepStartRef.current    = (stepStartRef.current !== null && !isNaN(stepStartRef.current)) ? stepStartRef.current + pausedMs : now;
+                    stepStartRef.current = (stepStartRef.current !== null && !isNaN(stepStartRef.current)) ? stepStartRef.current + pausedMs : now;
 
                     if (isNaN(workoutStartRef.current)) workoutStartRef.current = now;
-                    if (isNaN(stepStartRef.current))    stepStartRef.current = now;
+                    if (isNaN(stepStartRef.current)) stepStartRef.current = now;
 
                     pausedAtRef.current = null;
-                    setUiStatus('running'); // Update state
+                    setUiStatus('running');
                     console.log('togglePlay: Transitioned from paused to running. New workoutStartRef:', workoutStartRef.current, 'stepStartRef:', stepStartRef.current);
                 } else if (current === 'gps-running') {
                     speak('No se puede pausar durante el seguimiento GPS. Presiona el botón de encendido del celular para ver el botón de finalizar.', true);
@@ -1064,93 +840,6 @@
                 }
             }, [workout, setUiStatus]);
 
-
-            // ── Inicialización cuando cambia workout o el modo de entrenamiento ────
-            useEffect(() => {
-                console.log('PlayerView: Init useEffect running for dependencies change.');
-                // Reset ALL states and refs. This effect essentially re-initializes PlayerView fully.
-                setUiStatus('ready'); // Ensures starting from a known state
-                setUiIdx(0);
-                setElap(0);
-                setTime(0); // Reset time left using defensive setter
-                savedRef.current = false;
-                spokenInit.current = {};
-                lastSpokenKey.current = '';
-                workoutStartRef.current = null;
-                stepStartRef.current = null;
-                pausedAtRef.current = null;
-                setShowPostWorkoutMap(false);
-                setGpsCoordinates([]);
-                setHasGpsData(false);
-                setFinalGpsSummary(null);
-
-                // Clear any existing GPS watch
-                if (gpsWatcherId.current) {
-                    navigator.geolocation.clearWatch(gpsWatcherId.current);
-                    gpsWatcherId.current = null;
-                    console.log('PlayerView: Init useEffect cleanup: GPS watch cleared during re-init.');
-                }
-                setIsGpsActive(false); // Ensure GPS active state is off
-
-                // Only generate steps once selectedWorkoutPhases is decided AND mode selection is no longer visible
-                if (isModeSelectionScreenVisible || !workout || !selectedWorkoutPhases) {
-                    console.log('PlayerView: Init useEffect: Mode selection screen visible OR workout/phases not selected yet. Skipping step generation.');
-                    setSteps([]); // Clear steps while waiting for user input or if data is incomplete.
-                    return; // Stop here, ModeSelectionScreen or error will render.
-                }
-
-                console.log('PlayerView: Init useEffect: Generating workout steps based on selected phases:', selectedWorkoutPhases);
-                const generated = generateWorkoutSteps(workout, DEFAULT_PARAMS, selectedWorkoutPhases);
-                stepsRef.current = generated; // Update the ref with the full steps array
-                setSteps(generated); // Update React state for rendering
-
-                if (generated.length === 0) {
-                    console.error("PlayerView: Init useEffect: Generated steps array is empty, cannot set initial step details.");
-                    // The component will render an error screen due to steps.length === 0 check.
-                    return;
-                }
-
-                // Set initial step duration and time left for the first step
-                const firstStep = generated[0];
-                stepDurRef.current = firstStep.seconds;
-                setTime(firstStep.seconds); // Update UI state for time left of the first step
-                setUiIdx(0); // Ensure UI index is 0
-
-                let timeoutId;
-                // Auto-start logic
-                if (firstStep.phase !== 'error') { // Do not auto-start if the first step is an error message
-                    console.log('PlayerView: Init useEffect: Scheduling auto-start (timeout).');
-                    timeoutId = setTimeout(() => {
-                        // Check if status is still 'ready' before attempting to auto-play
-                        // This prevents auto-playing if user quickly clicked play/pause manually
-                        if (statusRef.current === 'ready') {
-                            console.log('PlayerView: Init useEffect: setTimeout triggered. Auto-calling togglePlay.');
-                            togglePlay();
-                        } else {
-                            console.log('PlayerView: Init useEffect: setTimeout triggered, but status is not "ready" (it is:', statusRef.current, '). Skipping auto-play.');
-                        }
-                    }, 50); // Small delay to allow initial render
-                }
-
-                return () => {
-                    console.log('PlayerView: Init useEffect cleanup on re-run or unmount.');
-                    if (timeoutId) clearTimeout(timeoutId);
-                    // No need to clear GPS watcher here, as it's handled at the start of the effect for re-init.
-                };
-
-            }, [
-                workout,
-                isModeSelectionScreenVisible,
-                selectedWorkoutPhases,
-                // These are stable setters/callbacks, but explicitly added for completeness and linter compliance.
-                setUiStatus, setUiIdx, setElap, setTime,
-                setHasGpsData, setIsGpsActive, setShowGpsControls,
-                setFinalGpsSummary, setGpsCoordinates, setShowPostWorkoutMap,
-                endWorkout, togglePlay, stopGpsTracking
-            ]);
-
-
-            // ── Wake lock ────────────────────────────────────────────────────────────
             const releaseWake = useCallback(() => {
                 if (videoRef.current) videoRef.current.pause();
                 if (wakeLockRef.current) {
@@ -1180,27 +869,26 @@
                 return releaseWake;
             }, [uiStatus, requestWake, releaseWake]);
 
-            // ── Visibility change (for screen off during GPS) ────────────────────────────────────────────────────
             useEffect(() => {
                 const handleVisibilityChange = () => {
                     console.log('PlayerView: Visibility changed to', document.hidden ? 'hidden' : 'visible', 'Current UI Status:', uiStatus);
                     if (document.hidden) {
-                        if (statusRef.current === 'running') { // Only pause if it was a regular run
+                        if (statusRef.current === 'running') {
                             pausedAtRef.current = Date.now();
-                            setUiStatus('paused'); // Update state
+                            setUiStatus('paused');
                         } else if (statusRef.current === 'gps-running') {
-                            setShowGpsControls(false); // Hide controls, GPS tracking continues
+                            setShowGpsControls(false);
                         }
                         releaseWake();
                     } else {
                         if (statusRef.current === 'paused' && pausedAtRef.current !== null) {
                             const hiddenMs = Date.now() - pausedAtRef.current;
                             workoutStartRef.current = (workoutStartRef.current !== null && !isNaN(workoutStartRef.current)) ? workoutStartRef.current + hiddenMs : Date.now();
-                            stepStartRef.current    = (stepStartRef.current !== null && !isNaN(stepStartRef.current)) ? stepStartRef.current + hiddenMs : Date.now();
+                            stepStartRef.current = (stepStartRef.current !== null && !isNaN(stepStartRef.current)) ? stepStartRef.current + hiddenMs : Date.now();
                             pausedAtRef.current = null;
-                            setUiStatus('running'); // Update state
+                            setUiStatus('running');
                         } else if (statusRef.current === 'gps-running') {
-                            setShowGpsControls(true); // Show controls again
+                            setShowGpsControls(true);
                         }
                         requestWake();
                     }
@@ -1209,32 +897,75 @@
                 return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
             }, [requestWake, releaseWake, uiStatus, setUiStatus, setShowGpsControls]);
 
+            // Main useEffect for initialization and step generation
+            useEffect(() => {
+                console.log('PlayerView: Init useEffect running for dependencies change. Steps length before generation:', stepsRef.current.length);
+                setUiStatus('ready');
+                setUiIdx(0);
+                setElap(0);
+                setTime(0);
+                savedRef.current = false;
+                spokenInit.current = {};
+                lastSpokenKey.current = '';
+                workoutStartRef.current = null;
+                stepStartRef.current = null;
+                pausedAtRef.current = null;
+                setShowPostWorkoutMap(false);
+                setGpsCoordinates([]);
+                setHasGpsData(false);
+                setFinalGpsSummary(null);
+                setShouldAutoStart(false); // Reset auto-start flag
 
-            // ── Speech helper (sin closures stale: recibe valores como params) ───────
-            const handleSpeech = useCallback((step, stepIdx, remaining) => {
-                if (statusRef.current !== 'running' && statusRef.current !== 'gps-running') return;
+                if (gpsWatcherId.current) {
+                    navigator.geolocation.clearWatch(gpsWatcherId.current);
+                    gpsWatcherId.current = null;
+                    console.log('PlayerView: Init useEffect cleanup: GPS watch cleared during re-init.');
+                }
+                setIsGpsActive(false);
 
-                const initKey = `${stepIdx}_init`;
-                if (remaining === step.seconds && step.voiceInitial && !spokenInit.current[initKey] && statusRef.current === 'running') {
-                    speak(step.voiceInitial, true);
-                    if (step.whistleOnStart) navigator.vibrate(150);
-                    spokenInit.current[initKey] = true;
+                if (isModeSelectionScreenVisible || !workout || !selectedWorkoutPhases) {
+                    console.log('PlayerView: Init useEffect: Mode selection screen visible OR workout/phases not selected yet. Skipping step generation.');
+                    setSteps([]);
+                    return;
                 }
-                if (step.voiceMidpoint && remaining === step.voiceMidpoint.time) {
-                    const k = `${stepIdx}_mid_${remaining}`;
-                    if (lastSpokenKey.current !== k) { speak(step.voiceMidpoint.text); lastSpokenKey.current = k; }
-                }
-                if (step.voiceCountdown && remaining > 0 && remaining <= 3) {
-                    const k = `${stepIdx}_cd_${remaining}`;
-                    if (lastSpokenKey.current !== k) { speak(String(remaining)); lastSpokenKey.current = k; }
-                }
-                if (step.whistleOnStart && remaining === step.seconds && statusRef.current === 'running' && step.phase !== GPS_PHASE_KEY && !spokenInit.current[initKey + '_whistle']) {
-                    whistle();
-                    spokenInit.current[initKey + '_whistle'] = true;
-                }
-            }, []);
 
-            // ── TIMER PRINCIPAL ──────────────────────────────────────────────────────
+                console.log('PlayerView: Init useEffect: Generating workout steps based on selected phases:', selectedWorkoutPhases, 'for workout:', workout?.name);
+                const generated = generateWorkoutSteps(workout, DEFAULT_PARAMS, selectedWorkoutPhases);
+                stepsRef.current = generated;
+                setSteps(generated);
+
+                if (generated.length === 0 || generated[0].phase === 'error') { // Added error phase check
+                    console.error("PlayerView: Init useEffect: Generated steps array is empty or first step is an error. Cannot auto-start.");
+                    setUiStatus('ready'); // Ensure UI status is ready for error display
+                    return;
+                }
+
+                const firstStep = generated[0];
+                stepDurRef.current = firstStep.seconds;
+                setTime(firstStep.seconds);
+                setUiIdx(0);
+
+                setShouldAutoStart(true); // Signal that the workout is ready to be auto-started
+
+                return () => {
+                    console.log('PlayerView: Init useEffect cleanup on re-run or unmount.');
+                    // Asegúrate de que el seguimiento GPS se detiene si el componente se desmonta o se re-inicializa
+                    if (isGpsActive) { // Solo si el GPS está activo, llámalo
+                        stopGpsTracking(true);
+                    }
+                };
+            }, [workout, isModeSelectionScreenVisible, selectedWorkoutPhases, setUiStatus, setUiIdx, setElap, setTime, setHasGpsData, setIsGpsActive, setShowGpsControls, setFinalGpsSummary, setGpsCoordinates, setShowPostWorkoutMap, stopGpsTracking, isGpsActive]); // Added isGpsActive to deps
+
+            // Nuevo useEffect para manejar el auto-inicio de la rutina
+            useEffect(() => {
+                if (shouldAutoStart && uiStatus === 'ready') {
+                    console.log('PlayerView: Auto-start useEffect: Triggering togglePlay.');
+                    togglePlay();
+                    setShouldAutoStart(false); // Consume la bandera para evitar que se dispare de nuevo
+                }
+            }, [shouldAutoStart, uiStatus, togglePlay]);
+
+
             useEffect(() => {
                 if (uiStatus !== 'running' && uiStatus !== 'gps-running') {
                     console.log('PlayerView: Timer useEffect skipped. Status is not running/gps-running:', uiStatus);
@@ -1254,44 +985,37 @@
                         return;
                     }
 
-                    // Always update total elapsed time
                     const currentWorkoutStart = workoutStartRef.current;
                     const totalElap = Math.floor((now - (currentWorkoutStart !== null && !isNaN(currentWorkoutStart) ? currentWorkoutStart : now)) / 1000);
                     if (!isNaN(totalElap)) {
                         elapsedRef.current = totalElap;
-                        setElap(totalElap); // Use defensive setter
+                        setElap(totalElap);
                     } else {
                         console.error('PlayerView: Timer: Calculated totalElap is NaN. Resetting to 0. Debug values: now=', now, 'workoutStartRef.current=', workoutStartRef.current);
                         elapsedRef.current = 0;
-                        setElap(0); // Use defensive setter
+                        setElap(0);
                     }
 
-
                     if (statusRef.current === 'gps-running') {
-                        // For GPS tracking, we just update elapsed time and potentially announce stats.
-                        // The step's remaining time is not counted down by this interval.
-                        // GPS specific announcement logic is inside startGpsTracking (for periodic updates)
                         return;
                     }
 
                     if (statusRef.current !== 'running') {
-                        // If not in 'running' state (e.g., if paused externally or status changed), stop processing this interval tick.
-                        // This should ideally be caught by the outer `if (uiStatus !== 'running' ...)` but as an extra safety.
                         console.log('PlayerView: Timer: Current status ref is not "running" (was', statusRef.current, '), pausing interval processing.');
                         return;
                     }
 
                     const currentStepStart = stepStartRef.current;
-                    const passed   = Math.floor((now - (currentStepStart !== null && !isNaN(currentStepStart) ? currentStepStart : now)) / 1000);
+                    const passed = Math.floor((now - (currentStepStart !== null && !isNaN(currentStepStart) ? currentStepStart : now)) / 1000);
                     const remaining = Math.max(0, stepDurRef.current - passed);
 
                     if (!isNaN(remaining)) {
                         timeLeftRef.current = remaining;
-                        setTime(remaining); // Use defensive setter
+                        setTime(remaining);
                     } else {
                         console.error('PlayerView: Timer: Calculated remaining is NaN. Resetting to 0. Debug values: remaining=', remaining, 'stepDurRef.current=', stepDurRef.current, 'passed=', passed, 'now=', now, 'stepStartRef.current=', stepStartRef.current);
                         timeLeftRef.current = 0;
-                        setTime(0); // Use defensive setter
+                        setTime(0);
                     }
 
                     handleSpeech(step, ci, remaining);
@@ -1300,7 +1024,7 @@
                         if (step.phase === GPS_PHASE_KEY) {
                             console.log('PlayerView: Timer: GPS countdown finished. Initiating GPS tracking.');
                             startGpsTracking();
-                            setUiStatus('gps-running'); // Update state
+                            setUiStatus('gps-running');
                             return;
                         }
 
@@ -1314,7 +1038,7 @@
                             endWorkout();
                         }
                     }
-                }, 250); // Interval 250ms for smoother updates
+                }, 250);
 
                 return () => {
                     console.log('PlayerView: Timer useEffect cleanup. Clearing interval.');
@@ -1322,8 +1046,6 @@
                 };
             }, [uiStatus, endWorkout, setElap, setTime, startGpsTracking, setUiStatus, advanceToStep, handleSpeech]);
 
-
-            // ── Render ───────────────────────────────────────────────────────────────
             if (!workout) {
                 console.log('PlayerView: Rendering error: Workout not selected.');
                 return React.createElement('div', { className: "h-screen flex items-center justify-center bg-slate-950 text-white/50 text-sm italic" }, "Error: Rutina no seleccionada. Por favor, vuelve a la lista.");
@@ -1403,16 +1125,12 @@
 
             console.log('PlayerView: Rendering main UI. Status:', uiStatus, 'Current Step Label:', curr.label, 'Time Left:', uiTimeLeft, 'Elapsed:', uiElapsed);
             return React.createElement('div', { className: `h-screen flex flex-col transition-colors duration-700 ${curr.color || 'bg-slate-950'} text-white` },
-                // Diagnostic text (always visible on top-left if main UI renders)
                 React.createElement('div', { style: { position: 'absolute', top: 0, left: 0, color: 'red', zIndex: 9999, fontSize: '10px', padding: '5px', backgroundColor: 'rgba(0,0,0,0.5)' } },
                     `Status: ${uiStatus}, Idx: ${uiIdx}, Phases: ${selectedWorkoutPhases?.length || 0}, Steps: ${steps.length}, Label: ${curr.label || 'N/A'}, TimeLeft: ${uiTimeLeft}`
                 ),
-
                 React.createElement('video', { ref: videoRef, loop: true, muted: true, playsInline: true, style: { position: 'absolute', width: '1px', height: '1px', opacity: 0.01 } },
                     React.createElement('source', { src: "https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/one-second-loop.mp4", type: "video/mp4" })
                 ),
-
-                // Header
                 React.createElement('div', { className: "bg-black/10 p-4 pt-10 flex justify-between items-center shrink-0 z-10" },
                     React.createElement('div', { className: "leading-none text-left" },
                         React.createElement('span', { className: "text-[10px] font-black text-orange-500 uppercase" }, "Tiempo Total"),
@@ -1423,8 +1141,6 @@
                     ),
                     React.createElement('button', { onClick: onExit, className: "opacity-40 text-xl font-black px-2" }, "✕")
                 ),
-
-                // Centro: label + temporizador
                 React.createElement('div', { className: "flex-1 flex flex-col items-center justify-center text-center px-4 min-h-0 relative" },
                     showOverlay && React.createElement('div', { className: "absolute inset-0 z-40 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center" },
                         React.createElement('button', { onClick: togglePlay, className: "bg-orange-500 p-10 rounded-full shadow-2xl active:scale-90" },
@@ -1434,8 +1150,6 @@
                     React.createElement('h2', { className: "text-[11vw] font-black uppercase italic text-white/80 leading-none mb-2" }, curr.label || 'LISTO'),
                     React.createElement('div', { className: "timer-huge tabular-nums text-white" }, uiTimeLeft)
                 ),
-
-                // Footer: controles
                 React.createElement('div', { className: "bg-slate-950 p-6 pb-10 flex flex-col items-center shrink-0" },
                     React.createElement('div', { className: "w-full max-w-md grid grid-cols-3 items-center mb-6 text-center italic" },
                         React.createElement('button', { onClick: skipStep, className: "bg-slate-800/40 py-4 rounded-xl text-[10px] font-black uppercase text-white/70 active:scale-95" }, "Saltar"),
@@ -1463,7 +1177,6 @@
             );
         }
 
-        // ─── AvanceView ──────────────────────────────────────────────────────────────
         function AvanceView({ history }) {
             const [periodType, setPeriodType] = useState('semana');
             const [periodOffset, setPeriodOffset] = useState(0);
@@ -1471,29 +1184,24 @@
             const chartInst = useRef(null);
             const PERIOD_TYPES = ['semana', 'mes', 'año'];
 
-            // Helper para formatear tiempo en horas y minutos
             const formatTimeHnM = useCallback((seconds) => {
                 const h = Math.floor(seconds / 3600);
                 const m = Math.floor((seconds % 3600) / 60);
                 return `${h}h ${m}m`;
             }, []);
 
-            // Tiempo total acumulado (General)
             const totalSec = useMemo(() => history.reduce((a, h) => a + (h.totalTime || 0), 0), [history]);
 
-            // Rango del período seleccionado actualmente (para el gráfico y resumen interactivo)
             const currentPeriodRange = useMemo(() => {
                 const today = new Date();
                 if (periodType === 'semana') return getWeekRange(today, periodOffset);
                 if (periodType === 'mes')    return getMonthRange(today, periodOffset);
                 if (periodType === 'año')    return getYearRange(today, periodOffset);
-                return { start: new Date(0), end: new Date() }; // Fallback
+                return { start: new Date(0), end: new Date() };
             }, [periodType, periodOffset]);
 
-            // Historial filtrado para el período seleccionado
             const filteredHistory = useMemo(() => history.filter(h => { const d = new Date(h.date); return d >= currentPeriodRange.start && d <= currentPeriodRange.end; }), [history, currentPeriodRange]);
 
-            // Tiempo total del período seleccionado
             const periodSec = useMemo(() => filteredHistory.reduce((a, h) => a + (h.totalTime || 0), 0), [filteredHistory]);
 
             useEffect(() => {
@@ -1509,16 +1217,13 @@
                     filteredHistory.forEach(h => { const k = new Date(h.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }); agg.set(k, (agg.get(k) || 0) + (h.totalTime || 0)); });
                     data = labels.map(l => Math.floor((agg.get(l) || 0) / 60));
                 } else if (periodType === 'mes') {
-                    // Adaptado para mostrar semanas dentro del mes, si el rango es un mes
                     let cur = startOfDay(new Date(currentPeriodRange.start));
-                    // Ajustar al inicio de la primera semana visible para el mes, que puede empezar en el mes anterior
-                    cur = startOfDay(new Date(cur.setDate(cur.getDate() - (cur.getDay() === 0 ? 6 : cur.getDay() - 1)))); // Lunes de la semana
+                    cur = startOfDay(new Date(cur.setDate(cur.getDate() - (cur.getDay() === 0 ? 6 : cur.getDay() - 1))));
                     let wn = 1;
                     while (cur <= currentPeriodRange.end) {
                         const ws = new Date(cur);
                         const we = endOfDay(new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 6));
 
-                        // Limitar la semana al rango del mes actual para el conteo de tiempo
                         const es = startOfDay(new Date(Math.max(ws.getTime(), currentPeriodRange.start.getTime())));
                         const ee = endOfDay(new Date(Math.min(we.getTime(), currentPeriodRange.end.getTime())));
 
@@ -1529,10 +1234,10 @@
                             data.push(Math.floor(wt / 60));
                             wn++;
                         }
-                        cur.setDate(cur.getDate() + 7); // Siguiente semana
-                        if (cur > currentPeriodRange.end && cur.getMonth() !== currentPeriodRange.end.getMonth()) break; // If already out of month range
+                        cur.setDate(cur.getDate() + 7);
+                        if (cur > currentPeriodRange.end && cur.getMonth() !== currentPeriodRange.end.getMonth()) break;
                     }
-                } else { // periodType === 'año'
+                } else {
                     for (let i = 0; i < 12; i++) labels.push(new Date(currentPeriodRange.start.getFullYear(), i, 1).toLocaleDateString('es-ES', { month: 'short' }));
                     filteredHistory.forEach(h => { const k = new Date(h.date).toLocaleDateString('es-ES', { month: 'short' }); agg.set(k, (agg.get(k) || 0) + (h.totalTime || 0)); });
                     data = labels.map(l => Math.floor((agg.get(l) || 0) / 60));
@@ -1567,7 +1272,6 @@
                 return `Año: ${start.getFullYear()}`;
             }, [currentPeriodRange, periodType]);
 
-            // Etiqueta para el resumen del período seleccionado (dinámico)
             const dynamicPeriodSummaryLabel = useMemo(() => {
                 if (periodOffset !== 0) {
                     if (periodType === 'semana') return 'Tiempo en la semana seleccionada';
@@ -1580,17 +1284,13 @@
             }, [periodOffset, periodType]);
 
             return React.createElement('div', { className: "flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4 pb-28" },
-                // Tarjeta de Tiempo Total Acumulado (General)
                 React.createElement('div', { className: "glass-card p-6 text-center" },
                     React.createElement('span', { className: "text-[9px] opacity-40 block mb-1 uppercase" }, "Tiempo Total Acumulado"),
                     React.createElement('span', { className: "text-3xl font-black text-orange-500" }, formatTimeHnM(totalSec))
                 ),
-
-                // Selector de tipo de período (Semana, Mes, Año)
                 React.createElement('div', { className: "flex gap-2" },
                     PERIOD_TYPES.map(p => React.createElement('button', { key: p, onClick: () => { setPeriodType(p); setPeriodOffset(0); }, className: `flex-1 py-3 rounded-xl font-black uppercase text-[10px] transition-all ${periodType === p ? 'bg-orange-500 text-white' : 'bg-white/5 text-slate-400'}` }, p))
                 ),
-                // Navegación de período y título
                 React.createElement('div', { className: "flex items-center justify-between glass-card p-4" },
                     React.createElement('button', { onClick: () => setPeriodOffset(p => p - 1), className: "p-2 bg-white/5 text-slate-400 rounded-lg" },
                         React.createElement('svg', { width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" }))
@@ -1600,7 +1300,6 @@
                         React.createElement('svg', { width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" }))
                     )
                 ),
-                // Resumen del período seleccionado (interactivo) - Esta es la tarjeta que cambia
                 React.createElement('div', { className: "glass-card p-5 flex justify-between items-center" },
                     React.createElement('div', { className: "text-left" },
                         React.createElement('span', { className: "text-[9px] opacity-40 uppercase block" }, dynamicPeriodSummaryLabel),
@@ -1611,12 +1310,182 @@
                         React.createElement('span', { className: "text-2xl font-black text-emerald-400" }, filteredHistory.length)
                     )
                 ),
-                // Gráfico de avance
                 React.createElement('div', { className: "glass-card p-4" },
                     React.createElement('div', { style: { height: '200px' } },
                         React.createElement('canvas', { ref: chartRef })
                     )
                 )
+            );
+        }
+
+        function App() {
+            const [user, setUser] = useState(null);
+            const [view, setView] = useState('workouts');
+            const [workouts, setWorkouts] = useState([]);
+            const [history, setHistory] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [selectedWorkout, setSelectedWorkout] = useState(null);
+
+            useEffect(() => {
+                const unsub = auth.onAuthStateChanged(u => {
+                    setUser(u && !u.isAnonymous ? u : null);
+                    setTimeout(() => setLoading(false), 500);
+                });
+                return unsub;
+            }, []);
+
+            useEffect(() => {
+                if (!user) return;
+                const base = db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid);
+                const unsubW = base.collection('workouts').onSnapshot(s => setWorkouts(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+                const unsubH = base.collection('history').onSnapshot(s => setHistory(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+                return () => { unsubW(); unsubH(); };
+            }, [user]);
+
+            const handleStartWorkout = useCallback((w) => {
+                if (window.speechSynthesis) {
+                    const silent = new SpeechSynthesisUtterance(' ');
+                    silent.volume = 0;
+                    window.speechSynthesis.speak(silent);
+                }
+                setSelectedWorkout(w);
+                setView('play');
+                console.log('App: Starting workout in PlayerView with workout:', w?.name);
+            }, []);
+
+            if (loading) return React.createElement('div', { className: "h-full w-full flex items-center justify-center bg-slate-950" }, React.createElement('div', { className: "animate-spin w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full" }));
+            if (!user) return React.createElement(AuthView, { APP_TITLE, APP_VERSION });
+
+            return React.createElement('div', { className: "h-full w-full flex flex-col bg-slate-950 text-white overflow-hidden" },
+                view !== 'play' && React.createElement('header', { className: "p-5 flex justify-between items-center bg-slate-900 border-b border-white/5 shrink-0" },
+                    React.createElement('div', { onClick: () => setView('workouts'), className: "cursor-pointer" },
+                        React.createElement('h1', { className: "text-lg font-black italic uppercase text-orange-500" }, APP_TITLE),
+                        React.createElement('p', { className: "text-[8px] text-slate-500 font-bold uppercase" }, user.email, " | V", APP_VERSION)
+                    ),
+                    React.createElement('button', { onClick: () => auth.signOut(), className: "p-2 bg-red-500/10 rounded-xl text-red-500 font-bold text-[10px] px-4 uppercase italic" }, "Salir")
+                ),
+                React.createElement('main', { className: "flex-1 relative flex flex-col min-h-0" },
+                    view === 'workouts' && React.createElement(WorkoutsView, { workouts, user, onStart: handleStartWorkout, onEdit: w => { setSelectedWorkout(w); setView('create'); }, onCreate: () => { setSelectedWorkout(null); setView('create'); } } ),
+                    view === 'avance'   && React.createElement(AvanceView, { history }),
+                    view === 'create'   && React.createElement(CreateView, { user, workoutToEdit: selectedWorkout, onCancel: () => setView('workouts') }),
+                    view === 'play'     && React.createElement(PlayerView, {
+                        workout: selectedWorkout,
+                        onExit: () => { console.log('PlayerView: Exiting.'); setView('workouts'); },
+                        onComplete: (name, time, gpsData) => {
+                            console.log('PlayerView: Workout completed. Saving history.');
+                            db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid)
+                              .collection('history').add({ workoutName: name, totalTime: time, date: new Date().toISOString(), gpsData: gpsData || null });
+                            setView('workouts');
+                        }
+                    })
+                ),
+                view !== 'play' && React.createElement('nav', { className: "bg-slate-900 border-t border-white/5 p-4 flex justify-around items-center shrink-0" },
+                    React.createElement('button', { onClick: () => setView('workouts'), className: `flex flex-col items-center text-[9px] font-black ${view === 'workouts' ? 'text-orange-500' : 'text-slate-500'}` }, React.createElement('span', { className: "text-xl mb-1" }, "🏋️"), "RUTINAS"),
+                    React.createElement('button', { onClick: () => setView('avance'),   className: `flex flex-col items-center text-[9px] font-black ${view === 'avance'   ? 'text-orange-500' : 'text-slate-500'}` }, React.createElement('span', { className: "text-xl mb-1" }, "📊"), "AVANCE")
+                )
+            );
+        }
+
+        function AuthView({ APP_TITLE, APP_VERSION }) {
+            const [isReg, setIsReg] = useState(false);
+            const [email, setEmail] = useState('');
+            const [pass, setPass] = useState('');
+            const handle = useCallback(async e => {
+                e.preventDefault();
+                try {
+                    if (isReg) await auth.createUserWithEmailAndPassword(email.trim(), pass);
+                    else await auth.signInWithEmailAndPassword(email.trim(), pass);
+                    console.log('AuthView: User logged in/registered.');
+                } catch (err) { alert("Error: " + err.message); console.error('Auth Error:', err); }
+            }, [isReg, email, pass]);
+            return React.createElement('div', { className: "h-screen flex flex-col items-center bg-slate-950 p-10 pt-20 text-center" },
+                React.createElement(React.Fragment, null,
+                    React.createElement('div', { className: "text-7xl mb-6" }, "🏃‍♂️"),
+                    React.createElement('h1', { className: "text-4xl font-black italic uppercase text-white" }, APP_TITLE),
+                    React.createElement('p', { className: "text-[8px] text-slate-600 uppercase mb-8" }, "V ", APP_VERSION),
+                    React.createElement('form', { onSubmit: handle, className: "space-y-4 w-full max-w-sm" },
+                        React.createElement('input', { type: "email", placeholder: "EMAIL", className: "w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value: email, onChange: e => setEmail(e.target.value), required: true }),
+                        React.createElement('input', { type: "password", placeholder: "CLAVE", className: "w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value: pass, onChange: e => setPass(e.target.value), required: true }),
+                        React.createElement('button', { type: "submit", className: "w-full bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic" }, isReg ? 'REGISTRARSE' : 'ENTRAR')
+                    ),
+                    React.createElement('button', { onClick: () => setIsReg(!isReg), className: "mt-8 text-slate-500 text-[10px] uppercase font-black" }, isReg ? 'YA TENGO CUENTA' : 'CREAR CUENTA NUEVA')
+                )
+            );
+        }
+
+        function WorkoutsView({ workouts, user, onStart, onEdit, onCreate }) {
+            return React.createElement('div', { className: "flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4 pb-32" },
+                workouts.length === 0
+                    ? React.createElement('div', { className: "text-center p-12 opacity-30 italic font-black text-[10px]" }, "Sin rutinas")
+                    : workouts.map(w => React.createElement('div', { key: w.id, className: "glass-card p-6 flex justify-between items-center shadow-lg" },
+                        React.createElement('div', { className: "flex-1 cursor-pointer", onClick: () => onStart(w) },
+                            React.createElement('h3', { className: "font-black uppercase italic text-sm" }, w.name),
+                            React.createElement('span', { className: "text-[10px] text-orange-400 font-black uppercase italic" }, "Activa")
+                        ),
+                        React.createElement('div', { className: "flex gap-2" },
+                            React.createElement('button', { onClick: () => onStart(w), className: "bg-white text-black p-4 rounded-xl" }, React.createElement(IconPlay, null)),
+                            React.createElement('button', { onClick: () => onEdit(w), className: "bg-slate-800/40 p-4 rounded-xl text-[10px] font-black uppercase italic" }, "Edit")
+                        )
+                    )),
+                React.createElement('button', { onClick: onCreate, className: "w-full bg-white/5 border border-white/10 py-6 rounded-full font-black uppercase italic" }, "➕ NUEVA RUTINA")
+            );
+        }
+
+        function CreateView({ user, workoutToEdit, onCancel }) {
+            const initialPhases = workoutToEdit?.phases
+                ? { ...DEFAULT_PARAMS, ...workoutToEdit.phases, entrenamiento: { ...DEFAULT_PARAMS.entrenamiento, ...(workoutToEdit.phases.entrenamiento || {}) } }
+                : DEFAULT_PARAMS;
+            const [name, setName] = useState(workoutToEdit?.name || '');
+            const [phases, setPhases] = useState(initialPhases);
+            const [saving, setSaving] = useState(false);
+            const update = useCallback((p, f, v) => setPhases(prev => ({ ...prev, [p]: { ...prev[p], [f]: parseInt(v) || 0 } })), []);
+            const save = useCallback(async () => {
+                if (!name.trim() || saving) return;
+                setSaving(true);
+                try {
+                    const col = db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid).collection('workouts');
+                    const dataToSave = { name: name.toUpperCase(), phases: { ...DEFAULT_PARAMS, ...phases, entrenamiento: { ...DEFAULT_PARAMS.entrenamiento, ...phases.entrenamiento } }, updatedAt: new Date().toISOString() };
+                    if (workoutToEdit?.id) await col.doc(workoutToEdit.id).update(dataToSave);
+                    else await col.add({ ...dataToSave, createdAt: new Date().toISOString() });
+                    onCancel();
+                } catch (e) { alert("Error al guardar: " + e.message); setSaving(false); }
+                }, [name, saving, phases, user, workoutToEdit, onCancel]);
+            const ENT_FIELDS = [
+                { f: 'action', label: 'Acción (s)' }, { f: 'change', label: 'Cambio (s)' },
+                { f: 'rounds', label: 'Rondas' }, { f: 'cycles', label: 'Ciclos' },
+                { f: 'rest', label: 'Descanso Ciclo (s)' }, { f: 'zoneRest', label: 'Descanso Zona (s)' }
+            ];
+            const STRETCH_FIELDS = [
+                { f: 'stretchSteps', label: 'Pasos Estiramiento' },
+                { f: 'stretchAction', label: 'Duración Estir. (s)' },
+                { f: 'stretchChange', label: 'Cambio Estir. (s)' }
+            ];
+            return React.createElement('div', { className: "flex-1 flex flex-col bg-slate-950 overflow-hidden text-center italic" },
+                React.createElement('header', { className: "p-6 flex items-center border-b border-white/5 shrink-0" },
+                    React.createElement('button', { onClick: onCancel, className: "p-3 bg-slate-900 rounded-2xl shadow-lg text-white" }, "⬅"),
+                    React.createElement('h2', { className: "text-xl font-black uppercase flex-1" }, "Configurar")
+                ),
+                React.createElement('div', { className: "flex-1 overflow-y-auto scrollbar-hide p-4 space-y-6 pb-28" },
+                    React.createElement('input', { type: "text", placeholder: "NOMBRE DE LA RUTINA", className: "w-full p-6 bg-slate-900 border border-white/10 rounded-[2rem] font-black uppercase text-center text-white outline-none", value: name, onChange: e => setName(e.target.value) }),
+                    React.createElement('div', { className: "glass-card p-6 space-y-4" },
+                        React.createElement('span', { className: "font-black uppercase text-xs text-orange-500 border-b border-white/5 block pb-2" }, "Entrenamiento"),
+                        React.createElement('div', { className: "grid grid-cols-2 gap-4" }, ENT_FIELDS.map(({ f, label }) => React.createElement(InputField, { key: f, label, val: (phases.entrenamiento?.[f] ?? DEFAULT_PARAMS.entrenamiento[f]), set: v => update('entrenamiento', f, v) })))
+                    ),
+                    React.createElement('div', { className: "glass-card p-6 space-y-4" },
+                        React.createElement('span', { className: "font-black uppercase text-xs text-orange-500 border-b border-white/5 block pb-2" }, "Estiramientos"),
+                        React.createElement('div', { className: "grid grid-cols-2 gap-4" }, STRETCH_FIELDS.map(({ f, label }) => React.createElement(InputField, { key: f, label, val: (phases.entrenamiento?.[f] ?? DEFAULT_PARAMS.entrenamiento[f]), set: v => update('entrenamiento', f, v) })))
+                    )
+                ),
+                React.createElement('div', { className: "p-6 bg-slate-950 border-t border-white/5 shrink-0" },
+                    React.createElement('button', { onClick: save, className: "w-full bg-white text-black py-6 rounded-full font-black uppercase", disabled: saving }, saving ? 'GUARDANDO...' : 'GUARDAR')
+                )
+            );
+        }
+
+        function InputField({ label, val, set }) {
+            return React.createElement('div', { className: "flex flex-col items-center" },
+                React.createElement('span', { className: "text-[8px] opacity-40 mb-2 uppercase" }, label),
+                React.createElement('input', { type: "number", className: "w-full bg-slate-800/40 p-4 rounded-xl text-center font-black text-white border border-white/5 outline-none", value: val, onChange: e => set(e.target.value) })
             );
         }
 
