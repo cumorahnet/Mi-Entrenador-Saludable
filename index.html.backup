@@ -58,6 +58,14 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
     <script>
+        // Global error handler for uncaught JavaScript errors
+        window.onerror = function(message, source, lineno, colno, error) {
+            console.error('GLOBAL JS ERROR:', { message, source, lineno, colno, error });
+            alert('Ha ocurrido un error inesperado en la aplicación. Por favor, revisa la consola para más detalles.');
+            // Devolver true para evitar que el navegador muestre su propio diálogo de error
+            return true;
+        };
+
         const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
         const IconPlay = () => React.createElement('svg', { width: "40", height: "40", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M8 5v14l11-7z" }));
@@ -86,7 +94,7 @@
 
         const APP_ID = "mientrenador-v3";
         const APP_TITLE = "Mi Entrenador Saludable";
-        const APP_VERSION = "1.0.4"; // <--- VERSIÓN ACTUALIZADA
+        const APP_VERSION = "1.0.5"; // <--- VERSIÓN ACTUALIZADA
 
         const WARMUP_STEPS = [
             { label: 'TOBILLO DERECHO', voice: 'Tobillo derecho' },
@@ -188,12 +196,17 @@
             msg.onend = msg.onerror = () => { voiceBusy = false; onEndCallback(); flushVoice(); };
             window.speechSynthesis.speak(msg);
         };
-        const speak = (text, interrupt = false, onEnd = null) => {
-            if (!window.speechSynthesis) return;
+       const speak = (text, interrupt = false, onEnd = null) => {
+            if (!window.speechSynthesis) {
+                console.warn("SpeechSynthesis not available.");
+                if (onEnd) onEnd(); // Call onEnd immediately if speech is unavailable
+                return;
+            }
             if (interrupt) { window.speechSynthesis.cancel(); voiceQueue.length = 0; voiceBusy = false; }
             if (text) voiceQueue.push(onEnd ? { text, onEnd } : text);
             flushVoice();
        };
+
 
         const startOfDay = (date) => { const d = new Date(date); d.setHours(0, 0, 0, 0); return d; };
         const endOfDay = (date) => { const d = new Date(date); d.setHours(23, 59, 59, 999); return d; };
@@ -313,9 +326,11 @@
         const generateWorkoutSteps = (workout, defaultParams, selectedPhasesKeys) => {
             // Safety check: if no phases selected, return a single "No phases" step
             if (!selectedPhasesKeys || selectedPhasesKeys.length === 0) {
+                console.warn('generateWorkoutSteps: No phases selected. Returning error step.');
                 return [{ label: 'NO HAY FASES', seconds: 5, color: 'bg-red-500', phase: 'error', voiceInitial: 'No se seleccionó ninguna fase. Por favor, cancela.', whistleOnStart: false, voiceCountdown: false }];
             }
             if (!workout) { // Should not happen if a workout is always passed to PlayerView
+                console.error('generateWorkoutSteps: Workout object is null. Returning error step.');
                  return [{ label: 'ERROR DE RUTINA', seconds: 5, color: 'bg-red-500', phase: 'error', voiceInitial: 'Error: Rutina no encontrada. Por favor, cancela.', whistleOnStart: false, voiceCountdown: false }];
             }
 
@@ -360,11 +375,12 @@
 
             // Ensure steps is not empty before adding final completion (should be caught by initial check but extra safe)
             if (steps.length === 0) {
+                console.error('generateWorkoutSteps: Steps array is empty after generation, adding generic error.');
                  return [{ label: 'ERROR DE GENERACIÓN', seconds: 5, color: 'bg-red-500', phase: 'error', voiceInitial: 'Error al generar los pasos de la rutina. Por favor, cancela.', whistleOnStart: false, voiceCountdown: false }];
             }
 
             steps.push({ label: 'FINAL DE LA RUTINA', seconds: 10, color: 'bg-green-500', phase: 'finished', voiceInitial: 'Rutina finalizada. ¡Buen trabajo!', whistleOnStart: false, voiceCountdown: false });
-
+            console.log('generateWorkoutSteps: Successfully generated steps. Count:', steps.length);
             return steps;
         };
 
@@ -386,6 +402,7 @@
                     speak('Por favor, selecciona al menos una fase de entrenamiento.', true);
                     return;
                 }
+                console.log('ModeSelectionScreen: Phases selected. Starting workout with:', selectedPhases);
                 onModeSelected(selectedPhases);
             };
 
@@ -602,6 +619,7 @@
                 }
                 setSelectedWorkout(w);
                 setView('play');
+                console.log('App: Starting workout in PlayerView with workout:', w?.name);
             }, []);
 
             if (loading) return React.createElement('div', { className: "h-full w-full flex items-center justify-center bg-slate-950" }, React.createElement('div', { className: "animate-spin w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full" }));
@@ -621,8 +639,9 @@
                     view === 'create'   && React.createElement(CreateView, { user, workoutToEdit: selectedWorkout, onCancel: () => setView('workouts') }),
                     view === 'play'     && React.createElement(PlayerView, {
                         workout: selectedWorkout,
-                        onExit: () => setView('workouts'),
+                        onExit: () => { console.log('PlayerView: Exiting.'); setView('workouts'); },
                         onComplete: (name, time, gpsData) => { // Added gpsData parameter
+                            console.log('PlayerView: Workout completed. Saving history.');
                             db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid)
                               .collection('history').add({ workoutName: name, totalTime: time, date: new Date().toISOString(), gpsData: gpsData || null }); // Save GPS data
                             setView('workouts');
@@ -646,7 +665,8 @@
                 try {
                     if (isReg) await auth.createUserWithEmailAndPassword(email.trim(), pass);
                     else await auth.signInWithEmailAndPassword(email.trim(), pass);
-                } catch (err) { alert("Error: " + err.message); }
+                    console.log('AuthView: User logged in/registered.');
+                } catch (err) { alert("Error: " + err.message); console.error('Auth Error:', err); }
             }, [isReg, email, pass]);
             return React.createElement('div', { className: "h-screen flex flex-col items-center bg-slate-950 p-10 pt-20 text-center" },
                 React.createElement(React.Fragment, null,
@@ -751,28 +771,34 @@
             const [steps, setSteps]           = useState([]);
 
             // Post-workout mode selection states
-            const [isModeSelectionScreenVisible, setIsModeSelectionScreenVisible] = useState(true); // Controls visibility of mode selection screen
-            const [selectedWorkoutPhases, setSelectedWorkoutPhases]               = useState(null); // User's chosen workout structure (array of phase keys)
-            const [showPostWorkoutMap, setShowPostWorkoutMap]                     = useState(false); // Controls visibility of the post-workout map
+            const [isModeSelectionScreenVisible, setIsModeSelectionScreenVisible] = useState(true);
+            const [selectedWorkoutPhases, setSelectedWorkoutPhases]               = useState(null);
+            const [showPostWorkoutMap, setShowPostWorkoutMap]                     = useState(false);
 
             // GPS specific states
-            const [isGpsActive, setIsGpsActive]           = useState(false); // If GPS tracker is currently running
-            const [showGpsControls, setShowGpsControls]   = useState(false); // Controls visibility for GPS screen content (e.g. stop button)
-            const [gpsCoordinates, setGpsCoordinates]     = useState([]);    // Stores collected GPS points
-            const [hasGpsData, setHasGpsData]             = useState(false); // True if at least some GPS data was collected
-            const [finalGpsSummary, setFinalGpsSummary]   = useState(null);  // Summary data for map display
+            const [isGpsActive, setIsGpsActive]           = useState(false);
+            const [showGpsControls, setShowGpsControls]   = useState(false);
+            const [gpsCoordinates, setGpsCoordinates]     = useState([]);
+            const [hasGpsData, setHasGpsData]             = useState(false);
+            const [finalGpsSummary, setFinalGpsSummary]   = useState(null);
+
+            // Console log to trace render cycle and current *render-time* state.
+            // THIS LINE HAS BEEN MOVED TO HERE TO AVOID REFERENCE_ERROR.
+            console.log('PlayerView: Render. Status:', uiStatus, 'Idx:', uiIdx, 'TimeLeft:', uiTimeLeft, 'Elapsed:', uiElapsed, 'ModeScreen:', isModeSelectionScreenVisible, 'Phases:', selectedWorkoutPhases?.length || 0, 'Steps:', steps.length);
+
 
             // ── Refs internos del timer (NO disparan re-render) ──────────────────────
-            const statusRef       = useRef('ready');
-            const idxRef          = useRef(0);
-            const timeLeftRef     = useRef(0);
-            const elapsedRef      = useRef(0);
-            const stepsRef        = useRef([]);
+            // Initialize refs with their corresponding state values for current render cycle
+            const statusRef       = useRef(uiStatus); // Initialize with current state value
+            const idxRef          = useRef(uiIdx);
+            const timeLeftRef     = useRef(uiTimeLeft);
+            const elapsedRef      = useRef(uiElapsed);
+            const stepsRef        = useRef([]); // stepsRef holds the full generated steps array
 
-            const stepDurRef      = useRef(0);     // duración del step actual
-            const stepStartRef    = useRef(null);  // cuándo empezó el step actual (ms)
-            const workoutStartRef = useRef(null);  // cuándo empezó el workout (ms, ajustado por pausa)
-            const pausedAtRef     = useRef(null);  // cuándo se pausó (ms)
+            const stepDurRef      = useRef(0);
+            const stepStartRef    = useRef(null);
+            const workoutStartRef = useRef(null);
+            const pausedAtRef     = useRef(null);
 
             const savedRef        = useRef(false);
             const spokenInit      = useRef({});
@@ -781,63 +807,87 @@
             const videoRef        = useRef(null);
 
             // GPS specific refs
-            const gpsWatcherId            = useRef(null); // Geolocation watch ID
-            const lastPosition            = useRef(null); // Last known GPS position
-            const gpsStartTime            = useRef(null); // When GPS tracking actually started
-            const gpsAnnounceLastTime     = useRef(0); // Timestamp of last voice announcement
-            const gpsTotalDistance        = useRef(0); // Accumulated distance for the current segment
-            const gpsTotalTime            = useRef(0); // Accumulated time for the current segment
-            const hasGpsDataRef           = useRef(false); // Ref for hasGpsData to avoid stale closure in callbacks
+            const gpsWatcherId            = useRef(null);
+            const lastPosition            = useRef(null);
+            const gpsStartTime            = useRef(null);
+            const gpsAnnounceLastTime     = useRef(0);
+            const gpsTotalDistance        = useRef(0);
+            const gpsTotalTime            = useRef(0);
+            const hasGpsDataRef           = useRef(false);
 
-            // ── Sincroniza refs de estado con state para uso en interval ────────────
-            const setStatus = (s) => { statusRef.current = s; setUiStatus(s); };
-            const setIdx    = (i) => { idxRef.current = i;    setUiIdx(i); };
-            const setTime   = (t) => { timeLeftRef.current = t; setUiTimeLeft(t); };
-            const setElap   = (e) => { elapsedRef.current = e; setUiElapsed(e); };
-            const setHasGpsDataAndRef = (val) => { hasGpsDataRef.current = val; setHasGpsData(val); };
+            // --- Sync Refs with State ---
+            // These useEffects ensure the refs always hold the latest state values
+            // for use in callbacks and intervals, preventing stale closures.
+            useEffect(() => { statusRef.current = uiStatus; }, [uiStatus]);
+            useEffect(() => { idxRef.current = uiIdx; }, [uiIdx]);
+            useEffect(() => { timeLeftRef.current = uiTimeLeft; }, [uiTimeLeft]);
+            useEffect(() => { elapsedRef.current = uiElapsed; }, [uiElapsed]);
+            useEffect(() => { hasGpsDataRef.current = hasGpsData; }, [hasGpsData]);
+            // --- End Sync Refs with State ---
 
+
+            // --- Defensive Setters for UI State (Checks for NaN) ---
+            const setTime = useCallback((t) => {
+                if (isNaN(t)) { console.error('PlayerView: setTime received NaN. Resetting to 0.'); setUiTimeLeft(0); }
+                else { setUiTimeLeft(t); }
+            }, []);
+            const setElap = useCallback((e) => {
+                if (isNaN(e)) { console.error('PlayerView: setElap received NaN. Resetting to 0.'); setUiElapsed(0); }
+                else { setUiElapsed(e); }
+            }, []);
+            // --- End Defensive Setters ---
 
             // ── Finalizar workout ────────────────────────────────────────────────────
             const endWorkout = useCallback(() => {
-                setStatus('finished');
+                console.log('PlayerView: endWorkout called. Current elapsed:', elapsedRef.current);
+                setUiStatus('finished'); // Use setter for UI state
                 speak('Entrenamiento finalizado. ¡Buen trabajo!', true, () => {
                     if (hasGpsDataRef.current && finalGpsSummary) {
+                        console.log('PlayerView: Showing post-workout map.');
                         setShowPostWorkoutMap(true); // Show map summary if GPS data exists
                     } else {
                         // No GPS data or not a GPS workout, proceed to onComplete directly
                         if (!savedRef.current && workout) {
+                            console.log('PlayerView: Completing workout without GPS data.');
                             onComplete(workout.name, elapsedRef.current, null); // Pass null for GPS data if none
                             savedRef.current = true;
                         }
                         onExit(); // Go back to workouts after simple finish
                     }
                 });
-            }, [workout, onComplete, onExit, finalGpsSummary]);
+            }, [workout, onComplete, onExit, finalGpsSummary, setUiStatus]);
 
             // ── Avanzar al siguiente step (lógica pura con refs) ─────────────────────
             const advanceToStep = useCallback((nextIdx) => {
                 const s = stepsRef.current;
                 if (nextIdx >= s.length) {
+                    console.log('PlayerView: No more steps to advance to. Ending workout.');
                     endWorkout(); // If no more steps, end the workout
                     return false;
                 }
+                console.log('PlayerView: Advancing to step', nextIdx, 'Label:', s[nextIdx].label);
                 idxRef.current   = nextIdx;
                 stepDurRef.current = s[nextIdx].seconds;
-                timeLeftRef.current = s[nextIdx].seconds;
+                timeLeftRef.current = s[nextIdx].seconds; // Update ref
                 stepStartRef.current = Date.now();
                 lastSpokenKey.current = '';
                 spokenInit.current = {};
-                setUiIdx(nextIdx);
-                setUiTimeLeft(s[nextIdx].seconds);
+                setUiIdx(nextIdx); // Update state
+                setTime(s[nextIdx].seconds); // Use defensive setter for UI state
                 return true;
-            }, [endWorkout]);
+            }, [endWorkout, setUiIdx, setTime]);
 
             // ── Saltar step ──────────────────────────────────────────────────────────
             const skipStep = useCallback(() => {
-                if (statusRef.current === 'finished' || stepsRef.current.length === 0) return;
+                if (statusRef.current === 'finished' || stepsRef.current.length === 0) {
+                    console.log('PlayerView: Skip request ignored. Status:', statusRef.current, 'Steps length:', stepsRef.current.length);
+                    return;
+                }
+                console.log('PlayerView: Skip step requested.');
                 const currentStep = stepsRef.current[idxRef.current];
                 // If currently in a GPS phase and user skips, stop GPS first
                 if (currentStep.phase === GPS_PHASE_KEY && isGpsActive) {
+                    console.log('PlayerView: Stopping GPS tracking due to skip.');
                     stopGpsTracking(true); // Stop GPS and then proceed to next step
                     return;
                 }
@@ -852,7 +902,7 @@
                 } else {
                     endWorkout();
                 }
-            }, [endWorkout, advanceToStep, isGpsActive, stopGpsTracking, handleSpeech]); // Added handleSpeech to dependencies
+            }, [endWorkout, advanceToStep, isGpsActive, stopGpsTracking, handleSpeech]);
 
             // ── GPS Tracking functions ───────────────────────────────────────────────
             const announceGpsStats = useCallback((distance, timeSec) => {
@@ -863,25 +913,29 @@
             }, []);
 
             const stopGpsTracking = useCallback((isSkip = false) => {
+                console.log('PlayerView: stopGpsTracking called. isSkip:', isSkip);
                 if (gpsWatcherId.current) {
                     navigator.geolocation.clearWatch(gpsWatcherId.current);
                     gpsWatcherId.current = null;
+                    console.log('PlayerView: GPS watch cleared.');
                 }
 
                 const finalDistance = gpsTotalDistance.current;
                 const finalTime = gpsTotalTime.current;
 
                 if (finalDistance > 0 && finalTime > 0 && gpsCoordinates.length > 1) {
-                    setHasGpsDataAndRef(true);
+                    setHasGpsData(true); // Update state directly
                     setFinalGpsSummary({
                         distance: finalDistance,
                         time: finalTime,
                         pace: formatPace(finalDistance, finalTime),
                         speed: formatSpeed(finalDistance, finalTime)
                     });
+                    console.log('PlayerView: GPS data collected and summarized:', { finalDistance, finalTime });
                 } else {
-                    setHasGpsDataAndRef(false);
+                    setHasGpsData(false); // Update state directly
                     setFinalGpsSummary(null);
+                    console.log('PlayerView: No significant GPS data collected.');
                 }
 
                 speak('Seguimiento de caminata o carrera finalizado.', true, () => {
@@ -892,38 +946,43 @@
                     }
                     setIsGpsActive(false);
                     setShowGpsControls(false); // Reset controls visibility
-                    setStatus('running'); // Return to normal running status so skipStep can proceed
+                    setUiStatus('running'); // Return to normal running status so skipStep can proceed
                     // After announcing, skip to the next step (which should be POST_GPS_REST)
                     if (!isSkip) { // Only auto-skip if it wasn't triggered by a user skip action
+                        console.log('PlayerView: Auto-skipping to next step after GPS phase.');
                         skipStep();
                     }
                 });
-            }, [skipStep, announceGpsStats, gpsCoordinates, setHasGpsDataAndRef, finalGpsSummary]);
+            }, [skipStep, announceGpsStats, gpsCoordinates, setHasGpsData, finalGpsSummary, setUiStatus, setIsGpsActive, setShowGpsControls]);
 
             const startGpsTracking = useCallback(() => {
+                console.log('PlayerView: startGpsTracking called.');
                 if (!('geolocation' in navigator)) {
                     speak('Error: Geolocalización no disponible. No se puede iniciar el seguimiento.');
-                    console.error("Geolocation is not supported by this browser.");
-                    // If GPS is not available, immediately skip this step.
-                    setIsGpsActive(false); // Make sure it's not considered active
-                    setStatus('running'); // Back to normal state for skip
-                    skipStep(); // Skip to next phase (POST_GPS_REST)
+                    console.error("Geolocation is not supported by this browser. Skipping GPS tracking.");
+                    setIsGpsActive(false);
+                    setUiStatus('running');
+                    skipStep();
                     return;
                 }
-                if (isGpsActive) return; // Prevent multiple starts if already active somehow
+                if (isGpsActive) {
+                    console.warn('PlayerView: GPS is already active, preventing multiple starts.');
+                    return;
+                }
 
                 speak('Iniciando seguimiento de caminata o carrera. Las actualizaciones serán por audio cada diez minutos. Presiona el botón de encendido del celular para ver el botón de finalizar.', true);
-                setIsGpsActive(true); // Indicate GPS is active for UI
-                setShowGpsControls(false); // Initially hide controls
+                setIsGpsActive(true);
+                setShowGpsControls(false);
 
                 gpsStartTime.current = Date.now();
                 lastPosition.current = null;
                 gpsTotalDistance.current = 0;
                 gpsTotalTime.current = 0;
-                setGpsCoordinates([]); // Clear previous GPS data
-                setHasGpsDataAndRef(false);
+                setGpsCoordinates([]);
+                setHasGpsData(false);
                 setFinalGpsSummary(null);
-                gpsAnnounceLastTime.current = gpsStartTime.current; // Initialize last announcement time
+                gpsAnnounceLastTime.current = gpsStartTime.current;
+                console.log('PlayerView: GPS tracking initialized. Requesting watchPosition.');
 
                 const options = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
 
@@ -932,7 +991,7 @@
                         const { latitude, longitude } = position.coords;
                         const now = Date.now();
                         const timeElapsedMs = now - gpsStartTime.current;
-                        const currentGpsTotalTime = Math.floor(timeElapsedMs / 1000); // Total time in seconds
+                        const currentGpsTotalTime = Math.floor(timeElapsedMs / 1000);
                         gpsTotalTime.current = currentGpsTotalTime;
 
                         let currentDistance = gpsTotalDistance.current;
@@ -949,59 +1008,71 @@
                         lastPosition.current = { latitude, longitude, timestamp: now };
                         setGpsCoordinates(prev => [...prev, { lat: latitude, lng: longitude, timestamp: now }]);
 
-                        // Announce every 10 minutes (600 seconds)
-                        // Only announce if currently in 'gps-running' status
                         if (statusRef.current === 'gps-running' && currentGpsTotalTime > 0 && (now - gpsAnnounceLastTime.current) >= (10 * 60 * 1000)) {
+                            console.log('PlayerView: Announcing GPS stats.');
                             announceGpsStats(gpsTotalDistance.current, currentGpsTotalTime);
                             gpsAnnounceLastTime.current = now;
                         }
                     },
                     (error) => {
-                        console.error("GPS Error:", error);
+                        console.error("PlayerView: GPS Error:", error);
                         speak(`Error de GPS: ${error.message}. Deteniendo seguimiento.`);
-                        stopGpsTracking(); // Automatically stop on error
+                        stopGpsTracking();
                     },
                     options
                 );
-            }, [skipStep, announceGpsStats, isGpsActive, stopGpsTracking, setHasGpsDataAndRef, statusRef]);
+            }, [skipStep, announceGpsStats, isGpsActive, stopGpsTracking, setHasGpsData, setUiStatus, setIsGpsActive, setShowGpsControls]);
 
 
             // ── Toggle play/pause ────────────────────────────────────────────────────
             const togglePlay = useCallback(() => {
-                if (!workout || stepsRef.current.length === 0) return;
+                if (!workout || stepsRef.current.length === 0) {
+                    console.warn('togglePlay: Cannot toggle play, workout or steps missing. Workout:', workout, 'Steps length:', stepsRef.current.length);
+                    speak('No se puede iniciar la rutina. Verifica la configuración.', true);
+                    return;
+                }
                 const current = statusRef.current;
+                console.log('togglePlay called. Current status (from ref):', current);
+
                 if (current === 'ready') {
-                    // Primera vez: inicializar timestamps
                     const now = Date.now();
                     workoutStartRef.current = now;
                     stepStartRef.current    = now;
-                    setStatus('running');
+                    setUiStatus('running'); // Update state
+                    console.log('togglePlay: Transitioned from ready to running.');
                 } else if (current === 'running') {
-                    // Pausar: guardar momento de pausa
                     pausedAtRef.current = Date.now();
-                    setStatus('paused');
+                    setUiStatus('paused'); // Update state
+                    console.log('togglePlay: Transitioned from running to paused.');
                 } else if (current === 'paused') {
-                    // Reanudar: ajustar timestamps por el tiempo pausado
                     const now = Date.now();
                     const pausedMs = pausedAtRef.current ? now - pausedAtRef.current : 0;
-                    if (workoutStartRef.current !== null) workoutStartRef.current += pausedMs;
-                    if (stepStartRef.current    !== null) stepStartRef.current    += pausedMs;
+                    console.log('togglePlay: Resuming from pause. Paused time (ms):', pausedMs);
+
+                    workoutStartRef.current = (workoutStartRef.current !== null && !isNaN(workoutStartRef.current)) ? workoutStartRef.current + pausedMs : now;
+                    stepStartRef.current    = (stepStartRef.current !== null && !isNaN(stepStartRef.current)) ? stepStartRef.current + pausedMs : now;
+
+                    if (isNaN(workoutStartRef.current)) workoutStartRef.current = now;
+                    if (isNaN(stepStartRef.current))    stepStartRef.current = now;
+
                     pausedAtRef.current = null;
-                    setStatus('running');
+                    setUiStatus('running'); // Update state
+                    console.log('togglePlay: Transitioned from paused to running. New workoutStartRef:', workoutStartRef.current, 'stepStartRef:', stepStartRef.current);
                 } else if (current === 'gps-running') {
-                    // No hay pausa en gps-running para no interrumpir el seguimiento.
-                    // Si se desea una pausa para GPS, se necesitaría lógica adicional.
-                    // Por ahora, se asume que 'gps-running' es un estado continuo.
                     speak('No se puede pausar durante el seguimiento GPS. Presiona el botón de encendido del celular para ver el botón de finalizar.', true);
+                    console.log('togglePlay: Attempted pause during GPS, ignored.');
                 }
-            }, [workout]);
+            }, [workout, setUiStatus]);
+
 
             // ── Inicialización cuando cambia workout o el modo de entrenamiento ────
             useEffect(() => {
-                // Reset all states and refs
-                setStatus('ready');
-                setIdx(0);
+                console.log('PlayerView: Init useEffect running for dependencies change.');
+                // Reset ALL states and refs. This effect essentially re-initializes PlayerView fully.
+                setUiStatus('ready'); // Ensures starting from a known state
+                setUiIdx(0);
                 setElap(0);
+                setTime(0); // Reset time left using defensive setter
                 savedRef.current = false;
                 spokenInit.current = {};
                 lastSpokenKey.current = '';
@@ -1010,51 +1081,101 @@
                 pausedAtRef.current = null;
                 setShowPostWorkoutMap(false);
                 setGpsCoordinates([]);
-                setHasGpsDataAndRef(false);
+                setHasGpsData(false);
                 setFinalGpsSummary(null);
 
-                // Stop any GPS tracking if component re-initializes
-                if (isGpsActive) stopGpsTracking();
+                // Clear any existing GPS watch
+                if (gpsWatcherId.current) {
+                    navigator.geolocation.clearWatch(gpsWatcherId.current);
+                    gpsWatcherId.current = null;
+                    console.log('PlayerView: Init useEffect cleanup: GPS watch cleared during re-init.');
+                }
+                setIsGpsActive(false); // Ensure GPS active state is off
 
                 // Only generate steps once selectedWorkoutPhases is decided AND mode selection is no longer visible
                 if (isModeSelectionScreenVisible || !workout || !selectedWorkoutPhases) {
-                    setSteps([]); // Clear steps while asking or if mode not set
+                    console.log('PlayerView: Init useEffect: Mode selection screen visible OR workout/phases not selected yet. Skipping step generation.');
+                    setSteps([]); // Clear steps while waiting for user input or if data is incomplete.
+                    return; // Stop here, ModeSelectionScreen or error will render.
+                }
+
+                console.log('PlayerView: Init useEffect: Generating workout steps based on selected phases:', selectedWorkoutPhases);
+                const generated = generateWorkoutSteps(workout, DEFAULT_PARAMS, selectedWorkoutPhases);
+                stepsRef.current = generated; // Update the ref with the full steps array
+                setSteps(generated); // Update React state for rendering
+
+                if (generated.length === 0) {
+                    console.error("PlayerView: Init useEffect: Generated steps array is empty, cannot set initial step details.");
+                    // The component will render an error screen due to steps.length === 0 check.
                     return;
                 }
 
-                const generated = generateWorkoutSteps(workout, DEFAULT_PARAMS, selectedWorkoutPhases);
-                stepsRef.current = generated;
-                setSteps(generated);
+                // Set initial step duration and time left for the first step
+                const firstStep = generated[0];
+                stepDurRef.current = firstStep.seconds;
+                setTime(firstStep.seconds); // Update UI state for time left of the first step
+                setUiIdx(0); // Ensure UI index is 0
 
-                const firstSec = generated.length > 0 ? generated[0].seconds : 0;
-                stepDurRef.current = firstSec;
-                setTime(firstSec);
-
-                // Automatically start the timer if steps are valid and visible after selection
-                if (generated.length > 0 && generated[0].phase !== 'error') {
-                     workoutStartRef.current = Date.now(); // Initialize workout start time
-                     stepStartRef.current = Date.now();   // Initialize current step start time
-                     setStatus('running'); // Start the main timer loop
+                let timeoutId;
+                // Auto-start logic
+                if (firstStep.phase !== 'error') { // Do not auto-start if the first step is an error message
+                    console.log('PlayerView: Init useEffect: Scheduling auto-start (timeout).');
+                    timeoutId = setTimeout(() => {
+                        // Check if status is still 'ready' before attempting to auto-play
+                        // This prevents auto-playing if user quickly clicked play/pause manually
+                        if (statusRef.current === 'ready') {
+                            console.log('PlayerView: Init useEffect: setTimeout triggered. Auto-calling togglePlay.');
+                            togglePlay();
+                        } else {
+                            console.log('PlayerView: Init useEffect: setTimeout triggered, but status is not "ready" (it is:', statusRef.current, '). Skipping auto-play.');
+                        }
+                    }, 50); // Small delay to allow initial render
                 }
 
-            }, [workout, isModeSelectionScreenVisible, selectedWorkoutPhases, stopGpsTracking, isGpsActive, setHasGpsDataAndRef]);
+                return () => {
+                    console.log('PlayerView: Init useEffect cleanup on re-run or unmount.');
+                    if (timeoutId) clearTimeout(timeoutId);
+                    // No need to clear GPS watcher here, as it's handled at the start of the effect for re-init.
+                };
+
+            }, [
+                workout,
+                isModeSelectionScreenVisible,
+                selectedWorkoutPhases,
+                // These are stable setters/callbacks, but explicitly added for completeness and linter compliance.
+                setUiStatus, setUiIdx, setElap, setTime,
+                setHasGpsData, setIsGpsActive, setShowGpsControls,
+                setFinalGpsSummary, setGpsCoordinates, setShowPostWorkoutMap,
+                endWorkout, togglePlay, stopGpsTracking
+            ]);
+
 
             // ── Wake lock ────────────────────────────────────────────────────────────
             const releaseWake = useCallback(() => {
                 if (videoRef.current) videoRef.current.pause();
-                if (wakeLockRef.current) { wakeLockRef.current.release(); wakeLockRef.current = null; }
+                if (wakeLockRef.current) {
+                    console.log('PlayerView: Releasing wake lock.');
+                    wakeLockRef.current.release().then(() => wakeLockRef.current = null)
+                                       .catch((e) => console.warn("PlayerView: Error releasing wake lock:", e));
+                }
             }, []);
 
             const requestWake = useCallback(async () => {
                 try {
                     if (videoRef.current) videoRef.current.play().catch(() => {});
-                    if ('wakeLock' in navigator && !wakeLockRef.current)
+                    if ('wakeLock' in navigator && !wakeLockRef.current) {
                         wakeLockRef.current = await navigator.wakeLock.request('screen');
-                } catch (e) { console.warn("WakeLock:", e); e.message.includes("not allowed") && speak('Para el seguimiento GPS, mantén la pantalla encendida.'); }
+                        console.log('PlayerView: Wake lock requested.');
+                    }
+                } catch (e) {
+                    console.warn("PlayerView: WakeLock failed:", e);
+                    if (statusRef.current === 'gps-running' && e.message.includes("not allowed")) {
+                        speak('Para el seguimiento GPS, mantén la pantalla encendida.');
+                    }
+                }
             }, []);
 
             useEffect(() => {
-                // Keep screen on during running or GPS tracking
                 if (uiStatus === 'running' || uiStatus === 'gps-running') requestWake(); else releaseWake();
                 return releaseWake;
             }, [uiStatus, requestWake, releaseWake]);
@@ -1062,46 +1183,41 @@
             // ── Visibility change (for screen off during GPS) ────────────────────────────────────────────────────
             useEffect(() => {
                 const handleVisibilityChange = () => {
+                    console.log('PlayerView: Visibility changed to', document.hidden ? 'hidden' : 'visible', 'Current UI Status:', uiStatus);
                     if (document.hidden) {
-                        // Screen off / app moved to background
-                        if (statusRef.current === 'running') {
+                        if (statusRef.current === 'running') { // Only pause if it was a regular run
                             pausedAtRef.current = Date.now();
-                            setStatus('paused'); // Pause normal workout
+                            setUiStatus('paused'); // Update state
                         } else if (statusRef.current === 'gps-running') {
-                            // For GPS, we hide controls, but tracking continues in background (best effort)
-                            setShowGpsControls(false); // Hide controls when screen is off
+                            setShowGpsControls(false); // Hide controls, GPS tracking continues
                         }
                         releaseWake();
                     } else {
-                        // Screen on / app moved to foreground
                         if (statusRef.current === 'paused' && pausedAtRef.current !== null) {
                             const hiddenMs = Date.now() - pausedAtRef.current;
-                            if (workoutStartRef.current !== null) workoutStartRef.current += hiddenMs;
-                            if (stepStartRef.current    !== null) stepStartRef.current    += hiddenMs;
+                            workoutStartRef.current = (workoutStartRef.current !== null && !isNaN(workoutStartRef.current)) ? workoutStartRef.current + hiddenMs : Date.now();
+                            stepStartRef.current    = (stepStartRef.current !== null && !isNaN(stepStartRef.current)) ? stepStartRef.current + hiddenMs : Date.now();
                             pausedAtRef.current = null;
-                            setStatus('running');
+                            setUiStatus('running'); // Update state
                         } else if (statusRef.current === 'gps-running') {
-                            setShowGpsControls(true); // Show controls when screen is on again
+                            setShowGpsControls(true); // Show controls again
                         }
-                        requestWake(); // Re-request wake lock
+                        requestWake();
                     }
                 };
                 document.addEventListener('visibilitychange', handleVisibilityChange);
                 return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-            }, [requestWake, releaseWake]);
+            }, [requestWake, releaseWake, uiStatus, setUiStatus, setShowGpsControls]);
 
 
             // ── Speech helper (sin closures stale: recibe valores como params) ───────
             const handleSpeech = useCallback((step, stepIdx, remaining) => {
-                // Only speak for standard running phase, not when GPS is the primary focus
-                if (statusRef.current !== 'running' && statusRef.current !== 'gps-running') return; // Only process speech if running or gps-running
+                if (statusRef.current !== 'running' && statusRef.current !== 'gps-running') return;
 
                 const initKey = `${stepIdx}_init`;
-                // If it's the GPS_PHASE_KEY and status is 'running', this is the initial countdown
-                // If status is 'gps-running', we do not want initial voice for a step, only for GPS stats (handled separately)
                 if (remaining === step.seconds && step.voiceInitial && !spokenInit.current[initKey] && statusRef.current === 'running') {
                     speak(step.voiceInitial, true);
-                    if (step.whistleOnStart) navigator.vibrate(150); // Whistle is loud, vibrate is better for countdown
+                    if (step.whistleOnStart) navigator.vibrate(150);
                     spokenInit.current[initKey] = true;
                 }
                 if (step.voiceMidpoint && remaining === step.voiceMidpoint.time) {
@@ -1112,7 +1228,6 @@
                     const k = `${stepIdx}_cd_${remaining}`;
                     if (lastSpokenKey.current !== k) { speak(String(remaining)); lastSpokenKey.current = k; }
                 }
-                // Whistle is only for the very start of an *action* step, not countdown
                 if (step.whistleOnStart && remaining === step.seconds && statusRef.current === 'running' && step.phase !== GPS_PHASE_KEY && !spokenInit.current[initKey + '_whistle']) {
                     whistle();
                     spokenInit.current[initKey + '_whistle'] = true;
@@ -1121,7 +1236,11 @@
 
             // ── TIMER PRINCIPAL ──────────────────────────────────────────────────────
             useEffect(() => {
-                if (uiStatus !== 'running' && uiStatus !== 'gps-running') return;
+                if (uiStatus !== 'running' && uiStatus !== 'gps-running') {
+                    console.log('PlayerView: Timer useEffect skipped. Status is not running/gps-running:', uiStatus);
+                    return;
+                }
+                console.log('PlayerView: Timer useEffect activated. Status:', uiStatus);
 
                 const interval = setInterval(() => {
                     const now = Date.now();
@@ -1130,48 +1249,64 @@
                     const step = s[ci];
 
                     if (!step) {
-                        endWorkout(); // No more steps
+                        console.error("PlayerView: Timer: No step found at current index (", ci, "). Steps array:", s, ". Ending workout.");
+                        endWorkout();
                         return;
                     }
 
                     // Always update total elapsed time
-                    const totalElap = Math.floor((now - workoutStartRef.current) / 1000);
-                    elapsedRef.current = totalElap;
-                    setUiElapsed(totalElap);
-
-                    // If currently in a GPS tracking phase (after its initial countdown)
-                    // and not paused, we don't count down for THIS step.
-                    // The step's actual duration is controlled by stopGpsTracking.
-                    if (statusRef.current === 'gps-running') {
-                        // Keep elapsed time ticking, but UI for this step's countdown is irrelevant.
-                        return; // Exit here for the GPS tracking *duration* itself
+                    const currentWorkoutStart = workoutStartRef.current;
+                    const totalElap = Math.floor((now - (currentWorkoutStart !== null && !isNaN(currentWorkoutStart) ? currentWorkoutStart : now)) / 1000);
+                    if (!isNaN(totalElap)) {
+                        elapsedRef.current = totalElap;
+                        setElap(totalElap); // Use defensive setter
+                    } else {
+                        console.error('PlayerView: Timer: Calculated totalElap is NaN. Resetting to 0. Debug values: now=', now, 'workoutStartRef.current=', workoutStartRef.current);
+                        elapsedRef.current = 0;
+                        setElap(0); // Use defensive setter
                     }
 
-                    // Standard step logic (for all phases, including the 4-second GPS countdown)
-                    if (statusRef.current !== 'running') return; // Ensure actual running state for normal steps
 
-                    const passed   = Math.floor((now - stepStartRef.current) / 1000);
+                    if (statusRef.current === 'gps-running') {
+                        // For GPS tracking, we just update elapsed time and potentially announce stats.
+                        // The step's remaining time is not counted down by this interval.
+                        // GPS specific announcement logic is inside startGpsTracking (for periodic updates)
+                        return;
+                    }
+
+                    if (statusRef.current !== 'running') {
+                        // If not in 'running' state (e.g., if paused externally or status changed), stop processing this interval tick.
+                        // This should ideally be caught by the outer `if (uiStatus !== 'running' ...)` but as an extra safety.
+                        console.log('PlayerView: Timer: Current status ref is not "running" (was', statusRef.current, '), pausing interval processing.');
+                        return;
+                    }
+
+                    const currentStepStart = stepStartRef.current;
+                    const passed   = Math.floor((now - (currentStepStart !== null && !isNaN(currentStepStart) ? currentStepStart : now)) / 1000);
                     const remaining = Math.max(0, stepDurRef.current - passed);
-                    timeLeftRef.current = remaining;
-                    setUiTimeLeft(remaining);
+
+                    if (!isNaN(remaining)) {
+                        timeLeftRef.current = remaining;
+                        setTime(remaining); // Use defensive setter
+                    } else {
+                        console.error('PlayerView: Timer: Calculated remaining is NaN. Resetting to 0. Debug values: remaining=', remaining, 'stepDurRef.current=', stepDurRef.current, 'passed=', passed, 'now=', now, 'stepStartRef.current=', stepStartRef.current);
+                        timeLeftRef.current = 0;
+                        setTime(0); // Use defensive setter
+                    }
 
                     handleSpeech(step, ci, remaining);
 
                     if (remaining === 0) {
-                        // Step finished → advance
-                        // Special handling for GPS_PHASE_KEY when its countdown finishes
                         if (step.phase === GPS_PHASE_KEY) {
-                            startGpsTracking(); // Now, start the actual GPS tracking
-                            setStatus('gps-running'); // Change status to reflect active GPS tracking
-                            // No advanceToStep here, as the GPS phase is of indefinite duration
-                            // The `stopGpsTracking` or `skipStep` will handle the advance.
-                            return; // Stop processing this step's countdown, now in GPS tracking mode.
+                            console.log('PlayerView: Timer: GPS countdown finished. Initiating GPS tracking.');
+                            startGpsTracking();
+                            setUiStatus('gps-running'); // Update state
+                            return;
                         }
 
                         const next = ci + 1;
                         if (next < s.length) {
                             advanceToStep(next);
-                            // Disparar speech inicial del siguiente step en el mismo tick
                             if (s[next].phase !== GPS_PHASE_KEY) {
                                 handleSpeech(s[next], next, s[next].seconds);
                             }
@@ -1179,31 +1314,35 @@
                             endWorkout();
                         }
                     }
-                }, 250);
+                }, 250); // Interval 250ms for smoother updates
 
-                return () => clearInterval(interval);
-            }, [uiStatus, workout, onComplete, handleSpeech, advanceToStep, startGpsTracking, endWorkout]);
+                return () => {
+                    console.log('PlayerView: Timer useEffect cleanup. Clearing interval.');
+                    clearInterval(interval);
+                };
+            }, [uiStatus, endWorkout, setElap, setTime, startGpsTracking, setUiStatus, advanceToStep, handleSpeech]);
 
 
             // ── Render ───────────────────────────────────────────────────────────────
-            // Add a check for workout being null here as well, in case onStart(null) was somehow called
             if (!workout) {
+                console.log('PlayerView: Rendering error: Workout not selected.');
                 return React.createElement('div', { className: "h-screen flex items-center justify-center bg-slate-950 text-white/50 text-sm italic" }, "Error: Rutina no seleccionada. Por favor, vuelve a la lista.");
             }
 
-            // Render initial prompt for workout mode selection
             if (isModeSelectionScreenVisible) {
+                console.log('PlayerView: Rendering ModeSelectionScreen.');
                 return React.createElement(ModeSelectionScreen, {
                     onModeSelected: (phases) => {
-                        setSelectedWorkoutPhases(phases); // Set the selected phases array
-                        setIsModeSelectionScreenVisible(false); // Hide selection screen
+                        setSelectedWorkoutPhases(phases);
+                        setIsModeSelectionScreenVisible(false);
+                        console.log('PlayerView: Mode selected, hiding selection screen.');
                     },
-                    onCancel: onExit // Go back to workouts screen
+                    onCancel: onExit
                 });
             }
 
-            // If steps are empty after mode selection (and mode selection is no longer visible)
             if (steps.length === 0 && !isModeSelectionScreenVisible) {
+                console.log('PlayerView: Rendering error: No steps generated.');
                 return React.createElement('div', { className: "h-screen flex flex-col items-center justify-center bg-slate-950 text-white/50 text-sm italic p-4" },
                     React.createElement('p', { className: "mb-4" }, "Error: No se pudieron generar los pasos de la rutina con las fases seleccionadas."),
                     React.createElement('p', { className: "mb-8" }, "Por favor, vuelve a la lista de rutinas e inténtalo de nuevo seleccionando al menos una fase."),
@@ -1211,16 +1350,16 @@
                 );
             }
 
-            // Render post-workout map summary screen
             if (showPostWorkoutMap) {
+                console.log('PlayerView: Rendering GpsMapSummary.');
                 return React.createElement(GpsMapSummary, {
                     gpsCoordinates,
                     finalGpsSummary,
-                    onSave: () => {}, // Handled internally by GpsMapSummary, passing empty func is fine.
-                    onShare: () => {}, // Handled internally by GpsMapSummary, passing empty func is fine.
+                    onSave: () => {},
+                    onShare: () => {},
                     onClose: () => {
-                        // Once map is viewed/shared, finalize workout and go back
                         if (!savedRef.current && workout) {
+                            console.log('PlayerView: GpsMapSummary closed. Completing workout with GPS data.');
                             onComplete(workout.name, elapsedRef.current, { coordinates: gpsCoordinates, summary: finalGpsSummary });
                             savedRef.current = true;
                         }
@@ -1229,27 +1368,21 @@
                 });
             }
 
-            // Render GPS tracking UI when active
-            // `isGpsActive` will be true if 'run' or 'walk' was selected AND `startGpsTracking` has been called.
-            // `uiStatus === 'gps-running'` confirms the app state is specifically in GPS tracking mode.
             if (isGpsActive && uiStatus === 'gps-running') {
+                console.log('PlayerView: Rendering GPS tracking UI. Show controls:', showGpsControls);
                 return React.createElement('div', { className: "h-screen flex flex-col items-center justify-center bg-slate-950 text-white p-6" },
                     React.createElement('div', {
                         className: "absolute inset-0 bg-slate-950 flex flex-col items-center justify-center p-6",
                     },
-                        // Content visible when controls are hidden (minimal display, "screen off")
                         !showGpsControls && React.createElement('div', { className: "text-center" },
                             React.createElement('h2', { className: "text-xl font-black uppercase text-slate-400 mb-2" }, "GPS ACTIVO"),
                             React.createElement('p', { className: "text-sm text-slate-600" }, "Presiona botón de encendido para controles")
                         ),
-
-                        // Content visible when controls are shown (interactable display)
                         showGpsControls && React.createElement(React.Fragment, null,
                             React.createElement('h2', { className: "text-3xl font-black uppercase text-orange-500 mb-4" }, "Caminata / Carrera"),
                             React.createElement('p', { className: "text-lg text-slate-400 mb-10" }, "Seguimiento GPS Activo. Actualizaciones solo por voz."),
-
                             React.createElement('button', {
-                                onClick: () => stopGpsTracking(), // Explicitly call stopGpsTracking when button is pressed
+                                onClick: () => stopGpsTracking(),
                                 className: "w-full max-w-sm bg-red-600/80 text-white py-6 rounded-full font-black uppercase active:scale-95 italic"
                             }, "TERMINAR CAMINATA / CARRERA")
                         )
@@ -1257,18 +1390,24 @@
                 );
             }
 
-
-            if (uiStatus === 'finished')
+            if (uiStatus === 'finished') {
+                console.log('PlayerView: Rendering Finished screen.');
                 return React.createElement('div', { className: "h-screen flex flex-col items-center justify-center p-8 bg-slate-950 text-white text-center" },
                     React.createElement('h1', { className: "text-5xl font-black italic mb-4" }, "¡HECHO!"),
                     React.createElement('button', { onClick: onExit, className: "w-full max-w-sm bg-white text-black py-6 rounded-full font-black uppercase" }, "Finalizar")
                 );
+            }
 
-            // curr is guaranteed to be defined here due to checks above for steps.length
-            const curr = steps[uiIdx] || { label: 'Cargando...', color: 'bg-slate-950' }; // Provide a fallback if curr somehow becomes undefined
+            const curr = steps[uiIdx] || { label: 'Cargando...', color: 'bg-slate-950' };
             const showOverlay = uiStatus === 'ready' || uiStatus === 'paused';
 
+            console.log('PlayerView: Rendering main UI. Status:', uiStatus, 'Current Step Label:', curr.label, 'Time Left:', uiTimeLeft, 'Elapsed:', uiElapsed);
             return React.createElement('div', { className: `h-screen flex flex-col transition-colors duration-700 ${curr.color || 'bg-slate-950'} text-white` },
+                // Diagnostic text (always visible on top-left if main UI renders)
+                React.createElement('div', { style: { position: 'absolute', top: 0, left: 0, color: 'red', zIndex: 9999, fontSize: '10px', padding: '5px', backgroundColor: 'rgba(0,0,0,0.5)' } },
+                    `Status: ${uiStatus}, Idx: ${uiIdx}, Phases: ${selectedWorkoutPhases?.length || 0}, Steps: ${steps.length}, Label: ${curr.label || 'N/A'}, TimeLeft: ${uiTimeLeft}`
+                ),
+
                 React.createElement('video', { ref: videoRef, loop: true, muted: true, playsInline: true, style: { position: 'absolute', width: '1px', height: '1px', opacity: 0.01 } },
                     React.createElement('source', { src: "https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/one-second-loop.mp4", type: "video/mp4" })
                 ),
