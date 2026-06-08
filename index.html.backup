@@ -13,10 +13,9 @@
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoCcT9Q5Ry0tCOiLw86eKtrLPMAd+Cpsff/2cTTz" crossorigin=""/>
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/4K8VMYdg36+L9VOh3HnRy/B9gPbhzgzHV328+mabAqP" crossorigin=""></script>
+    <!-- REMOVIDO Leaflet CSS y JS -->
+    <!-- Google Maps JS - AÑADIDO: callback para asegurar carga. ¡REEMPLAZA TU CLAVE API AQUÍ! -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY_HERE&libraries=geometry&callback=initGoogleMaps" async defer></script>
     <!-- html2canvas for saving map as image -->
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
@@ -38,7 +37,8 @@
             letter-spacing: -0.06em; pointer-events: none;
         }
         @media (orientation: landscape) { .timer-huge { font-size: 75vh; } }
-        .leaflet-container {
+        /* CAMBIADO: .leaflet-container a .map-container */
+        .map-container {
             width: 100%;
             height: 100%;
             border-radius: 1.5rem;
@@ -268,8 +268,8 @@
                 whistleOnStart: true,
                 voiceCountdown: true
             });
-            // The actual GPS tracking will be an indefinite "step" within the 'gps-running' UI status
-            // The post-GPS rest phase will be triggered manually after user ends tracking.
+            // La fase real de seguimiento GPS es indefinida y se termina con el botón.
+            // Esta fase de "DESCANSO (POST-GPS)" se activa solo después de terminar manualmente el GPS.
             const transitionVoice = nextPhaseIntro ? ` ${nextPhaseIntro}` : '';
             s.push({ label: 'DESCANSO (POST-GPS)', seconds: 10, color: 'bg-teal-400', phase: POST_GPS_REST_PHASE_KEY, voiceInitial: `Descanso.${transitionVoice}`, whistleOnStart: false, voiceCountdown: true });
             return s;
@@ -403,51 +403,187 @@
             );
         }
 
-        function GpsMapSummary({ gpsCoordinates, finalGpsSummary, onSave, onShare, onClose }) {
+        function GpsMapSummary({ gpsCoordinates, finalGpsSummary, onSave, onShare, onClose, isGoogleMapsLoaded }) {
             const mapRef = useRef(null);
             const mapInstance = useRef(null);
-            const mapContainerRef = useRef(null);
+            const markers = useRef([]); // To keep track of markers
+            const polylines = useRef([]); // To keep track of polylines
 
             useEffect(() => {
-                if (!gpsCoordinates || gpsCoordinates.length === 0 || !mapRef.current) return;
-
-                if (mapInstance.current) {
-                    mapInstance.current.remove();
+                // Verificar que Google Maps API esté cargada y los datos existan
+                if (!isGoogleMapsLoaded || !window.google || !window.google.maps || !gpsCoordinates || gpsCoordinates.length === 0 || !mapRef.current) {
+                    console.log("GpsMapSummary: Google Maps no cargado, no hay coordenadas o mapRef no disponible. Esperando.", { isGoogleMapsLoaded, gpsCoordinatesPresent: gpsCoordinates?.length > 0, mapRefCurrent: mapRef.current });
+                    return;
                 }
-                mapInstance.current = L.map(mapRef.current).setView([gpsCoordinates[0].lat, gpsCoordinates[0].lng], 13);
 
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                }).addTo(mapInstance.current);
+                console.log("GpsMapSummary: Inicializando Google Map.");
 
-                const latLngs = gpsCoordinates.map(coord => [coord.lat, coord.lng]);
-                const polyline = L.polyline(latLngs, { color: '#f97316', weight: 5 }).addTo(mapInstance.current);
-                mapInstance.current.fitBounds(polyline.getBounds());
+                // Limpiar instancias previas de mapas, marcadores y polilíneas
+                markers.current.forEach(m => m.setMap(null));
+                markers.current = [];
+                polylines.current.forEach(p => p.setMap(null));
+                polylines.current = [];
+                // mapInstance.current = null; // No es estrictamente necesario, pero ayuda a la recolección de basura si se recrea
+
+                const initialLatLng = new google.maps.LatLng(gpsCoordinates[0].lat, gpsCoordinates[0].lng);
+                mapInstance.current = new google.maps.Map(mapRef.current, {
+                    center: initialLatLng,
+                    zoom: 13,
+                    disableDefaultUI: true, // Personalizar UI
+                    zoomControl: true,
+                    mapTypeId: google.maps.MapTypeId.ROADMAP,
+                    styles: [ // Estilo oscuro
+                        { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+                        { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
+                        { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
+                        {
+                            featureType: "administrative.locality",
+                            elementType: "labels.text.fill",
+                            stylers: [{ color: "#d59563" }],
+                        },
+                        {
+                            featureType: "poi",
+                            elementType: "labels.text.fill",
+                            stylers: [{ color: "#d59563" }],
+                        },
+                        {
+                            featureType: "poi.park",
+                            elementType: "geometry",
+                            stylers: [{ color: "#263c3f" }],
+                        },
+                        {
+                            featureType: "poi.park",
+                            elementType: "labels.text.fill",
+                            stylers: [{ color: "#6b9a76" }],
+                        },
+                        {
+                            featureType: "road",
+                            elementType: "geometry",
+                            stylers: [{ color: "#38414e" }],
+                        },
+                        {
+                            featureType: "road",
+                            elementType: "geometry.stroke",
+                            stylers: [{ color: "#212a37" }],
+                        },
+                        {
+                            featureType: "road",
+                            elementType: "labels.text.fill",
+                            stylers: [{ color: "#9ca5b3" }],
+                        },
+                        {
+                            featureType: "road.highway",
+                            elementType: "geometry",
+                            stylers: [{ color: "#746855" }],
+                        },
+                        {
+                            featureType: "road.highway",
+                            elementType: "geometry.stroke",
+                            stylers: [{ color: "#1f2835" }],
+                        },
+                        {
+                            featureType: "road.highway",
+                            elementType: "labels.text.fill",
+                            stylers: [{ color: "#f3d19c" }],
+                        },
+                        {
+                            featureType: "transit",
+                            elementType: "geometry",
+                            stylers: [{ color: "#2f3948" }],
+                        },
+                        {
+                            featureType: "transit.station",
+                            elementType: "labels.text.fill",
+                            stylers: [{ color: "#d59563" }],
+                        },
+                        {
+                            featureType: "water",
+                            elementType: "geometry",
+                            stylers: [{ color: "#17263c" }],
+                        },
+                        {
+                            featureType: "water",
+                            elementType: "labels.text.fill",
+                            stylers: [{ color: "#515c6d" }],
+                        },
+                        {
+                            featureType: "water",
+                            elementType: "labels.text.stroke",
+                            stylers: [{ color: "#17263c" }],
+                        },
+                    ],
+                });
+
+                const latLngs = gpsCoordinates.map(coord => new google.maps.LatLng(coord.lat, coord.lng));
+                const polyline = new google.maps.Polyline({
+                    path: latLngs,
+                    geodesic: true,
+                    strokeColor: '#f97316', // Tailwind orange-500
+                    strokeOpacity: 1.0,
+                    strokeWeight: 5
+                });
+                polyline.setMap(mapInstance.current);
+                polylines.current.push(polyline); // Almacenar polilínea para limpieza
 
                 if (gpsCoordinates.length > 0) {
-                    L.marker([gpsCoordinates[0].lat, gpsCoordinates[0].lng]).addTo(mapInstance.current)
-                        .bindPopup('Inicio').openPopup();
+                    const startMarker = new google.maps.Marker({
+                        position: latLngs[0],
+                        map: mapInstance.current,
+                        title: 'Inicio',
+                        icon: { // Icono personalizado para marcador de inicio
+                            path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                            scale: 6,
+                            fillColor: '#EF4444', // Tailwind red-500
+                            fillOpacity: 1,
+                            strokeWeight: 1,
+                            strokeColor: '#fff',
+                            rotation: -90 // Apuntando hacia adelante a lo largo del camino
+                        }
+                    });
+                    markers.current.push(startMarker);
+                    
                     if (gpsCoordinates.length > 1) {
-                        const lastCoord = gpsCoordinates[gpsCoordinates.length - 1];
-                        L.marker([lastCoord.lat, lastCoord.lng]).addTo(mapInstance.current)
-                            .bindPopup('Fin').openPopup();
+                        const lastCoord = latLngs[latLngs.length - 1];
+                        const endMarker = new google.maps.Marker({
+                            position: lastCoord,
+                            map: mapInstance.current,
+                            title: 'Fin',
+                            icon: { // Icono personalizado para marcador de fin
+                                path: google.maps.SymbolPath.CIRCLE,
+                                scale: 8, // Escala más grande para visibilidad
+                                fillColor: '#4ADE80', // Tailwind green-400
+                                fillOpacity: 1,
+                                strokeWeight: 2,
+                                strokeColor: '#fff'
+                            }
+                        });
+                        markers.current.push(endMarker);
                     }
+                }
+
+                // Ajustar los límites para que la polilínea sea visible
+                if (latLngs.length > 0) {
+                    const bounds = new google.maps.LatLngBounds();
+                    latLngs.forEach(latLng => bounds.extend(latLng));
+                    mapInstance.current.fitBounds(bounds);
                 }
 
                 return () => {
-                    if (mapInstance.current) {
-                        mapInstance.current.remove();
-                        mapInstance.current = null;
-                    }
+                    console.log("GpsMapSummary: Limpiando recursos del mapa.");
+                    markers.current.forEach(m => m.setMap(null));
+                    markers.current = [];
+                    polylines.current.forEach(p => p.setMap(null));
+                    polylines.current = [];
+                    mapInstance.current = null; // Ayudar a la recolección de basura
                 };
-            }, [gpsCoordinates]);
+            }, [gpsCoordinates, isGoogleMapsLoaded]); // Dependencia de isGoogleMapsLoaded para re-inicializar si la API se carga más tarde
 
             const handleSave = useCallback(() => {
-                if (!mapContainerRef.current) {
+                if (!mapRef.current) { 
                     alert('Error: No se puede capturar el mapa.');
                     return;
                 }
-                html2canvas(mapContainerRef.current, { useCORS: true, logging: false }).then(canvas => {
+                html2canvas(mapRef.current, { useCORS: true, logging: false }).then(canvas => {
                     const image = canvas.toDataURL('image/png');
                     const link = document.createElement('a');
                     link.href = image;
@@ -458,12 +594,12 @@
                     speak('Mapa guardado.');
                 }).catch(err => {
                     console.error('Error al guardar mapa:', err);
-                    alert('No se pudo guardar el mapa. Inténtalo de nuevo.');
+                    alert('No se pudo guardar el mapa. html2canvas puede tener problemas con Google Maps. Inténtalo de nuevo.');
                 });
             }, []);
 
             const handleShare = useCallback(() => {
-                if (!mapContainerRef.current) {
+                if (!mapRef.current) { 
                     alert('Error: No se puede compartir el mapa.');
                     return;
                 }
@@ -473,7 +609,7 @@
                     return;
                 }
 
-                html2canvas(mapContainerRef.current, { useCORS: true, logging: false }).then(async canvas => {
+                html2canvas(mapRef.current, { useCORS: true, logging: false }).then(async canvas => {
                     canvas.toBlob(async (blob) => {
                         if (!blob) {
                             alert('No se pudo generar la imagen para compartir.');
@@ -493,7 +629,7 @@
                         } catch (err) {
                             console.error('Error al compartir:', err);
                             if (err.name !== 'AbortError') {
-                                alert('No se pudo compartir el mapa. Inténtalo de nuevo.');
+                                alert('No se pudo compartir el mapa. html2canvas puede tener problemas con Google Maps.');
                             }
                         }
                     }, 'image/png');
@@ -508,9 +644,8 @@
             return React.createElement('div', { className: "h-screen flex flex-col bg-slate-950 text-white p-6" },
                 React.createElement('h2', { className: "text-3xl font-black italic text-orange-500 mb-4 text-center" }, "Tu Ruta GPS"),
                 React.createElement('div', { className: "glass-card p-4 mb-4" },
-                    React.createElement('div', { ref: mapContainerRef, className: "w-full h-64 rounded-xl overflow-hidden mb-4 relative" },
-                        React.createElement('div', { ref: mapRef, className: "leaflet-container" })
-                    ),
+                    // CAMBIADO: clase a map-container
+                    React.createElement('div', { ref: mapRef, className: "w-full h-64 rounded-xl overflow-hidden mb-4 relative map-container" }),
                     React.createElement('div', { className: "grid grid-cols-2 gap-4 text-center" },
                         React.createElement('div', null,
                             React.createElement('span', { className: "text-[9px] opacity-40 block uppercase" }, "Distancia"),
@@ -547,7 +682,7 @@
             );
         }
 
-        function PlayerView({ workout, onExit, onComplete }) {
+        function PlayerView({ workout, onExit, onComplete, isGoogleMapsLoaded }) {
             const [uiStatus, setUiStatus] = useState('ready');
             const [uiIdx, setUiIdx] = useState(0);
             const [uiTimeLeft, setUiTimeLeft] = useState(0);
@@ -557,7 +692,6 @@
             const [selectedWorkoutPhases, setSelectedWorkoutPhases] = useState(null);
             const [showPostWorkoutMap, setShowPostWorkoutMap] = useState(false);
             const [isGpsActive, setIsGpsActive] = useState(false);
-            // const [showGpsControls, setShowGpsControls] = useState(false); // REMOVED
             const [gpsCoordinates, setGpsCoordinates] = useState([]);
             const [hasGpsData, setHasGpsData] = useState(false);
             const [finalGpsSummary, setFinalGpsSummary] = useState(null);
@@ -576,7 +710,7 @@
             const spokenInit = useRef({});
             const lastSpokenKey = useRef('');
             const wakeLockRef = useRef(null);
-            const videoRef = useRef(null);
+            // ELIMINADO: const videoRef = useRef(null);
             const gpsWatcherId = useRef(null);
             const lastPosition = useRef(null);
             const gpsStartTime = useRef(null);
@@ -712,7 +846,6 @@
                         speak('No se registró distancia significativa.');
                     }
                     setIsGpsActive(false);
-                    // setShowGpsControls(false); // REMOVED
                     setUiStatus('running'); // Transición a 'running' para que el resto de la rutina continúe si no es el último paso.
                     if (!isSkip) {
                         console.log('PlayerView: Auto-skipping to next step after GPS phase.');
@@ -720,7 +853,7 @@
                         advanceToStep(next);
                     }
                 });
-            }, [advanceToStep, announceGpsStats, gpsCoordinates, setHasGpsData, setFinalGpsSummary, setUiStatus, setIsGpsActive]); // Removed setShowGpsControls from dependencies
+            }, [advanceToStep, announceGpsStats, gpsCoordinates, setHasGpsData, setFinalGpsSummary, setUiStatus, setIsGpsActive]);
 
             // useEffect para mantener la ref de stopGpsTracking actualizada
             useEffect(() => {
@@ -752,8 +885,9 @@
                 }
             }, [endWorkout, advanceToStep, handleSpeech]);
 
-            const startGpsTracking = useCallback(() => {
+            const startGpsTracking = useCallback(async () => { // Hacemos la función async para await navigator.permissions.query
                 console.log('PlayerView: startGpsTracking called.');
+                // Limpiar cualquier intervalo existente al iniciar el seguimiento GPS
                 if (intervalIdRef.current) {
                     clearInterval(intervalIdRef.current);
                     intervalIdRef.current = null;
@@ -761,22 +895,43 @@
                 }
 
                 if (!('geolocation' in navigator)) {
-                    speak('Error: Geolocalización no disponible. No se puede iniciar el seguimiento.');
+                    speak('Error: Geolocalización no disponible en este dispositivo.');
                     console.error("Geolocation is not supported by this browser. Skipping GPS tracking.");
                     setIsGpsActive(false);
                     setUiStatus('running'); 
                     skipStep();
                     return;
                 }
+
+                try {
+                    const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
+                    if (permissionStatus.state === 'denied') {
+                        speak('Permiso de geolocalización denegado. Por favor, habilítalo en la configuración de privacidad de tu dispositivo para usar esta función.');
+                        console.error("Geolocation permission denied. Cannot start GPS tracking.");
+                        setIsGpsActive(false);
+                        setUiStatus('running');
+                        skipStep();
+                        return;
+                    } else if (permissionStatus.state === 'prompt') {
+                        speak('Solicitando permiso de geolocalización.');
+                        // watchPosition will also trigger a prompt, so we can just proceed.
+                    }
+                } catch (error) {
+                    console.error("Error querying geolocation permission:", error);
+                    speak('Error al verificar permisos de geolocalización.');
+                    setIsGpsActive(false);
+                    setUiStatus('running');
+                    skipStep();
+                    return;
+                }
+                
                 if (isGpsActiveRef.current) {
                     console.warn('PlayerView: GPS is already active, preventing multiple starts.');
                     return;
                 }
 
-                // Removed "Presiona el botón de encendido del celular para ver el botón de finalizar."
                 speak('Iniciando seguimiento de caminata o carrera. Las actualizaciones serán por audio cada diez minutos.', true);
                 setIsGpsActive(true);
-                // setShowGpsControls(true); // REMOVED: button visible by default when GPS is active
                 setUiStatus('gps-running'); 
 
                 gpsStartTime.current = Date.now();
@@ -795,9 +950,15 @@
                     (position) => {
                         const { latitude, longitude } = position.coords;
                         const now = Date.now();
-                        const timeElapsedMs = now - gpsStartTime.current;
+                        const timeElapsedMs = now - (gpsStartTime.current || now); 
                         const currentGpsTotalTime = Math.floor(timeElapsedMs / 1000);
                         gpsTotalTime.current = currentGpsTotalTime;
+                        
+                        // Actualizar uiElapsed para que se refleje en la UI cuando esté activa
+                        if (statusRef.current === 'gps-running') { 
+                             elapsedRef.current = currentGpsTotalTime;
+                             setElap(currentGpsTotalTime); // Esto forzará una re-renderización con el tiempo actualizado
+                        }
 
                         let currentDistance = gpsTotalDistance.current;
                         if (lastPosition.current) {
@@ -807,13 +968,16 @@
                                 latitude,
                                 longitude
                             );
-                            currentDistance += dist;
-                            gpsTotalDistance.current = currentDistance;
+                            // Solo añadir distancia si es significativa (ej. > 1 metro) para evitar ruido de GPS
+                            if (dist > 1) { 
+                                currentDistance += dist;
+                                gpsTotalDistance.current = currentDistance;
+                            }
                         }
                         lastPosition.current = { latitude, longitude, timestamp: now };
                         setGpsCoordinates(prev => [...prev, { lat: latitude, lng: longitude, timestamp: now }]);
 
-                        if (statusRef.current === 'gps-running' && currentGpsTotalTime > 0 && (now - gpsAnnounceLastTime.current) >= (10 * 60 * 1000)) {
+                        if (statusRef.current === 'gps-running' && currentGpsTotalTime > 0 && (now - gpsAnnounceLastTime.current) >= (10 * 60 * 1000)) { // Cada 10 minutos
                             console.log('PlayerView: Announcing GPS stats.');
                             announceGpsStats(gpsTotalDistance.current, currentGpsTotalTime);
                             gpsAnnounceLastTime.current = now;
@@ -826,7 +990,7 @@
                     },
                     options
                 );
-            }, [skipStep, announceGpsStats, setHasGpsData, setUiStatus, setIsGpsActive]); // Removed setShowGpsControls from dependencies
+            }, [skipStep, announceGpsStats, setHasGpsData, setUiStatus, setIsGpsActive, setElap]);
 
             const togglePlay = useCallback(() => {
                 if (!workout || stepsRef.current.length === 0) {
@@ -862,14 +1026,14 @@
                     setUiStatus('running');
                     console.log('togglePlay: Transitioned from paused to running. New workoutStartRef:', workoutStartRef.current, 'stepStartRef:', stepStartRef.current);
                 } else if (current === 'gps-running') {
-                    // Removed specific message for GPS pause. User will use the dedicated button.
+                    // Mensaje actualizado para GPS, el usuario debe usar el botón dedicado
                     speak('No se puede pausar durante el seguimiento GPS. Por favor, utiliza el botón "TERMINAR CAMINATA / CARRERA" para finalizar.', true);
                     console.log('togglePlay: Attempted pause during GPS, ignored.');
                 }
             }, [workout, setUiStatus]); 
 
             const releaseWake = useCallback(() => {
-                if (videoRef.current) videoRef.current.pause();
+                // ELIMINADO: if (videoRef.current) videoRef.current.pause();
                 if (wakeLockRef.current) {
                     console.log('PlayerView: Releasing wake lock.');
                     wakeLockRef.current.release().then(() => wakeLockRef.current = null)
@@ -879,16 +1043,12 @@
 
             const requestWake = useCallback(async () => {
                 try {
-                    if (videoRef.current && statusRef.current === 'running') {
-                        videoRef.current.play().catch(() => {});
-                    } else if (videoRef.current) {
-                        videoRef.current.pause(); 
-                    }
-
+                    // Si el estado es 'running' (ejercicio normal), intentamos mantener la pantalla encendida
                     if (statusRef.current === 'running' && 'wakeLock' in navigator && !wakeLockRef.current) {
                         wakeLockRef.current = await navigator.wakeLock.request('screen');
                         console.log('PlayerView: Wake lock requested for running state.');
                     } else if (statusRef.current !== 'running' && wakeLockRef.current) {
+                        // Si el estado no es 'running' (ej. 'gps-running', 'paused', etc.) y el wakelock está activo, lo liberamos
                         releaseWake();
                     }
                 } catch (e) {
@@ -897,12 +1057,15 @@
             }, [releaseWake]); 
 
             useEffect(() => {
+                // Este efecto gestiona explícitamente el wakeLock basado en uiStatus
+                // Cuando uiStatus es 'running', intenta adquirir/mantener wakeLock.
+                // Cuando uiStatus es 'gps-running' o cualquier otro estado, libera wakeLock (permitiendo que la pantalla se apague).
                 if (uiStatus === 'running') {
                     requestWake();
                 } else {
                     releaseWake();
                 }
-                return releaseWake; 
+                return releaseWake; // Cleanup on unmount or re-run
             }, [uiStatus, requestWake, releaseWake]);
 
             useEffect(() => {
@@ -911,24 +1074,25 @@
                     if (document.hidden) {
                         if (statusRef.current === 'running') {
                             pausedAtRef.current = Date.now();
-                            setUiStatus('paused');
+                            setUiStatus('paused'); // Pausar si no es GPS
                         } 
-                        // For 'gps-running', nothing changes visually, GPS continues tracking.
-                        releaseWake(); 
+                        // Para 'gps-running', el seguimiento GPS continúa en segundo plano, no se cambia el estado de UI.
+                        releaseWake(); // Siempre liberar wake lock cuando está oculto para ahorrar batería
                     } else {
+                        // Al volver de oculto
                         if (statusRef.current === 'paused' && pausedAtRef.current !== null) {
                             const hiddenMs = Date.now() - pausedAtRef.current;
                             workoutStartRef.current = (workoutStartRef.current !== null && !isNaN(workoutStartRef.current)) ? workoutStartRef.current + hiddenMs : Date.now(); 
                             stepStartRef.current = (stepStartRef.current !== null && !isNaN(stepStartRef.current)) ? stepStartRef.current + hiddenMs : Date.now(); 
                             pausedAtRef.current = null;
-                            setUiStatus('running'); 
+                            setUiStatus('running'); // Reanudar la ejecución normal
                         } 
-                        // For 'gps-running', screen just becomes visible, UI shows button automatically.
+                        // Para 'gps-running', la pantalla simplemente se vuelve visible; la UI mostrará el botón automáticamente.
                     }
                 };
                 document.addEventListener('visibilitychange', handleVisibilityChange);
                 return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-            }, [releaseWake, uiStatus, setUiStatus]); // Removed setShowGpsControls from dependencies
+            }, [releaseWake, uiStatus, setUiStatus]);
 
             // Main useEffect for initialization and step generation
             useEffect(() => {
@@ -951,7 +1115,6 @@
                 setFinalGpsSummary(null);
                 setShouldAutoStart(false); 
                 setIsGpsActive(false); 
-                // setShowGpsControls(false); // REMOVED
 
                 if (gpsWatcherId.current) {
                     navigator.geolocation.clearWatch(gpsWatcherId.current);
@@ -1058,8 +1221,8 @@
                     }
                     
                     if (statusRef.current === 'gps-running') {
-                        // If GPS is running, we only update elapsed time, not step countdown.
-                        // The step advancement for GPS is handled manually by stopGpsTrackingRef.current()
+                        // Si GPS está corriendo, solo actualizamos el tiempo transcurrido (ya hecho arriba).
+                        // El avance de los pasos para GPS se maneja manualmente al detener el seguimiento.
                         return;
                     }
 
@@ -1159,25 +1322,47 @@
 
             if (showPostWorkoutMap) {
                 console.log('PlayerView: Rendering GpsMapSummary.');
+                // Pasar isGoogleMapsLoaded al componente GpsMapSummary
                 return React.createElement(GpsMapSummary, {
                     gpsCoordinates,
                     finalGpsSummary,
-                    onSave: () => {},
-                    onShare: () => {},
-                    onClose: handleGpsSummaryClosed 
+                    onSave: () => {}, 
+                    onShare: () => {}, 
+                    onClose: handleGpsSummaryClosed,
+                    isGoogleMapsLoaded: isGoogleMapsLoaded
                 });
             }
 
-            // Simplified GPS tracking UI: button is always present when screen is on and GPS is active
+            // UI para seguimiento GPS: el botón para finalizar siempre está visible cuando el GPS está activo y la pantalla encendida.
             if (isGpsActive && uiStatus === 'gps-running') {
                 console.log('PlayerView: Rendering GPS tracking UI.');
                 return React.createElement('div', { className: "h-screen flex flex-col items-center justify-center bg-slate-950 text-white p-6" },
                     React.createElement(React.Fragment, null,
                         React.createElement('h2', { className: "text-3xl font-black uppercase text-orange-500 mb-4" }, "Caminata / Carrera"),
-                        React.createElement('p', { className: "text-lg text-slate-400 mb-10" }, "Seguimiento GPS Activo. Actualizaciones solo por voz."),
+                        // MOSTRAR RESUMEN EN TIEMPO REAL AQUÍ
+                        React.createElement('div', { className: "glass-card p-4 mb-4 w-full max-w-sm" },
+                            React.createElement('div', { className: "grid grid-cols-2 gap-4 text-center" },
+                                React.createElement('div', null,
+                                    React.createElement('span', { className: "text-[9px] opacity-40 block uppercase" }, "Distancia"),
+                                    React.createElement('span', { className: "text-xl font-black text-sky-400" }, formatDistance(gpsTotalDistance.current))
+                                ),
+                                React.createElement('div', null,
+                                    React.createElement('span', { className: "text-[9px] opacity-40 block uppercase" }, "Tiempo"),
+                                    React.createElement('span', { className: "text-xl font-black text-emerald-400" }, formatTime(gpsTotalTime.current))
+                                ),
+                                React.createElement('div', null,
+                                    React.createElement('span', { className: "text-[9px] opacity-40 block uppercase" }, "Ritmo Promedio"),
+                                    React.createElement('span', { className: "text-xl font-black text-purple-400" }, formatPace(gpsTotalDistance.current, gpsTotalTime.current), " /km")
+                                ),
+                                React.createElement('div', null,
+                                    React.createElement('span', { className: "text-[9px] opacity-40 block uppercase" }, "Velocidad Media"),
+                                    React.createElement('span', { className: "text-xl font-black text-yellow-400" }, formatSpeed(gpsTotalDistance.current, gpsTotalTime.current))
+                                )
+                            )
+                        ),
                         React.createElement('button', {
                             onClick: () => stopGpsTrackingRef.current(), 
-                            className: "w-full max-w-sm bg-red-600/80 text-white py-6 rounded-full font-black uppercase active:scale-95 italic"
+                            className: "w-full max-w-sm bg-red-600/80 text-white py-6 rounded-full font-black uppercase active:scale-95 italic mt-auto" // mt-auto para empujar hacia abajo
                         }, "TERMINAR CAMINATA / CARRERA")
                     )
                 );
@@ -1196,9 +1381,7 @@
 
             console.log('PlayerView: Rendering main UI. Status:', uiStatus, 'Current Step Label:', curr.label, 'Time Left:', uiTimeLeft, 'Elapsed:', uiElapsed);
             return React.createElement('div', { className: `h-screen flex flex-col transition-colors duration-700 ${curr.color || 'bg-slate-950'} text-white` },
-                React.createElement('video', { ref: videoRef, loop: true, muted: true, playsInline: true, style: { position: 'absolute', width: '1px', height: '1px', opacity: 0.01 } },
-                    React.createElement('source', { src: "https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/one-second-loop.mp4", type: "video/mp4" })
-                ),
+                <!-- REMOVIDO: Etiqueta de video. -->
                 React.createElement('div', { className: "bg-black/10 p-4 pt-10 flex justify-between items-center shrink-0 z-10" },
                     React.createElement('div', { className: "leading-none text-left" },
                         React.createElement('span', { className: "text-[10px] font-black text-orange-500 uppercase" }, "Tiempo Total"),
@@ -1386,6 +1569,17 @@
             );
         }
 
+        // Variable global para indicar si la API de Google Maps está cargada
+        let globalIsGoogleMapsLoaded = false;
+        // La función de callback para la API de Google Maps
+        window.initGoogleMaps = () => {
+            console.log("Google Maps API loaded via callback. Dispatching event.");
+            globalIsGoogleMapsLoaded = true;
+            // Disparar un evento personalizado para que los componentes React puedan reaccionar
+            const event = new Event('googleMapsLoaded');
+            window.dispatchEvent(event);
+        };
+
         function App() {
             const [user, setUser] = useState(null);
             const [view, setView] = useState('workouts');
@@ -1393,6 +1587,27 @@
             const [history, setHistory] = useState([]);
             const [loading, setLoading] = useState(true);
             const [selectedWorkout, setSelectedWorkout] = useState(null);
+            // Estado local para la carga de Google Maps
+            const [isGoogleMapsLoaded, setIsGoogleMapsLoaded] = useState(globalIsGoogleMapsLoaded);
+
+            // Efecto para escuchar la carga global de Google Maps
+            useEffect(() => {
+                const handleGoogleMapsLoad = () => {
+                    console.log("App component received googleMapsLoaded event.");
+                    setIsGoogleMapsLoaded(true);
+                };
+                // Si la API ya estaba cargada antes de que App se montara, establecer el estado
+                if (globalIsGoogleMapsLoaded) {
+                    setIsGoogleMapsLoaded(true);
+                } else {
+                    // Si no, añadir un listener para cuando se cargue
+                    window.addEventListener('googleMapsLoaded', handleGoogleMapsLoad);
+                }
+                return () => {
+                    // Limpiar el listener al desmontar
+                    window.removeEventListener('googleMapsLoaded', handleGoogleMapsLoad);
+                };
+            }, []); // Sin dependencias para que se ejecute una sola vez al montar
 
             useEffect(() => {
                 const unsub = auth.onAuthStateChanged(u => {
@@ -1444,7 +1659,8 @@
                             db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid)
                               .collection('history').add({ workoutName: name, totalTime: time, date: new Date().toISOString(), gpsData: gpsData || null });
                             setView('workouts');
-                        }
+                        },
+                        isGoogleMapsLoaded: isGoogleMapsLoaded // Pasar el estado de carga de Google Maps
                     })
                 ),
                 view !== 'play' && React.createElement('nav', { className: "bg-slate-900 border-t border-white/5 p-4 flex justify-around items-center shrink-0" },

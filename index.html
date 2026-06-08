@@ -579,6 +579,7 @@
             }, [gpsCoordinates, isGoogleMapsLoaded]); // Dependencia de isGoogleMapsLoaded para re-inicializar si la API se carga más tarde
 
             const handleSave = useCallback(() => {
+                // html2canvas necesita un elemento DOM para capturar, mapRef.current apunta al div que contiene el mapa.
                 if (!mapRef.current) { 
                     alert('Error: No se puede capturar el mapa.');
                     return;
@@ -710,7 +711,7 @@
             const spokenInit = useRef({});
             const lastSpokenKey = useRef('');
             const wakeLockRef = useRef(null);
-            // ELIMINADO: const videoRef = useRef(null);
+            // ELIMINADO: const videoRef = useRef(null); // Ya no se usa el truco del video
             const gpsWatcherId = useRef(null);
             const lastPosition = useRef(null);
             const gpsStartTime = useRef(null);
