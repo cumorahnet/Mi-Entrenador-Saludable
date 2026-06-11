@@ -15,6 +15,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- REMOVIDO Leaflet CSS y JS -->
     <!-- Google Maps JS - AÑADIDO: callback para asegurar carga. ¡REEMPLAZA TU CLAVE API AQUÍ! -->
+    <!-- IMPORTANTE: El mapa no aparecerá si no reemplazas 'YOUR_GOOGLE_MAPS_API_KEY_HERE' con una clave de API válida de Google Maps. -->
     <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY_HERE&libraries=geometry&callback=initGoogleMaps" async defer></script>
     <!-- html2canvas for saving map as image -->
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -124,6 +125,8 @@
             return R * c;
         };
 
+        // La fórmula del ritmo (pace) ya es correcta: tiempo por unidad de distancia (min/km).
+        // totalTimeSeconds / (totalDistanceMeters / 1000) = segundos por kilómetro
         const formatPace = (totalDistanceMeters, totalTimeSeconds) => {
             if (totalDistanceMeters <= 0 || totalTimeSeconds <= 0) return '0:00';
             const paceSecondsPerKm = (totalTimeSeconds / (totalDistanceMeters / 1000));
@@ -579,6 +582,7 @@
             }, [gpsCoordinates, isGoogleMapsLoaded]); // Dependencia de isGoogleMapsLoaded para re-inicializar si la API se carga más tarde
 
             const handleSave = useCallback(() => {
+                // html2canvas necesita un elemento DOM para capturar, mapRef.current apunta al div que contiene el mapa.
                 if (!mapRef.current) { 
                     alert('Error: No se puede capturar el mapa.');
                     return;
@@ -710,11 +714,11 @@
             const spokenInit = useRef({});
             const lastSpokenKey = useRef('');
             const wakeLockRef = useRef(null);
-            // ELIMINADO: const videoRef = useRef(null);
+            // ELIMINADO: const videoRef = useRef(null); // Ya no se usa el truco del video
             const gpsWatcherId = useRef(null);
             const lastPosition = useRef(null);
             const gpsStartTime = useRef(null);
-            const gpsAnnounceLastTime = useRef(0);
+            const gpsAnnounceLastTime = useRef(0); // Último momento en que se anunciaron las estadísticas GPS
             const gpsTotalDistance = useRef(0);
             const gpsTotalTime = useRef(0);
             const hasGpsDataRef = useRef(false);
@@ -742,10 +746,12 @@
             }, []);
 
             const announceGpsStats = useCallback((distance, timeSec) => {
+                console.log('announceGpsStats called with distance:', distance, 'timeSec:', timeSec);
                 const formattedDistance = formatDistance(distance);
                 const formattedSpeed = formatSpeed(distance, timeSec);
                 const formattedPace = formatPace(distance, timeSec);
-                speak(`Distancia: ${formattedDistance}. Velocidad promedio: ${formattedSpeed}. Ritmo promedio: ${formattedPace}.`);
+                speak(`Distancia: ${formattedDistance}. Velocidad promedio: ${formattedSpeed}. Ritmo promedio: ${formattedPace}.`, true); // Added true for interrupt
+                console.log('announceGpsStats: Spoke:', `Distancia: ${formattedDistance}. Velocidad promedio: ${formattedSpeed}. Ritmo promedio: ${formattedPace}.`);
             }, []);
 
             const handleSpeech = useCallback((step, stepIdx, remaining) => {
@@ -759,11 +765,11 @@
                 }
                 if (step.voiceMidpoint && remaining === step.voiceMidpoint.time) {
                     const k = `${stepIdx}_mid_${remaining}`;
-                    if (lastSpokenKey.current !== k) { speak(step.voiceMidpoint.text); lastSpokenKey.current = k; }
+                    if (lastSpokenKey.current !== k) { speak(step.voiceMidpoint.text, true); lastSpokenKey.current = k; } // Added true for interrupt
                 }
                 if (step.voiceCountdown && remaining > 0 && remaining <= 3) {
                     const k = `${stepIdx}_cd_${remaining}`;
-                    if (lastSpokenKey.current !== k) { speak(String(remaining)); lastSpokenKey.current = k; }
+                    if (lastSpokenKey.current !== k) { speak(String(remaining), true); lastSpokenKey.current = k; } // Added true for interrupt
                 }
                 if (step.whistleOnStart && remaining === step.seconds && statusRef.current === 'running' && step.phase !== GPS_PHASE_KEY && !spokenInit.current[initKey + '_whistle']) {
                     whistle();
@@ -895,7 +901,7 @@
                 }
 
                 if (!('geolocation' in navigator)) {
-                    speak('Error: Geolocalización no disponible en este dispositivo.');
+                    speak('Error: Geolocalización no disponible en este dispositivo.', true); // Added true for interrupt
                     console.error("Geolocation is not supported by this browser. Skipping GPS tracking.");
                     setIsGpsActive(false);
                     setUiStatus('running'); 
@@ -906,19 +912,19 @@
                 try {
                     const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
                     if (permissionStatus.state === 'denied') {
-                        speak('Permiso de geolocalización denegado. Por favor, habilítalo en la configuración de privacidad de tu dispositivo para usar esta función.');
+                        speak('Permiso de geolocalización denegado. Por favor, habilítalo en la configuración de privacidad de tu dispositivo para usar esta función.', true); // Added true for interrupt
                         console.error("Geolocation permission denied. Cannot start GPS tracking.");
                         setIsGpsActive(false);
                         setUiStatus('running');
                         skipStep();
                         return;
                     } else if (permissionStatus.state === 'prompt') {
-                        speak('Solicitando permiso de geolocalización.');
+                        speak('Solicitando permiso de geolocalización.', true); // Added true for interrupt
                         // watchPosition will also trigger a prompt, so we can just proceed.
                     }
                 } catch (error) {
                     console.error("Error querying geolocation permission:", error);
-                    speak('Error al verificar permisos de geolocalización.');
+                    speak('Error al verificar permisos de geolocalización.', true); // Added true for interrupt
                     setIsGpsActive(false);
                     setUiStatus('running');
                     skipStep();
@@ -930,7 +936,12 @@
                     return;
                 }
 
-                speak('Iniciando seguimiento de caminata o carrera. Las actualizaciones serán por audio cada diez minutos.', true);
+                // Initial announcement for GPS start, ensure 10-minute timer starts *after* this.
+                speak('Iniciando seguimiento de caminata o carrera. Las actualizaciones serán por audio cada diez minutos.', true, () => {
+                    gpsAnnounceLastTime.current = Date.now(); // Set after initial speak finishes or starts
+                    console.log('PlayerView: GPS tracking initial announcement made, setting gpsAnnounceLastTime.current to:', gpsAnnounceLastTime.current);
+                });
+
                 setIsGpsActive(true);
                 setUiStatus('gps-running'); 
 
@@ -941,7 +952,7 @@
                 setGpsCoordinates([]);
                 setHasGpsData(false);
                 setFinalGpsSummary(null);
-                gpsAnnounceLastTime.current = gpsStartTime.current;
+                
                 console.log('PlayerView: GPS tracking initialized. Requesting watchPosition.');
 
                 const options = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
@@ -977,15 +988,17 @@
                         lastPosition.current = { latitude, longitude, timestamp: now };
                         setGpsCoordinates(prev => [...prev, { lat: latitude, lng: longitude, timestamp: now }]);
 
+                        // Audio notifications every 10 minutes
                         if (statusRef.current === 'gps-running' && currentGpsTotalTime > 0 && (now - gpsAnnounceLastTime.current) >= (10 * 60 * 1000)) { // Cada 10 minutos
-                            console.log('PlayerView: Announcing GPS stats.');
+                            console.log('PlayerView: Condition met for 10-minute GPS announcement. Current time since last announce (ms):', now - gpsAnnounceLastTime.current);
                             announceGpsStats(gpsTotalDistance.current, currentGpsTotalTime);
                             gpsAnnounceLastTime.current = now;
+                            console.log('PlayerView: GPS stats announced. Next announcement time will be relative to:', gpsAnnounceLastTime.current);
                         }
                     },
                     (error) => {
                         console.error("PlayerView: GPS Error:", error);
-                        speak(`Error de GPS: ${error.message}. Deteniendo seguimiento.`);
+                        speak(`Error de GPS: ${error.message}. Deteniendo seguimiento.`, true); // Added true for interrupt
                         stopGpsTrackingRef.current(); 
                     },
                     options
