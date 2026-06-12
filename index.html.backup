@@ -17,6 +17,11 @@
     <!-- <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB7teEYbyemFiH0_nZxXvG3_-qumcnRMRE&libraries=geometry&callback=initGoogleMaps" async defer></script> -->
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQPDQwr7xKEkmV3S8gawQ9G4Bsn4APw=" crossorigin="" />
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZQXNrHE1BlClZlAWyowE0/fiPzS=" crossorigin=""></script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
         body {
@@ -35,6 +40,19 @@
             letter-spacing: -0.06em; pointer-events: none;
         }
         @media (orientation: landscape) { .timer-huge { font-size: 75vh; } }
+        /* AÑADIDO: Estilo para el contenedor del mapa Leaflet */
+        .leaflet-map-container {
+            width: 100%;
+            height: 100%; /* Ajusta según sea necesario para tu diseño */
+            border-radius: 1.5rem;
+            overflow: hidden; /* Asegura que el mapa se ajuste a los bordes redondeados */
+        }
+        /* Ajuste para que el mapa se muestre correctamente */
+        .leaflet-container {
+            font-size: 1rem; /* Asegura que el texto de Leaflet no sea demasiado grande */
+            height: 100%;
+            width: 100%;
+        }
         /* ELIMINADO: Estilo para el contenedor del mapa de Google Maps */
         /* .map-container { width: 100%; height: 100%; border-radius: 1.5rem; } */
 
@@ -71,6 +89,8 @@
         const IconPause = () => React.createElement('svg', { width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M6 19h4V5H6v14zm8-14v14h4V5h-4z" }));
         const IconShare = () => React.createElement('svg', { width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.52.47 1.2.77 1.96.77 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L7.94 12.03c-.52-.47-1.2-.77-1.96-.77-1.66 0-3 1.34-3 3s1.34 3 3 3c.76 0 1.44-.3 1.96-.77l7.05 4.11c-.05.23-.09.46-.09.7 0 1.66 1.34 3 3 3s3-1.34 3-3-1.34-3-3-3z" }));
         const IconSave = () => React.createElement('svg', { width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" }));
+        const IconMap = () => React.createElement('svg', { width:"24", height:"24", viewBox:"0 0 24 24", fill:"currentColor" }, React.createElement('path', { d:"M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5h16c.21 0 .39-.13.45-.33l.14-.52V3.5c0-.28-.22-.5-.5-.5zm-9.92 1.3L15 6.1l4.47-1.44.03.01L19 18.5 15 16.9l-4.47 1.44-.03-.01L5 5.5l4.47-1.44.03.01z" }));
+
 
         const firebaseConfig = {
             apiKey: "AIzaSyDg0nohFAprIYta3Z3IvFGms55PehyxGIM",
@@ -129,14 +149,8 @@
         const POST_GPS_REST_PHASE_KEY = 'post-gps-rest';
 
         // ─── IMPLEMENTACIÓN DE MHJMAPS (SIMULADA EN JAVASCRIPT) ───────────────────────
-        // El código proporcionado para MhjMaps está en sintaxis Dart/Flutter y se enfoca
-        // en el cálculo de rutas fijas entre dos puntos, no en el seguimiento GPS en tiempo real
-        // ni en la representación de mapas en el navegador.
-        // La funcionalidad de seguimiento GPS en tiempo real ya la gestiona `navigator.geolocation.watchPosition`.
-        // A continuación, se presenta una implementación simulada en JavaScript que reproduce la
-        // estructura y el resultado del snippet de código MhjMaps proporcionado, pero sin
-        // capacidades de renderizado de mapas ni de integración real con un servicio de rutas.
-
+        // Este mock simula la funcionalidad de cálculo de ruta punto a punto
+        // como se especificó en el requisito, sin una integración real con una API.
         class MhjMapsLatLng {
             constructor(lat, lng) {
                 this.lat = lat;
@@ -152,38 +166,16 @@
         }
 
         class MhjMaps {
-            // Esta es una implementación simulada. En un escenario real, esto implicaría
-            // una llamada a una API de un servicio de enrutamiento.
             async route({ origin, destination }) {
                 console.log(`MhjMaps: Calculando ruta desde (${origin.lat}, ${origin.lng}) hasta (${destination.lat}, ${destination.lng})`);
-                // Simula un retraso de red
                 await new Promise(resolve => setTimeout(resolve, 1000));
-
-                // Valores fijos del ejemplo del usuario, ya que la lógica de cálculo
-                // no fue proporcionada. En una implementación real, esto involucraría
-                // cálculos geográficos complejos o una API de enrutamiento externa.
                 return new MhjMapsRoute('15 mins', '2.3 km');
             }
         }
 
-        // Ejemplo de uso del mock de MhjMaps, como se solicitó (solo para demostración en consola)
-        /*
-        (async () => {
-            console.log("--- Prueba de MhjMaps ---");
-            const nav = new MhjMaps();
-            const route = await nav.route({
-                origin: new MhjMapsLatLng(lat: 19.432608, lng: -99.133209),
-                destination: new MhjMapsLatLng(lat: 19.427045, lng: -99.127571),
-            });
-            console.log('Duración (MhjMaps mock):', route.durationText);  // "15 mins"
-            console.log('Distancia (MhjMaps mock):', route.distanceText);  // "2.3 km"
-            console.log("--- Fin de Prueba de MhjMaps ---");
-        })();
-        */
         // ────────────────────────────────────────────────────────────────────────────────
 
         // ─── Fases disponibles (sin calentamiento — siempre se incluye automáticamente) ───
-        // Las fases que el usuario puede elegir. 'warmup' ya no aparece aquí.
         const SELECTABLE_PHASES = [
             { key: 'training', label: 'Entrenamiento Principal', icon: '🏋️', desc: 'Piernas, brazos y tronco en ciclos' },
             { key: 'walk',     label: 'Caminata',               icon: '🚶', desc: 'Seguimiento GPS de tu caminata' },
@@ -198,8 +190,6 @@
             const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         };
-
-        // Las funciones formatPace, formatDistance, formatSpeed ya están definidas arriba.
 
         const whistle = () => {
             try {
@@ -351,12 +341,8 @@
         };
 
         // ─── PhaseSelectionScreen ─────────────────────────────────────────────────────
-        // Pantalla de selección de fases: la primera que ve el usuario al abrir la app.
-        // El calentamiento NO aparece (siempre se incluye automáticamente).
-        // Si el usuario elige "Entrenamiento Principal", después se le mostrará la pantalla de rutinas.
         function PhaseSelectionScreen({ onPhasesSelected, user, workouts, onCreateWorkout }) {
             const [selectedPhases, setSelectedPhases] = useState([]);
-            const [pendingStart, setPendingStart] = useState(false);
 
             const togglePhase = (key) => {
                 setSelectedPhases(prev =>
@@ -369,19 +355,15 @@
                     speak('Por favor, elige al menos una fase.', true);
                     return;
                 }
-                // Siempre incluye warmup; onPhasesSelected recibe solo las fases extra elegidas
                 onPhasesSelected(selectedPhases);
             };
 
             return React.createElement('div', { className: "h-screen flex flex-col bg-slate-950 overflow-hidden" },
-                // Header
                 React.createElement('div', { className: "p-6 pt-12 text-center shrink-0" },
                     React.createElement('p', { className: "text-[10px] font-black uppercase text-orange-500 tracking-widest mb-1" }, "Mi Entrenador Saludable"),
                     React.createElement('h1', { className: "text-3xl font-black italic uppercase text-white leading-tight" }, "¿Qué haremos hoy?"),
                     React.createElement('p', { className: "text-[11px] text-slate-500 mt-2 font-medium" }, "El calentamiento siempre se incluye automáticamente")
                 ),
-
-                // Phase cards
                 React.createElement('div', { className: "flex-1 overflow-y-auto scrollbar-hide px-5 py-2 space-y-3" },
                     SELECTABLE_PHASES.map(phase =>
                         React.createElement('div', {
@@ -389,7 +371,6 @@
                             onClick: () => togglePhase(phase.key),
                             className: `phase-card glass-card p-5 flex items-center gap-4 cursor-pointer ${selectedPhases.includes(phase.key) ? 'selected' : ''}`
                         },
-                            // Checkbox visual
                             React.createElement('div', {
                                 className: `w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${selectedPhases.includes(phase.key) ? 'bg-orange-500 border-orange-500' : 'border-slate-600'}`
                             },
@@ -405,8 +386,6 @@
                             selectedPhases.includes(phase.key) && React.createElement('div', { className: "w-2 h-2 rounded-full bg-orange-500 shrink-0" })
                         )
                     ),
-
-                    // Warmup siempre incluido — tarjeta decorativa no seleccionable
                     React.createElement('div', { className: "glass-card p-5 flex items-center gap-4 opacity-40 mt-1" },
                         React.createElement('div', { className: "w-6 h-6 rounded-full bg-yellow-500 flex items-center justify-center shrink-0" },
                             React.createElement('svg', { width:"12", height:"12", viewBox:"0 0 24 24", fill:"white" },
@@ -421,8 +400,6 @@
                         React.createElement('span', { className: "text-[9px] font-black uppercase text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded-full" }, "AUTO")
                     )
                 ),
-
-                // CTA
                 React.createElement('div', { className: "p-5 pb-10 shrink-0 space-y-3" },
                     React.createElement('button', {
                         onClick: handleStart,
@@ -436,13 +413,105 @@
             );
         }
 
-        // ─── GpsSummaryDisplay (NUEVO COMPONENTE DE RESUMEN DE GPS SIN MAPA) ──────────
-        // Este componente reemplaza a GpsMapSummary y muestra solo las estadísticas de GPS.
-        function GpsSummaryDisplay({ finalGpsSummary, onSave, onShare, onClose }) {
+        // ─── MapDisplay (NUEVO: Componente para mostrar un mapa Leaflet con seguimiento) ──────────────────
+        function MapDisplay({ gpsCoordinates, currentLocation, isLiveTracking, className }) {
+            const mapRef = useRef(null);
+            const mapInstance = useRef(null);
+            const polylineInstance = useRef(null);
+            const currentMarker = useRef(null);
+            const startMarker = useRef(null);
+            const endMarker = useRef(null);
+
+            const defaultLocation = [19.432608, -99.133209]; // Centro de CDMX como fallback
+            const defaultZoom = 13;
+
+            useEffect(() => {
+                // Initialize map if it doesn't exist
+                if (!mapInstance.current && mapRef.current) {
+                    const initialCoords = currentLocation || gpsCoordinates[0] || { lat: defaultLocation[0], lng: defaultLocation[1] };
+                    mapInstance.current = L.map(mapRef.current, {
+                        center: [initialCoords.lat, initialCoords.lng],
+                        zoom: defaultZoom,
+                        zoomControl: false, // Deshabilitar control de zoom predeterminado si se desea control personalizado
+                        attributionControl: false // Ocultar "Leaflet | OpenStreetMap" para una UI más limpia, añadirlo manualmente si es necesario
+                    });
+
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        maxZoom: 19,
+                        // attribution: '© OpenStreetMap contributors' // Añadir si attributionControl es true
+                    }).addTo(mapInstance.current);
+
+                    // Add custom zoom controls
+                    L.control.zoom({
+                        position: 'topright' // Puedes cambiar la posición
+                    }).addTo(mapInstance.current);
+                }
+
+                const map = mapInstance.current;
+                if (!map) return;
+
+                // Clear existing layers (polyline and markers)
+                if (polylineInstance.current) { map.removeLayer(polylineInstance.current); }
+                if (currentMarker.current) { map.removeLayer(currentMarker.current); }
+                if (startMarker.current) { map.removeLayer(startMarker.current); }
+                if (endMarker.current) { map.removeLayer(endMarker.current); }
+
+                const latlngs = gpsCoordinates.map(c => [c.lat, c.lng]);
+
+                // Draw polyline if there are enough points
+                if (latlngs.length > 1) {
+                    polylineInstance.current = L.polyline(latlngs, { color: '#f97316', weight: 5, opacity: 1.0 }).addTo(map);
+                }
+
+                // Add markers
+                const startIcon = L.divIcon({ className: 'custom-div-icon', html: '<div style="background-color:#EF4444; width:16px; height:16px; border-radius:50%; border:2px solid #fff; transform:translate(-8px, -8px);"></div>', iconSize: [16, 16], iconAnchor: [8, 8] });
+                const endIcon = L.divIcon({ className: 'custom-div-icon', html: '<div style="background-color:#4ADE80; width:16px; height:16px; border-radius:50%; border:2px solid #fff; transform:translate(-8px, -8px);"></div>', iconSize: [16, 16], iconAnchor: [8, 8] });
+                const currentIcon = L.divIcon({ className: 'custom-div-icon', html: '<div style="background-color:#60A5FA; width:12px; height:12px; border-radius:50%; border:2px solid #fff; transform:translate(-6px, -6px);"></div>', iconSize: [12, 12], iconAnchor: [6, 6] });
+
+
+                if (latlngs.length > 0) {
+                    // Start marker
+                    startMarker.current = L.marker(latlngs[0], { icon: startIcon }).addTo(map);
+
+                    if (!isLiveTracking && latlngs.length > 1) {
+                        // End marker for finished routes
+                        endMarker.current = L.marker(latlngs[latlngs.length - 1], { icon: endIcon }).addTo(map);
+                    }
+                }
+
+                // Handle current location marker and map view
+                if (currentLocation && isLiveTracking) {
+                    currentMarker.current = L.marker([currentLocation.lat, currentLocation.lng], { icon: currentIcon }).addTo(map);
+                    map.setView([currentLocation.lat, currentLocation.lng], map.getZoom() || defaultZoom, {
+                        animate: true,
+                        pan: { duration: 0.5 }
+                    });
+                } else if (!isLiveTracking && latlngs.length > 0) {
+                    // Fit bounds for a completed route
+                    map.fitBounds(polylineInstance.current ? polylineInstance.current.getBounds() : L.latLngBounds(latlngs), { padding: [50, 50] });
+                } else {
+                    // Fallback to default location if no data
+                    map.setView(defaultLocation, defaultZoom);
+                }
+                
+                return () => {
+                    if (mapInstance.current) {
+                        mapInstance.current.remove();
+                        mapInstance.current = null;
+                    }
+                };
+            }, [gpsCoordinates, currentLocation, isLiveTracking]); // Re-render map when coords or live status changes
+
+            return React.createElement('div', { ref: mapRef, className: `leaflet-map-container ${className}` });
+        }
+
+
+        // ─── GpsActivityDisplay (Anteriormente GpsSummaryDisplay, ahora incluye mapa) ──────────
+        function GpsActivityDisplay({ gpsCoordinates, finalGpsSummary, onSave, onShare, onClose, showMap = true }) {
             const handleSave = useCallback(() => {
                 alert(`Guardando resumen de actividad:\nDistancia: ${finalGpsSummary.distanceText}\nTiempo: ${finalGpsSummary.timeText}\nRitmo: ${finalGpsSummary.pace} /km\nVelocidad: ${finalGpsSummary.speed}`);
                 speak('Resumen guardado.');
-                if (onSave) onSave(); // Callback para guardar en Firebase o similar si se requiere
+                if (onSave) onSave();
             }, [finalGpsSummary, onSave]);
 
             const handleShare = useCallback(() => {
@@ -455,7 +524,7 @@
                         title: 'Mi ruta de entrenamiento',
                         text: `¡Mi actividad de hoy!\nDistancia: ${finalGpsSummary.distanceText}\nTiempo: ${finalGpsSummary.timeText}\nRitmo: ${finalGpsSummary.pace} /km\nVelocidad: ${finalGpsSummary.speed}`
                     });
-                    if (onShare) onShare(); // Callback para compartir si se requiere
+                    if (onShare) onShare();
                 } catch (err) {
                     if (err.name !== 'AbortError') alert('No se pudo compartir.');
                 }
@@ -466,6 +535,12 @@
             return React.createElement('div', { className: "h-screen flex flex-col bg-slate-950 text-white p-6" },
                 React.createElement('h2', { className: "text-3xl font-black italic text-orange-500 mb-4 text-center" }, "Tu Actividad GPS"),
                 React.createElement('div', { className: "glass-card p-4 mb-4" },
+                    showMap && gpsCoordinates && gpsCoordinates.length > 0 &&
+                        React.createElement(MapDisplay, {
+                            gpsCoordinates,
+                            isLiveTracking: false, // Es una ruta finalizada
+                            className: "h-64 mb-4"
+                        }),
                     React.createElement('div', { className: "grid grid-cols-2 gap-4 text-center" },
                         React.createElement('div', null, React.createElement('span', { className: "text-[9px] opacity-40 block uppercase" }, "Distancia"), React.createElement('span', { className: "text-xl font-black text-sky-400" }, finalGpsSummary.distanceText)),
                         React.createElement('div', null, React.createElement('span', { className: "text-[9px] opacity-40 block uppercase" }, "Tiempo"), React.createElement('span', { className: "text-xl font-black text-emerald-400" }, finalGpsSummary.timeText)),
@@ -481,20 +556,20 @@
             );
         }
 
-        // ─── PlayerView (calentamiento siempre incluido, sin ModeSelectionScreen interno) ─
-        function PlayerView({ workout, selectedPhases, onExit, onComplete }) { // isGoogleMapsLoaded eliminado
+        // ─── PlayerView ─────────────────────────────────────────────────────────────────
+        function PlayerView({ workout, selectedPhases, onExit, onComplete }) {
             const [uiStatus, setUiStatus] = useState('ready');
             const [uiIdx, setUiIdx] = useState(0);
             const [uiTimeLeft, setUiTimeLeft] = useState(0);
             const [uiElapsed, setUiElapsed] = useState(0);
             const [steps, setSteps] = useState([]);
-            // ELIMINADO: showPostWorkoutMap
             const [isGpsActive, setIsGpsActive] = useState(false);
             const [gpsCoordinates, setGpsCoordinates] = useState([]);
+            const [currentLocation, setCurrentLocation] = useState(null); // NUEVO: para el marcador de ubicación actual en tiempo real
             const [hasGpsData, setHasGpsData] = useState(false);
             const [finalGpsSummary, setFinalGpsSummary] = useState(null);
             const [shouldAutoStart, setShouldAutoStart] = useState(false);
-            const [showGpsResults, setShowGpsResults] = useState(false); // NUEVO: estado para mostrar el resumen de GPS (sin mapa)
+            const [showGpsResults, setShowGpsResults] = useState(false);
 
             const statusRef = useRef(uiStatus);
             const idxRef = useRef(uiIdx);
@@ -556,7 +631,7 @@
                 setUiStatus('finished');
                 speak('Entrenamiento finalizado. ¡Buen trabajo!', true, () => {
                     if (hasGpsDataRef.current && finalGpsSummary) {
-                        setShowGpsResults(true); // Mostrar el nuevo componente de resumen de GPS
+                        setShowGpsResults(true);
                     } else {
                         if (!savedRef.current && workout) {
                             onComplete(workout.name, elapsedRef.current, null);
@@ -584,8 +659,8 @@
                     setFinalGpsSummary({
                         distance: finalDistance,
                         time: finalTime,
-                        distanceText: formatDistance(finalDistance), // Almacenar texto formateado
-                        timeText: formatTime(finalTime),             // Almacenar texto formateado
+                        distanceText: formatDistance(finalDistance),
+                        timeText: formatTime(finalTime),
                         pace: formatPace(finalDistance,finalTime),
                         speed: formatSpeed(finalDistance,finalTime)
                     });
@@ -594,15 +669,14 @@
                 speak('Seguimiento finalizado.', true, () => {
                     if (finalDistance > 0 && finalTime > 0) announceGpsStats(finalDistance, finalTime);
                     setIsGpsActive(false);
+                    setCurrentLocation(null); // Limpiar ubicación actual
 
-                    // Si se saltó el paso, o si la fase GPS es la última o no hay más fases después de GPS
                     const nextStepIndex = idxRef.current + 1;
                     if (isSkip || nextStepIndex >= stepsRef.current.length || stepsRef.current[nextStepIndex].phase === POST_GPS_REST_PHASE_KEY) {
-                        setUiStatus('finished'); // Establecer el estado para mostrar el resumen de GPS o el final de la rutina
+                        setUiStatus('finished');
                         if (hasGpsDataRef.current) {
                             setShowGpsResults(true);
                         } else {
-                             // Si no hay datos GPS pero la actividad terminó, ir directamente a onExit
                             if (!savedRef.current && workout) {
                                 onComplete(workout.name, elapsedRef.current, null);
                                 savedRef.current = true;
@@ -610,7 +684,7 @@
                             onExit();
                         }
                     } else {
-                        setUiStatus('running'); // Si hay más fases después de la actividad GPS, reanudar el entrenamiento normal
+                        setUiStatus('running');
                         advanceToStep(idxRef.current + 1);
                     }
                 });
@@ -654,7 +728,10 @@
                             if (dist > 1) gpsTotalDistance.current += dist;
                         }
                         lastPosition.current = {latitude, longitude, timestamp: now};
-                        setGpsCoordinates(prev => [...prev, {lat:latitude, lng:longitude, timestamp:now}]);
+                        const newCoord = {lat:latitude, lng:longitude, timestamp:now};
+                        setGpsCoordinates(prev => [...prev, newCoord]);
+                        setCurrentLocation(newCoord); // Actualizar ubicación actual para el mapa en vivo
+
                         if (statusRef.current === 'gps-running' && currentGpsTotalTime > 0 && (now - gpsAnnounceLastTime.current) >= 600000) {
                             announceGpsStats(gpsTotalDistance.current, currentGpsTotalTime);
                             gpsAnnounceLastTime.current = now;
@@ -719,9 +796,10 @@
                 setUiStatus('ready'); setUiIdx(0); setElap(0); setTime(0);
                 savedRef.current = false; spokenInit.current = {}; lastSpokenKey.current = '';
                 workoutStartRef.current = null; stepStartRef.current = null; pausedAtRef.current = null;
-                // ELIMINADO: setShowPostWorkoutMap(false);
-                setShowGpsResults(false); // Reiniciar el estado del resumen de GPS
-                setGpsCoordinates([]); setHasGpsData(false); setFinalGpsSummary(null); setShouldAutoStart(false); setIsGpsActive(false);
+                setShowGpsResults(false);
+                setGpsCoordinates([]);
+                setCurrentLocation(null); // Reset current location
+                setHasGpsData(false); setFinalGpsSummary(null); setShouldAutoStart(false); setIsGpsActive(false);
                 if (gpsWatcherId.current) { navigator.geolocation.clearWatch(gpsWatcherId.current); gpsWatcherId.current = null; }
                 if (intervalIdRef.current) { clearInterval(intervalIdRef.current); intervalIdRef.current = null; }
                 if (!workout || !selectedPhases) { setSteps([]); return; }
@@ -750,7 +828,8 @@
                     const totalElap = Math.floor((now - (workoutStartRef.current||now)) / 1000);
                     if (!isNaN(totalElap)) { elapsedRef.current = totalElap; setElap(totalElap); }
                     if (statusRef.current !== 'running' && statusRef.current !== 'gps-running') return;
-                    if (statusRef.current === 'gps-running') return;
+                    if (statusRef.current === 'gps-running') return; // GPS handles its own timing
+                    
                     const passed = Math.floor((now - (stepStartRef.current||now)) / 1000);
                     const remaining = Math.max(0, stepDurRef.current - passed);
                     if (!isNaN(remaining)) { timeLeftRef.current = remaining; setTime(remaining); }
@@ -766,15 +845,13 @@
                 return () => { clearInterval(interval); intervalIdRef.current = null; };
             }, [uiStatus, endWorkout, setElap, setTime, startGpsTracking, advanceToStep, handleSpeech]);
 
-            // Manejador para cuando se cierra el resumen de GPS (ya no hay un mapa que guardar)
             const handleGpsSummaryClosed = useCallback(() => {
-                setShowGpsResults(false); // Ocultar el resumen de GPS
-                // Guardar los datos de GPS en el historial antes de salir, si no se hizo ya
+                setShowGpsResults(false);
                 if (!savedRef.current && workout) {
                     onComplete(workout.name, elapsedRef.current, { coordinates: gpsCoordinates, summary: finalGpsSummary });
                     savedRef.current = true;
                 }
-                onExit(); // Salir del reproductor
+                onExit();
             }, [workout, onComplete, onExit, gpsCoordinates, finalGpsSummary, elapsedRef]);
 
             if (!workout) return React.createElement('div', { className:"h-screen flex items-center justify-center bg-slate-950 text-white/50 text-sm italic" }, "Error: Rutina no seleccionada.");
@@ -784,17 +861,27 @@
                 React.createElement('button', { onClick:onExit, className:"bg-white/10 text-white py-4 px-8 rounded-full font-black uppercase italic text-xs" }, "Volver")
             );
 
-            // Mostrar el resumen de GPS después de una actividad GPS, en lugar del mapa
-            if (showGpsResults) return React.createElement(GpsSummaryDisplay, {
+            if (showGpsResults) return React.createElement(GpsActivityDisplay, {
                 finalGpsSummary,
-                onSave: () => { /* Las acciones de guardar/compartir se gestionan dentro de GpsSummaryDisplay */ },
-                onShare: () => { /* Las acciones de guardar/compartir se gestionan dentro de GpsSummaryDisplay */ },
+                gpsCoordinates, // Pasar coordenadas para mostrar en el mapa
+                onSave: () => {},
+                onShare: () => {},
                 onClose: handleGpsSummaryClosed
             });
 
-            if (isGpsActive && uiStatus === 'gps-running') return React.createElement('div', { className:"h-screen flex flex-col items-center justify-center bg-slate-950 text-white p-6" },
-                React.createElement('h2', { className:"text-3xl font-black uppercase text-orange-500 mb-4" }, "Seguimiento GPS"),
-                React.createElement('div', { className:"glass-card p-4 mb-6 w-full max-w-sm" },
+            const curr = steps[uiIdx] || { label:'Cargando...', color:'bg-slate-950' };
+            const showOverlay = uiStatus === 'ready' || uiStatus === 'paused';
+
+            // ─── PANTALLA DE SEGUIMIENTO GPS EN VIVO (con mapa) ────────────────────────────────
+            if (isGpsActive && uiStatus === 'gps-running') return React.createElement('div', { className:"h-screen flex flex-col bg-slate-950 text-white p-6" },
+                React.createElement('h2', { className:"text-3xl font-black uppercase text-orange-500 mb-4 text-center" }, "Seguimiento GPS en vivo"),
+                React.createElement('div', { className:"glass-card p-4 mb-4 flex-1 flex flex-col" },
+                    React.createElement(MapDisplay, {
+                        gpsCoordinates,
+                        currentLocation,
+                        isLiveTracking: true,
+                        className: "flex-1 mb-4" // El mapa ocupa el espacio restante
+                    }),
                     React.createElement('div', { className:"grid grid-cols-2 gap-4 text-center" },
                         React.createElement('div', null, React.createElement('span',{className:"text-[9px] opacity-40 block uppercase"},"Distancia"), React.createElement('span',{className:"text-xl font-black text-sky-400"},formatDistance(gpsTotalDistance.current))),
                         React.createElement('div', null, React.createElement('span',{className:"text-[9px] opacity-40 block uppercase"},"Tiempo"), React.createElement('span',{className:"text-xl font-black text-emerald-400"},formatTime(gpsTotalTime.current))),
@@ -802,16 +889,14 @@
                         React.createElement('div', null, React.createElement('span',{className:"text-[9px] opacity-40 block uppercase"},"Velocidad"), React.createElement('span',{className:"text-xl font-black text-yellow-400"},formatSpeed(gpsTotalDistance.current,gpsTotalTime.current)))
                     )
                 ),
-                React.createElement('button', { onClick:()=>stopGpsTrackingRef.current(), className:"w-full max-w-sm bg-red-600/80 text-white py-6 rounded-full font-black uppercase active:scale-95 italic" }, "TERMINAR ACTIVIDAD GPS")
+                React.createElement('button', { onClick:()=>stopGpsTrackingRef.current(), className:"w-full max-w-sm mx-auto bg-red-600/80 text-white py-6 rounded-full font-black uppercase active:scale-95 italic" }, "TERMINAR ACTIVIDAD GPS")
             );
+            // ───────────────────────────────────────────────────────────────────────────
 
             if (uiStatus === 'finished') return React.createElement('div', { className:"h-screen flex flex-col items-center justify-center p-8 bg-slate-950 text-white text-center" },
                 React.createElement('h1', { className:"text-5xl font-black italic mb-4" }, "¡HECHO!"),
                 React.createElement('button', { onClick:onExit, className:"w-full max-w-sm bg-white text-black py-6 rounded-full font-black uppercase" }, "Finalizar")
             );
-
-            const curr = steps[uiIdx] || { label:'Cargando...', color:'bg-slate-950' };
-            const showOverlay = uiStatus === 'ready' || uiStatus === 'paused';
 
             return React.createElement('div', { className:`h-screen flex flex-col transition-colors duration-700 ${curr.color||'bg-slate-950'} text-white` },
                 React.createElement('div', { className:"bg-black/10 p-4 pt-10 flex justify-between items-center shrink-0 z-10" },
@@ -855,10 +940,85 @@
             );
         }
 
-        // ─── AvanceView (sin cambios) ─────────────────────────────────────────────────
+        // ─── MapPlayback (NUEVO: Componente para visualizar rutas guardadas en AvanceView) ──────────────────
+        function MapPlayback({ routeCoordinates, routeSummary, onClose }) {
+            const mapRef = useRef(null);
+            const mapInstance = useRef(null);
+
+            const defaultLocation = [19.432608, -99.133209]; // Fallback para CDMX
+            const defaultZoom = 13;
+
+            useEffect(() => {
+                if (!mapRef.current) return;
+
+                if (mapInstance.current) {
+                    mapInstance.current.remove(); // Limpiar mapa existente si ya fue inicializado
+                }
+
+                mapInstance.current = L.map(mapRef.current, {
+                    zoomControl: false,
+                    attributionControl: false // Ocultar atribución, añadir manualmente si se requiere
+                });
+
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                }).addTo(mapInstance.current);
+                
+                L.control.zoom({ position: 'topright' }).addTo(mapInstance.current);
+
+                const latlngs = routeCoordinates ? routeCoordinates.map(c => [c.lat, c.lng]) : [];
+
+                if (latlngs.length > 0) {
+                    const polyline = L.polyline(latlngs, { color: '#f97316', weight: 5, opacity: 1.0 }).addTo(mapInstance.current);
+                    mapInstance.current.fitBounds(polyline.getBounds(), { padding: [50, 50] });
+
+                    // Add start marker
+                    const startIcon = L.divIcon({ className: 'custom-div-icon', html: '<div style="background-color:#EF4444; width:16px; height:16px; border-radius:50%; border:2px solid #fff; transform:translate(-8px, -8px);"></div>', iconSize: [16, 16], iconAnchor: [8, 8] });
+                    L.marker(latlngs[0], { icon: startIcon }).addTo(mapInstance.current);
+
+                    // Add end marker
+                    const endIcon = L.divIcon({ className: 'custom-div-icon', html: '<div style="background-color:#4ADE80; width:16px; height:16px; border-radius:50%; border:2px solid #fff; transform:translate(-8px, -8px);"></div>', iconSize: [16, 16], iconAnchor: [8, 8] });
+                    L.marker(latlngs[latlngs.length - 1], { icon: endIcon }).addTo(mapInstance.current);
+                } else {
+                    mapInstance.current.setView(defaultLocation, defaultZoom);
+                }
+
+                return () => {
+                    if (mapInstance.current) {
+                        mapInstance.current.remove();
+                        mapInstance.current = null;
+                    }
+                };
+            }, [routeCoordinates]);
+
+            if (!routeCoordinates || routeCoordinates.length === 0) {
+                return React.createElement('div', { className: "text-center p-4 text-white/50" }, "No hay datos de ruta disponibles.");
+            }
+
+            return React.createElement('div', { className: "fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex flex-col p-6" },
+                React.createElement('div', { className: "flex justify-between items-center mb-4" },
+                    React.createElement('h2', { className: "text-xl font-black italic text-orange-500" }, "Ruta Histórica"),
+                    React.createElement('button', { onClick: onClose, className: "text-white opacity-60 text-3xl font-black" }, "✕")
+                ),
+                React.createElement('div', { className: "glass-card p-4 mb-4 flex-1 flex flex-col" },
+                    React.createElement('div', { ref: mapRef, className: "leaflet-map-container flex-1 mb-4" }),
+                    routeSummary && React.createElement('div', { className: "grid grid-cols-2 gap-4 text-center" },
+                        React.createElement('div', null, React.createElement('span', { className: "text-[9px] opacity-40 block uppercase" }, "Distancia"), React.createElement('span', { className: "text-xl font-black text-sky-400" }, routeSummary.distanceText)),
+                        React.createElement('div', null, React.createElement('span', { className: "text-[9px] opacity-40 block uppercase" }, "Tiempo"), React.createElement('span', { className: "text-xl font-black text-emerald-400" }, routeSummary.timeText)),
+                        React.createElement('div', null, React.createElement('span', { className: "text-[9px] opacity-40 block uppercase" }, "Ritmo"), React.createElement('span', { className: "text-xl font-black text-purple-400" }, routeSummary.pace, " /km")),
+                        React.createElement('div', null, React.createElement('span', { className: "text-[9px] opacity-40 block uppercase" }, "Velocidad"), React.createElement('span', { className: "text-xl font-black text-yellow-400" }, routeSummary.speed))
+                    )
+                ),
+                React.createElement('button', { onClick: onClose, className: "w-full max-w-sm mx-auto bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic" }, "CERRAR MAPA")
+            );
+        }
+
+        // ─── AvanceView (con la posibilidad de ver el mapa de una ruta histórica) ─────────────────────────────────────────────────
         function AvanceView({ history }) {
             const [periodType, setPeriodType] = useState('semana');
             const [periodOffset, setPeriodOffset] = useState(0);
+            const [showHistoricalMap, setShowHistoricalMap] = useState(false);
+            const [selectedHistoricalGpsData, setSelectedHistoricalGpsData] = useState(null);
             const chartRef = useRef(null);
             const chartInst = useRef(null);
             const PERIOD_TYPES = ['semana', 'mes', 'año'];
@@ -872,6 +1032,7 @@
             }, [periodType, periodOffset]);
             const filteredHistory = useMemo(() => history.filter(h=>{const d=new Date(h.date);return d>=currentPeriodRange.start&&d<=currentPeriodRange.end;}),[history,currentPeriodRange]);
             const periodSec = useMemo(() => filteredHistory.reduce((a,h)=>a+(h.totalTime||0),0),[filteredHistory]);
+            
             useEffect(() => {
                 const ctx = chartRef.current?.getContext('2d'); if (!ctx) return;
                 if (chartInst.current) chartInst.current.destroy();
@@ -900,12 +1061,24 @@
                 chartInst.current = new Chart(ctx, { type:'bar', data:{labels,datasets:[{label:'Minutos',data,backgroundColor:'#f97316',borderRadius:8}]}, options:{maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#64748b'}},x:{grid:{display:false},ticks:{color:'#64748b',font:{size:10}}}}} });
                 return () => chartInst.current?.destroy();
             }, [filteredHistory, periodType, currentPeriodRange]);
+
             const periodTitle = useMemo(() => {
                 const {start,end} = currentPeriodRange, sf={day:'numeric',month:'short'};
                 if (periodType==='semana') { const cw=getWeekRange(new Date(),0); if(start.getTime()===cw.start.getTime()) return 'Semana Actual'; if(start.getTime()===getWeekRange(new Date(),-1).start.getTime()) return 'Semana Anterior'; return start.getMonth()===end.getMonth()?`${start.getDate()} - ${end.toLocaleDateString('es-ES',{day:'numeric'})}`:`${start.toLocaleDateString('es-ES',sf)} - ${end.toLocaleDateString('es-ES',sf)}`; }
                 if (periodType==='mes') { if(start.getTime()===getMonthRange(new Date(),0).start.getTime()) return 'Mes Actual'; if(start.getTime()===getMonthRange(new Date(),-1).start.getTime()) return 'Mes Anterior'; return start.toLocaleDateString('es-ES',{month:'long',year:'numeric'}); }
                 if(start.getTime()===getYearRange(new Date(),0).start.getTime()) return 'Año Actual'; if(start.getTime()===getYearRange(new Date(),-1).start.getTime()) return 'Año Anterior'; return `${start.getFullYear()}`;
             }, [currentPeriodRange, periodType]);
+
+            const handleShowMap = useCallback((gpsData) => {
+                setSelectedHistoricalGpsData(gpsData);
+                setShowHistoricalMap(true);
+            }, []);
+
+            const handleCloseHistoricalMap = useCallback(() => {
+                setShowHistoricalMap(false);
+                setSelectedHistoricalGpsData(null);
+            }, []);
+
             return React.createElement('div', { className:"flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4 pb-28" },
                 React.createElement('div', { className:"glass-card p-6 text-center" },
                     React.createElement('span', { className:"text-[9px] opacity-40 block mb-1 uppercase" }, "Tiempo Total Acumulado"),
@@ -921,22 +1094,38 @@
                     React.createElement('div', { className:"text-left" }, React.createElement('span',{className:"text-[9px] opacity-40 uppercase block"},"Tiempo en el periodo"), React.createElement('span',{className:"text-2xl font-black text-sky-400"},formatTimeHnM(periodSec))),
                     React.createElement('div', { className:"text-right" }, React.createElement('span',{className:"text-[9px] opacity-40 uppercase block"},"Sesiones"), React.createElement('span',{className:"text-2xl font-black text-emerald-400"},filteredHistory.length))
                 ),
-                React.createElement('div', { className:"glass-card p-4" }, React.createElement('div', { style:{height:'200px'} }, React.createElement('canvas', { ref:chartRef })))
+                React.createElement('div', { className:"glass-card p-4" }, React.createElement('div', { style:{height:'200px'} }, React.createElement('canvas', { ref:chartRef }))),
+
+                // Lista de actividades históricas
+                React.createElement('div', { className:"mt-8" },
+                    React.createElement('h3', { className:"font-black uppercase text-xs text-orange-500 mb-4" }, "Historial de Actividades"),
+                    filteredHistory.length === 0
+                        ? React.createElement('p', { className:"text-white/50 italic text-sm" }, "No hay actividades en este periodo.")
+                        : filteredHistory.map(h => React.createElement('div', { key:h.id, className:"glass-card p-4 mb-2 flex justify-between items-center" },
+                            React.createElement('div', { className:"flex-1" },
+                                React.createElement('p', { className:"text-sm font-bold" }, h.workoutName || "Actividad GPS"),
+                                React.createElement('p', { className:"text-[10px] text-slate-400" }, `Fecha: ${new Date(h.date).toLocaleDateString()}`),
+                                h.gpsData && h.gpsData.summary && React.createElement('p', { className:"text-[10px] text-slate-400" }, `Distancia: ${h.gpsData.summary.distanceText} | Tiempo: ${h.gpsData.summary.timeText}`)
+                            ),
+                            h.gpsData && h.gpsData.coordinates && h.gpsData.coordinates.length > 1 &&
+                                React.createElement('button', {
+                                    onClick: () => handleShowMap(h.gpsData),
+                                    className: "bg-orange-500/10 text-orange-400 p-2 rounded-lg ml-4 flex items-center gap-1 text-[10px] font-black uppercase"
+                                }, React.createElement(IconMap), "Mapa")
+                        ))
+                ),
+
+                // MapPlayback condicional
+                showHistoricalMap && selectedHistoricalGpsData &&
+                    React.createElement(MapPlayback, {
+                        routeCoordinates: selectedHistoricalGpsData.coordinates,
+                        routeSummary: selectedHistoricalGpsData.summary,
+                        onClose: handleCloseHistoricalMap
+                    })
             );
         }
 
-        // ─── ELIMINADO: Global Google Maps flag y su inicialización ───────────────────
-        // let globalIsGoogleMapsLoaded = false;
-        // window.initGoogleMaps = () => {
-        //     globalIsGoogleMapsLoaded = true;
-        //     window.dispatchEvent(new Event('googleMapsLoaded'));
-        // };
-
         // ─── App ──────────────────────────────────────────────────────────────────────
-        // Flujo rediseñado:
-        //   1. PhaseSelectionScreen (siempre lo primero)
-        //   2a. Si incluye 'training' → WorkoutsView para elegir rutina → PlayerView
-        //   2b. Si NO incluye 'training' → PlayerView directo con rutina dummy
         function App() {
             const [user, setUser] = useState(null);
             const [view, setView] = useState('phases');   // 'phases' | 'workouts' | 'play' | 'avance'
@@ -945,17 +1134,7 @@
             const [loading, setLoading] = useState(true);
             const [selectedWorkout, setSelectedWorkout] = useState(null);
             const [selectedPhases, setSelectedPhases] = useState(null);
-            // ELIMINADO: isGoogleMapsLoaded y su useEffect
-            // const [isGoogleMapsLoaded, setIsGoogleMapsLoaded] = useState(globalIsGoogleMapsLoaded);
             const [editingWorkout, setEditingWorkout] = useState(null);
-
-            // ELIMINADO: useEffect para cargar Google Maps
-            // useEffect(() => {
-            //     const handler = () => setIsGoogleMapsLoaded(true);
-            //     if (globalIsGoogleMapsLoaded) setIsGoogleMapsLoaded(true);
-            //     else window.addEventListener('googleMapsLoaded', handler);
-            //     return () => window.removeEventListener('googleMapsLoaded', handler);
-            // }, []);
 
             useEffect(() => {
                 const unsub = auth.onAuthStateChanged(u => {
@@ -973,7 +1152,6 @@
                 return () => { unsubW(); unsubH(); };
             }, [user]);
 
-            // Cuando el usuario elige las fases desde PhaseSelectionScreen
             const handlePhasesSelected = useCallback((phases) => {
                 if (window.speechSynthesis) {
                     const silent = new SpeechSynthesisUtterance(' ');
@@ -981,23 +1159,19 @@
                 }
                 setSelectedPhases(phases);
                 if (phases.includes('training')) {
-                    // Necesita elegir una rutina antes de ir al player
                     setView('workouts');
                 } else {
-                    // No hay entrenamiento principal: usar rutina dummy y directo al player
                     setSelectedWorkout({ id:'_no_training', name:'Sesión', phases: DEFAULT_PARAMS });
                     setView('play');
                 }
             }, []);
 
-            // Cuando desde WorkoutsView el usuario elige con qué rutina entrenar
             const handleStartWorkout = useCallback((workout) => {
                 setSelectedWorkout(workout);
                 setView('play');
             }, []);
 
             const handleExitPlayer = useCallback(() => {
-                // Siempre regresa a la selección de fases
                 setSelectedPhases(null);
                 setSelectedWorkout(null);
                 setView('phases');
@@ -1010,7 +1184,6 @@
 
             return React.createElement('div', { className:"h-full w-full flex flex-col bg-slate-950 text-white overflow-hidden" },
 
-                // Header: solo cuando NO está en player ni en phases
                 (view === 'workouts' || view === 'avance' || view === 'create') && React.createElement('header', { className:"p-5 flex justify-between items-center bg-slate-900 border-b border-white/5 shrink-0" },
                     React.createElement('div', { onClick:()=>setView('phases'), className:"cursor-pointer" },
                         React.createElement('h1', { className:"text-lg font-black italic uppercase text-orange-500" }, APP_TITLE),
@@ -1035,14 +1208,13 @@
                         selectedPhases: selectedPhases,
                         onExit: handleExitPlayer,
                         onComplete: (name, time, gpsData) => {
+                            // Guardar coordenadas completas y el resumen GPS en Firestore
                             db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid)
-                              .collection('history').add({ workoutName:name, totalTime:time, date:new Date().toISOString(), gpsData:gpsData||null });
-                        },
-                        // ELIMINADO: isGoogleMapsLoaded
+                              .collection('history').add({ workoutName:name, totalTime:time, date:new Date().toISOString(), gpsData:gpsData || null });
+                        }
                     })
                 ),
 
-                // Nav: solo en fases, rutinas y avance
                 (view === 'phases' || view === 'workouts' || view === 'avance') && React.createElement('nav', { className:"bg-slate-900 border-t border-white/5 p-4 flex justify-around items-center shrink-0" },
                     React.createElement('button', { onClick:()=>setView('phases'),   className:`flex flex-col items-center text-[9px] font-black ${(view==='phases'||view==='workouts')?'text-orange-500':'text-slate-500'}` }, React.createElement('span',{className:"text-xl mb-1"},"🏠"), "INICIO"),
                     React.createElement('button', { onClick:()=>setView('avance'),   className:`flex flex-col items-center text-[9px] font-black ${view==='avance'?'text-orange-500':'text-slate-500'}` }, React.createElement('span',{className:"text-xl mb-1"},"📊"), "AVANCE")

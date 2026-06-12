@@ -421,40 +421,69 @@
             const currentMarker = useRef(null);
             const startMarker = useRef(null);
             const endMarker = useRef(null);
+            const resizeObserverRef = useRef(null); // Ref for ResizeObserver
 
             const defaultLocation = [19.432608, -99.133209]; // Centro de CDMX como fallback
             const defaultZoom = 13;
 
+            // Effect for map initialization (runs once)
             useEffect(() => {
-                // Initialize map if it doesn't exist
-                if (!mapInstance.current && mapRef.current) {
-                    const initialCoords = currentLocation || gpsCoordinates[0] || { lat: defaultLocation[0], lng: defaultLocation[1] };
-                    mapInstance.current = L.map(mapRef.current, {
-                        center: [initialCoords.lat, initialCoords.lng],
-                        zoom: defaultZoom,
-                        zoomControl: false, // Deshabilitar control de zoom predeterminado si se desea control personalizado
-                        attributionControl: false // Ocultar "Leaflet | OpenStreetMap" para una UI más limpia, añadirlo manualmente si es necesario
-                    });
+                if (!mapRef.current || !window.L) return; // Ensure Leaflet is loaded
 
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        maxZoom: 19,
-                        // attribution: '© OpenStreetMap contributors' // Añadir si attributionControl es true
-                    }).addTo(mapInstance.current);
+                if (!mapInstance.current) {
+                    try {
+                        const initialCoords = currentLocation || gpsCoordinates[0] || { lat: defaultLocation[0], lng: defaultLocation[1] };
+                        mapInstance.current = L.map(mapRef.current, {
+                            center: [initialCoords.lat, initialCoords.lng],
+                            zoom: defaultZoom,
+                            zoomControl: false,
+                            attributionControl: false
+                        });
 
-                    // Add custom zoom controls
-                    L.control.zoom({
-                        position: 'topright' // Puedes cambiar la posición
-                    }).addTo(mapInstance.current);
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            maxZoom: 19,
+                        }).addTo(mapInstance.current);
+
+                        L.control.zoom({ position: 'topright' }).addTo(mapInstance.current);
+
+                        // Invalidate size immediately after initialization
+                        mapInstance.current.invalidateSize();
+
+                        // Use ResizeObserver to automatically invalidate size if container changes
+                        resizeObserverRef.current = new ResizeObserver(() => {
+                            mapInstance.current?.invalidateSize();
+                        });
+                        resizeObserverRef.current.observe(mapRef.current);
+
+                    } catch (error) {
+                        console.error("Error initializing Leaflet map:", error);
+                        // Consider showing a fallback message on the UI if map fails to init
+                    }
                 }
 
-                const map = mapInstance.current;
-                if (!map) return;
+                // Cleanup function for this effect
+                return () => {
+                    if (resizeObserverRef.current) {
+                        resizeObserverRef.current.disconnect();
+                        resizeObserverRef.current = null;
+                    }
+                    if (mapInstance.current) {
+                        mapInstance.current.remove();
+                        mapInstance.current = null;
+                    }
+                };
+            }, []); // Empty dependency array means this runs once on mount
 
-                // Clear existing layers (polyline and markers)
-                if (polylineInstance.current) { map.removeLayer(polylineInstance.current); }
-                if (currentMarker.current) { map.removeLayer(currentMarker.current); }
-                if (startMarker.current) { map.removeLayer(startMarker.current); }
-                if (endMarker.current) { map.removeLayer(endMarker.current); }
+            // Effect for map updates (polyline, markers, view)
+            useEffect(() => {
+                const map = mapInstance.current;
+                if (!map) return; // Map must be initialized
+
+                // Remove previous layers before redrawing/updating
+                if (polylineInstance.current) { map.removeLayer(polylineInstance.current); polylineInstance.current = null; }
+                if (currentMarker.current) { map.removeLayer(currentMarker.current); currentMarker.current = null; }
+                if (startMarker.current) { map.removeLayer(startMarker.current); startMarker.current = null; }
+                if (endMarker.current) { map.removeLayer(endMarker.current); endMarker.current = null; }
 
                 const latlngs = gpsCoordinates.map(c => [c.lat, c.lng]);
 
@@ -463,10 +492,10 @@
                     polylineInstance.current = L.polyline(latlngs, { color: '#f97316', weight: 5, opacity: 1.0 }).addTo(map);
                 }
 
-                // Add markers
+                // Define icons (using L.divIcon for custom CSS styling)
                 const startIcon = L.divIcon({ className: 'custom-div-icon', html: '<div style="background-color:#EF4444; width:16px; height:16px; border-radius:50%; border:2px solid #fff; transform:translate(-8px, -8px);"></div>', iconSize: [16, 16], iconAnchor: [8, 8] });
                 const endIcon = L.divIcon({ className: 'custom-div-icon', html: '<div style="background-color:#4ADE80; width:16px; height:16px; border-radius:50%; border:2px solid #fff; transform:translate(-8px, -8px);"></div>', iconSize: [16, 16], iconAnchor: [8, 8] });
-                const currentIcon = L.divIcon({ className: 'custom-div-icon', html: '<div style="background-color:#60A5FA; width:12px; height:12px; border-radius:50%; border:2px solid #fff; transform:translate(-6px, -6px);"></div>', iconSize: [12, 12], iconAnchor: [6, 6] });
+                const currentLocIcon = L.divIcon({ className: 'custom-div-icon', html: '<div style="background-color:#60A5FA; width:12px; height:12px; border-radius:50%; border:2px solid #fff; transform:translate(-6px, -6px);"></div>', iconSize: [12, 12], iconAnchor: [6, 6] });
 
 
                 if (latlngs.length > 0) {
@@ -474,33 +503,28 @@
                     startMarker.current = L.marker(latlngs[0], { icon: startIcon }).addTo(map);
 
                     if (!isLiveTracking && latlngs.length > 1) {
-                        // End marker for finished routes
+                        // End marker for finished routes (not live tracking)
                         endMarker.current = L.marker(latlngs[latlngs.length - 1], { icon: endIcon }).addTo(map);
                     }
                 }
 
-                // Handle current location marker and map view
+                // Handle current location marker and map view for live tracking
                 if (currentLocation && isLiveTracking) {
-                    currentMarker.current = L.marker([currentLocation.lat, currentLocation.lng], { icon: currentIcon }).addTo(map);
+                    currentMarker.current = L.marker([currentLocation.lat, currentLocation.lng], { icon: currentLocIcon }).addTo(map);
                     map.setView([currentLocation.lat, currentLocation.lng], map.getZoom() || defaultZoom, {
                         animate: true,
                         pan: { duration: 0.5 }
                     });
                 } else if (!isLiveTracking && latlngs.length > 0) {
-                    // Fit bounds for a completed route
+                    // Fit bounds for a completed route (not live tracking)
                     map.fitBounds(polylineInstance.current ? polylineInstance.current.getBounds() : L.latLngBounds(latlngs), { padding: [50, 50] });
-                } else {
-                    // Fallback to default location if no data
-                    map.setView(defaultLocation, defaultZoom);
+                } else if (!isLiveTracking && !currentLocation && latlngs.length === 0) {
+                     // Fallback to default if no data and not live
+                     map.setView(defaultLocation, defaultZoom);
                 }
-                
-                return () => {
-                    if (mapInstance.current) {
-                        mapInstance.current.remove();
-                        mapInstance.current = null;
-                    }
-                };
-            }, [gpsCoordinates, currentLocation, isLiveTracking]); // Re-render map when coords or live status changes
+
+
+            }, [gpsCoordinates, currentLocation, isLiveTracking]); // Dependencies for updates
 
             return React.createElement('div', { ref: mapRef, className: `leaflet-map-container ${className}` });
         }
@@ -944,52 +968,87 @@
         function MapPlayback({ routeCoordinates, routeSummary, onClose }) {
             const mapRef = useRef(null);
             const mapInstance = useRef(null);
+            const polylineInstance = useRef(null);
+            const startMarker = useRef(null);
+            const endMarker = useRef(null);
+            const resizeObserverRef = useRef(null); // Ref for ResizeObserver
 
             const defaultLocation = [19.432608, -99.133209]; // Fallback para CDMX
             const defaultZoom = 13;
 
+            // Effect for map initialization (runs once)
             useEffect(() => {
-                if (!mapRef.current) return;
+                if (!mapRef.current || !window.L) return;
 
-                if (mapInstance.current) {
-                    mapInstance.current.remove(); // Limpiar mapa existente si ya fue inicializado
-                }
+                if (!mapInstance.current) {
+                    try {
+                        const initialCoords = routeCoordinates && routeCoordinates.length > 0 ? routeCoordinates[0] : { lat: defaultLocation[0], lng: defaultLocation[1] };
+                        mapInstance.current = L.map(mapRef.current, {
+                            center: [initialCoords.lat, initialCoords.lng],
+                            zoom: defaultZoom,
+                            zoomControl: false,
+                            attributionControl: false
+                        });
 
-                mapInstance.current = L.map(mapRef.current, {
-                    zoomControl: false,
-                    attributionControl: false // Ocultar atribución, añadir manualmente si se requiere
-                });
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            maxZoom: 19,
+                        }).addTo(mapInstance.current);
+                        
+                        L.control.zoom({ position: 'topright' }).addTo(mapInstance.current);
 
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 19,
-                }).addTo(mapInstance.current);
-                
-                L.control.zoom({ position: 'topright' }).addTo(mapInstance.current);
+                        mapInstance.current.invalidateSize();
 
-                const latlngs = routeCoordinates ? routeCoordinates.map(c => [c.lat, c.lng]) : [];
+                        resizeObserverRef.current = new ResizeObserver(() => {
+                            mapInstance.current?.invalidateSize();
+                        });
+                        resizeObserverRef.current.observe(mapRef.current);
 
-                if (latlngs.length > 0) {
-                    const polyline = L.polyline(latlngs, { color: '#f97316', weight: 5, opacity: 1.0 }).addTo(mapInstance.current);
-                    mapInstance.current.fitBounds(polyline.getBounds(), { padding: [50, 50] });
-
-                    // Add start marker
-                    const startIcon = L.divIcon({ className: 'custom-div-icon', html: '<div style="background-color:#EF4444; width:16px; height:16px; border-radius:50%; border:2px solid #fff; transform:translate(-8px, -8px);"></div>', iconSize: [16, 16], iconAnchor: [8, 8] });
-                    L.marker(latlngs[0], { icon: startIcon }).addTo(mapInstance.current);
-
-                    // Add end marker
-                    const endIcon = L.divIcon({ className: 'custom-div-icon', html: '<div style="background-color:#4ADE80; width:16px; height:16px; border-radius:50%; border:2px solid #fff; transform:translate(-8px, -8px);"></div>', iconSize: [16, 16], iconAnchor: [8, 8] });
-                    L.marker(latlngs[latlngs.length - 1], { icon: endIcon }).addTo(mapInstance.current);
-                } else {
-                    mapInstance.current.setView(defaultLocation, defaultZoom);
+                    } catch (error) {
+                        console.error("Error initializing Leaflet map in MapPlayback:", error);
+                    }
                 }
 
                 return () => {
+                    if (resizeObserverRef.current) {
+                        resizeObserverRef.current.disconnect();
+                        resizeObserverRef.current = null;
+                    }
                     if (mapInstance.current) {
                         mapInstance.current.remove();
                         mapInstance.current = null;
                     }
                 };
-            }, [routeCoordinates]);
+            }, []);
+
+            // Effect for map updates (polyline, markers, view)
+            useEffect(() => {
+                const map = mapInstance.current;
+                if (!map) return;
+
+                // Remove previous layers before redrawing/updating
+                if (polylineInstance.current) { map.removeLayer(polylineInstance.current); polylineInstance.current = null; }
+                if (startMarker.current) { map.removeLayer(startMarker.current); startMarker.current = null; }
+                if (endMarker.current) { map.removeLayer(endMarker.current); endMarker.current = null; }
+
+                const latlngs = routeCoordinates ? routeCoordinates.map(c => [c.lat, c.lng]) : [];
+
+                if (latlngs.length > 0) {
+                    polylineInstance.current = L.polyline(latlngs, { color: '#f97316', weight: 5, opacity: 1.0 }).addTo(map);
+                    map.fitBounds(polylineInstance.current.getBounds(), { padding: [50, 50] });
+
+                    // Add start marker
+                    const startIcon = L.divIcon({ className: 'custom-div-icon', html: '<div style="background-color:#EF4444; width:16px; height:16px; border-radius:50%; border:2px solid #fff; transform:translate(-8px, -8px);"></div>', iconSize: [16, 16], iconAnchor: [8, 8] });
+                    startMarker.current = L.marker(latlngs[0], { icon: startIcon }).addTo(map);
+
+                    // Add end marker
+                    const endIcon = L.divIcon({ className: 'custom-div-icon', html: '<div style="background-color:#4ADE80; width:16px; height:16px; border-radius:50%; border:2px solid #fff; transform:translate(-8px, -8px);"></div>', iconSize: [16, 16], iconAnchor: [8, 8] });
+                    endMarker.current = L.marker(latlngs[latlngs.length - 1], { icon: endIcon }).addTo(map);
+                } else {
+                    map.setView(defaultLocation, defaultZoom);
+                }
+
+            }, [routeCoordinates]); // Depend on routeCoordinates for updates
+
 
             if (!routeCoordinates || routeCoordinates.length === 0) {
                 return React.createElement('div', { className: "text-center p-4 text-white/50" }, "No hay datos de ruta disponibles.");
