@@ -13,7 +13,8 @@
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB7teEYbyemFiH0_nZxXvG3_-qumcnRMRE&libraries=geometry&callback=initGoogleMaps" async defer></script>
+    <!-- ELIMINADO: Script de Google Maps -->
+    <!-- <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB7teEYbyemFiH0_nZxXvG3_-qumcnRMRE&libraries=geometry&callback=initGoogleMaps" async defer></script> -->
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
     <style>
@@ -34,7 +35,8 @@
             letter-spacing: -0.06em; pointer-events: none;
         }
         @media (orientation: landscape) { .timer-huge { font-size: 75vh; } }
-        .map-container { width: 100%; height: 100%; border-radius: 1.5rem; }
+        /* ELIMINADO: Estilo para el contenedor del mapa de Google Maps */
+        /* .map-container { width: 100%; height: 100%; border-radius: 1.5rem; } */
 
         /* Phase selector styles */
         .phase-card {
@@ -107,10 +109,78 @@
                 stretchSteps: 16, stretchAction: 30, stretchChange: 10
             }
         };
+
+        // Funciones de formato de tiempo, distancia, ritmo y velocidad
         const formatTime = (s) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
+        const formatPace = (totalDistanceMeters, totalTimeSeconds) => {
+            if (totalDistanceMeters <= 0 || totalTimeSeconds <= 0) return '0:00';
+            const paceSecondsPerKm = totalTimeSeconds / (totalDistanceMeters / 1000);
+            const minutes = Math.floor(paceSecondsPerKm / 60);
+            const seconds = Math.round(paceSecondsPerKm % 60);
+            return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        };
+        const formatDistance = (meters) => meters < 1000 ? `${Math.round(meters)} m` : `${(meters/1000).toFixed(2)} km`;
+        const formatSpeed = (meters, seconds) => {
+            if (meters <= 0 || seconds <= 0) return '0.0 km/h';
+            return `${((meters/1000)/(seconds/3600)).toFixed(1)} km/h`;
+        };
 
         const GPS_PHASE_KEY = 'gps-tracking';
         const POST_GPS_REST_PHASE_KEY = 'post-gps-rest';
+
+        // ─── IMPLEMENTACIÓN DE MHJMAPS (SIMULADA EN JAVASCRIPT) ───────────────────────
+        // El código proporcionado para MhjMaps está en sintaxis Dart/Flutter y se enfoca
+        // en el cálculo de rutas fijas entre dos puntos, no en el seguimiento GPS en tiempo real
+        // ni en la representación de mapas en el navegador.
+        // La funcionalidad de seguimiento GPS en tiempo real ya la gestiona `navigator.geolocation.watchPosition`.
+        // A continuación, se presenta una implementación simulada en JavaScript que reproduce la
+        // estructura y el resultado del snippet de código MhjMaps proporcionado, pero sin
+        // capacidades de renderizado de mapas ni de integración real con un servicio de rutas.
+
+        class MhjMapsLatLng {
+            constructor(lat, lng) {
+                this.lat = lat;
+                this.lng = lng;
+            }
+        }
+
+        class MhjMapsRoute {
+            constructor(durationText, distanceText) {
+                this.durationText = durationText;
+                this.distanceText = distanceText;
+            }
+        }
+
+        class MhjMaps {
+            // Esta es una implementación simulada. En un escenario real, esto implicaría
+            // una llamada a una API de un servicio de enrutamiento.
+            async route({ origin, destination }) {
+                console.log(`MhjMaps: Calculando ruta desde (${origin.lat}, ${origin.lng}) hasta (${destination.lat}, ${destination.lng})`);
+                // Simula un retraso de red
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                // Valores fijos del ejemplo del usuario, ya que la lógica de cálculo
+                // no fue proporcionada. En una implementación real, esto involucraría
+                // cálculos geográficos complejos o una API de enrutamiento externa.
+                return new MhjMapsRoute('15 mins', '2.3 km');
+            }
+        }
+
+        // Ejemplo de uso del mock de MhjMaps, como se solicitó (solo para demostración en consola)
+        /*
+        (async () => {
+            console.log("--- Prueba de MhjMaps ---");
+            const nav = new MhjMaps();
+            const route = await nav.route({
+                origin: new MhjMapsLatLng(lat: 19.432608, lng: -99.133209),
+                destination: new MhjMapsLatLng(lat: 19.427045, lng: -99.127571),
+            });
+            console.log('Duración (MhjMaps mock):', route.durationText);  // "15 mins"
+            console.log('Distancia (MhjMaps mock):', route.distanceText);  // "2.3 km"
+            console.log("--- Fin de Prueba de MhjMaps ---");
+        })();
+        */
+        // ────────────────────────────────────────────────────────────────────────────────
 
         // ─── Fases disponibles (sin calentamiento — siempre se incluye automáticamente) ───
         // Las fases que el usuario puede elegir. 'warmup' ya no aparece aquí.
@@ -129,19 +199,7 @@
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         };
 
-        const formatPace = (totalDistanceMeters, totalTimeSeconds) => {
-            if (totalDistanceMeters <= 0 || totalTimeSeconds <= 0) return '0:00';
-            const paceSecondsPerKm = totalTimeSeconds / (totalDistanceMeters / 1000);
-            const minutes = Math.floor(paceSecondsPerKm / 60);
-            const seconds = Math.round(paceSecondsPerKm % 60);
-            return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-        };
-
-        const formatDistance = (meters) => meters < 1000 ? `${Math.round(meters)} m` : `${(meters/1000).toFixed(2)} km`;
-        const formatSpeed = (meters, seconds) => {
-            if (meters <= 0 || seconds <= 0) return '0.0 km/h';
-            return `${((meters/1000)/(seconds/3600)).toFixed(1)} km/h`;
-        };
+        // Las funciones formatPace, formatDistance, formatSpeed ya están definidas arriba.
 
         const whistle = () => {
             try {
@@ -276,7 +334,7 @@
                 const nextKey = phasesToRun[i + 1];
                 let introForNext = null;
                 if (nextKey) {
-                    const nextLabel = SELECTABLE_PHASES.find(p => p.key === nextKey)?.label || nextKey;
+                    const nextLabel = SELECTABLE_PHASES.find(p => p.key === nextKey)?.label || key;
                     introForNext = `A continuación, ${nextLabel.toLowerCase()}.`;
                 } else {
                     introForNext = 'Rutina finalizada.';
@@ -378,100 +436,65 @@
             );
         }
 
-        // ─── GpsMapSummary (sin cambios) ──────────────────────────────────────────────
-        function GpsMapSummary({ gpsCoordinates, finalGpsSummary, onSave, onShare, onClose, isGoogleMapsLoaded }) {
-            const mapRef = useRef(null);
-            const mapInstance = useRef(null);
-            const markers = useRef([]);
-            const polylines = useRef([]);
-
-            useEffect(() => {
-                if (!isGoogleMapsLoaded || !window.google || !window.google.maps || !gpsCoordinates || gpsCoordinates.length === 0 || !mapRef.current) return;
-                markers.current.forEach(m => m.setMap(null)); markers.current = [];
-                polylines.current.forEach(p => p.setMap(null)); polylines.current = [];
-                const initialLatLng = new google.maps.LatLng(gpsCoordinates[0].lat, gpsCoordinates[0].lng);
-                mapInstance.current = new google.maps.Map(mapRef.current, {
-                    center: initialLatLng, zoom: 13, disableDefaultUI: true, zoomControl: true,
-                    mapTypeId: google.maps.MapTypeId.ROADMAP,
-                    styles: [
-                        { elementType:"geometry", stylers:[{color:"#242f3e"}] },
-                        { elementType:"labels.text.stroke", stylers:[{color:"#242f3e"}] },
-                        { elementType:"labels.text.fill", stylers:[{color:"#746855"}] },
-                        { featureType:"road", elementType:"geometry", stylers:[{color:"#38414e"}] },
-                        { featureType:"road.highway", elementType:"geometry", stylers:[{color:"#746855"}] },
-                        { featureType:"water", elementType:"geometry", stylers:[{color:"#17263c"}] },
-                    ],
-                });
-                const latLngs = gpsCoordinates.map(c => new google.maps.LatLng(c.lat, c.lng));
-                const polyline = new google.maps.Polyline({ path:latLngs, geodesic:true, strokeColor:'#f97316', strokeOpacity:1.0, strokeWeight:5 });
-                polyline.setMap(mapInstance.current); polylines.current.push(polyline);
-                if (latLngs.length > 0) {
-                    markers.current.push(new google.maps.Marker({ position:latLngs[0], map:mapInstance.current, title:'Inicio', icon:{path:google.maps.SymbolPath.FORWARD_CLOSED_ARROW, scale:6, fillColor:'#EF4444', fillOpacity:1, strokeWeight:1, strokeColor:'#fff', rotation:-90} }));
-                    if (latLngs.length > 1)
-                        markers.current.push(new google.maps.Marker({ position:latLngs[latLngs.length-1], map:mapInstance.current, title:'Fin', icon:{path:google.maps.SymbolPath.CIRCLE, scale:8, fillColor:'#4ADE80', fillOpacity:1, strokeWeight:2, strokeColor:'#fff'} }));
-                    const bounds = new google.maps.LatLngBounds();
-                    latLngs.forEach(ll => bounds.extend(ll));
-                    mapInstance.current.fitBounds(bounds);
-                }
-                return () => { markers.current.forEach(m=>m.setMap(null)); markers.current=[]; polylines.current.forEach(p=>p.setMap(null)); polylines.current=[]; mapInstance.current=null; };
-            }, [gpsCoordinates, isGoogleMapsLoaded]);
-
+        // ─── GpsSummaryDisplay (NUEVO COMPONENTE DE RESUMEN DE GPS SIN MAPA) ──────────
+        // Este componente reemplaza a GpsMapSummary y muestra solo las estadísticas de GPS.
+        function GpsSummaryDisplay({ finalGpsSummary, onSave, onShare, onClose }) {
             const handleSave = useCallback(() => {
-                if (!mapRef.current) return;
-                html2canvas(mapRef.current, {useCORS:true, logging:false}).then(canvas => {
-                    const link = document.createElement('a');
-                    link.href = canvas.toDataURL('image/png');
-                    link.download = `ruta_${new Date().toISOString().slice(0,10)}.png`;
-                    document.body.appendChild(link); link.click(); document.body.removeChild(link);
-                    speak('Mapa guardado.');
-                }).catch(err => alert('No se pudo guardar el mapa.'));
-            }, []);
+                alert(`Guardando resumen de actividad:\nDistancia: ${finalGpsSummary.distanceText}\nTiempo: ${finalGpsSummary.timeText}\nRitmo: ${finalGpsSummary.pace} /km\nVelocidad: ${finalGpsSummary.speed}`);
+                speak('Resumen guardado.');
+                if (onSave) onSave(); // Callback para guardar en Firebase o similar si se requiere
+            }, [finalGpsSummary, onSave]);
 
             const handleShare = useCallback(() => {
-                if (!mapRef.current || !navigator.share) { alert('Compartir no disponible.'); return; }
-                html2canvas(mapRef.current, {useCORS:true, logging:false}).then(async canvas => {
-                    canvas.toBlob(async blob => {
-                        if (!blob) return;
-                        try {
-                            await navigator.share({ title:'Mi ruta de entrenamiento', text:`Distancia: ${formatDistance(finalGpsSummary.distance)}\nTiempo: ${formatTime(finalGpsSummary.time)}`, files:[new File([blob],`ruta_${new Date().toISOString().slice(0,10)}.png`,{type:'image/png'})] });
-                        } catch(err) { if (err.name !== 'AbortError') alert('No se pudo compartir.'); }
-                    }, 'image/png');
-                });
-            }, [finalGpsSummary]);
+                if (!navigator.share) {
+                    alert('Compartir no disponible en este dispositivo.');
+                    return;
+                }
+                try {
+                    navigator.share({
+                        title: 'Mi ruta de entrenamiento',
+                        text: `¡Mi actividad de hoy!\nDistancia: ${finalGpsSummary.distanceText}\nTiempo: ${finalGpsSummary.timeText}\nRitmo: ${finalGpsSummary.pace} /km\nVelocidad: ${finalGpsSummary.speed}`
+                    });
+                    if (onShare) onShare(); // Callback para compartir si se requiere
+                } catch (err) {
+                    if (err.name !== 'AbortError') alert('No se pudo compartir.');
+                }
+            }, [finalGpsSummary, onShare]);
 
             if (!finalGpsSummary) return null;
-            return React.createElement('div', { className:"h-screen flex flex-col bg-slate-950 text-white p-6" },
-                React.createElement('h2', { className:"text-3xl font-black italic text-orange-500 mb-4 text-center" }, "Tu Ruta GPS"),
-                React.createElement('div', { className:"glass-card p-4 mb-4" },
-                    React.createElement('div', { ref:mapRef, className:"w-full h-64 rounded-xl overflow-hidden mb-4 relative map-container" }),
-                    React.createElement('div', { className:"grid grid-cols-2 gap-4 text-center" },
-                        React.createElement('div', null, React.createElement('span', {className:"text-[9px] opacity-40 block uppercase"},"Distancia"), React.createElement('span', {className:"text-xl font-black text-sky-400"}, formatDistance(finalGpsSummary.distance))),
-                        React.createElement('div', null, React.createElement('span', {className:"text-[9px] opacity-40 block uppercase"},"Tiempo"), React.createElement('span', {className:"text-xl font-black text-emerald-400"}, formatTime(finalGpsSummary.time))),
-                        React.createElement('div', null, React.createElement('span', {className:"text-[9px] opacity-40 block uppercase"},"Ritmo"), React.createElement('span', {className:"text-xl font-black text-purple-400"}, finalGpsSummary.pace, " /km")),
-                        React.createElement('div', null, React.createElement('span', {className:"text-[9px] opacity-40 block uppercase"},"Velocidad"), React.createElement('span', {className:"text-xl font-black text-yellow-400"}, formatSpeed(finalGpsSummary.distance, finalGpsSummary.time)))
+
+            return React.createElement('div', { className: "h-screen flex flex-col bg-slate-950 text-white p-6" },
+                React.createElement('h2', { className: "text-3xl font-black italic text-orange-500 mb-4 text-center" }, "Tu Actividad GPS"),
+                React.createElement('div', { className: "glass-card p-4 mb-4" },
+                    React.createElement('div', { className: "grid grid-cols-2 gap-4 text-center" },
+                        React.createElement('div', null, React.createElement('span', { className: "text-[9px] opacity-40 block uppercase" }, "Distancia"), React.createElement('span', { className: "text-xl font-black text-sky-400" }, finalGpsSummary.distanceText)),
+                        React.createElement('div', null, React.createElement('span', { className: "text-[9px] opacity-40 block uppercase" }, "Tiempo"), React.createElement('span', { className: "text-xl font-black text-emerald-400" }, finalGpsSummary.timeText)),
+                        React.createElement('div', null, React.createElement('span', { className: "text-[9px] opacity-40 block uppercase" }, "Ritmo"), React.createElement('span', { className: "text-xl font-black text-purple-400" }, finalGpsSummary.pace, " /km")),
+                        React.createElement('div', null, React.createElement('span', { className: "text-[9px] opacity-40 block uppercase" }, "Velocidad"), React.createElement('span', { className: "text-xl font-black text-yellow-400" }, finalGpsSummary.speed))
                     )
                 ),
-                React.createElement('div', { className:"flex gap-4 mb-4" },
-                    React.createElement('button', { onClick:handleSave, className:"flex-1 bg-white/10 text-white py-4 rounded-full font-black uppercase italic active:scale-95 text-xs flex items-center justify-center gap-2" }, React.createElement(IconSave), "GUARDAR"),
-                    React.createElement('button', { onClick:handleShare, className:"flex-1 bg-white/10 text-white py-4 rounded-full font-black uppercase italic active:scale-95 text-xs flex items-center justify-center gap-2" }, React.createElement(IconShare), "COMPARTIR")
+                React.createElement('div', { className: "flex gap-4 mb-4" },
+                    React.createElement('button', { onClick: handleSave, className: "flex-1 bg-white/10 text-white py-4 rounded-full font-black uppercase italic active:scale-95 text-xs flex items-center justify-center gap-2" }, React.createElement(IconSave), "GUARDAR"),
+                    React.createElement('button', { onClick: handleShare, className: "flex-1 bg-white/10 text-white py-4 rounded-full font-black uppercase italic active:scale-95 text-xs flex items-center justify-center gap-2" }, React.createElement(IconShare), "COMPARTIR")
                 ),
-                React.createElement('button', { onClick:onClose, className:"w-full bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic mt-auto" }, "FINALIZAR")
+                React.createElement('button', { onClick: onClose, className: "w-full bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic mt-auto" }, "FINALIZAR")
             );
         }
 
         // ─── PlayerView (calentamiento siempre incluido, sin ModeSelectionScreen interno) ─
-        function PlayerView({ workout, selectedPhases, onExit, onComplete, isGoogleMapsLoaded }) {
+        function PlayerView({ workout, selectedPhases, onExit, onComplete }) { // isGoogleMapsLoaded eliminado
             const [uiStatus, setUiStatus] = useState('ready');
             const [uiIdx, setUiIdx] = useState(0);
             const [uiTimeLeft, setUiTimeLeft] = useState(0);
             const [uiElapsed, setUiElapsed] = useState(0);
             const [steps, setSteps] = useState([]);
-            const [showPostWorkoutMap, setShowPostWorkoutMap] = useState(false);
+            // ELIMINADO: showPostWorkoutMap
             const [isGpsActive, setIsGpsActive] = useState(false);
             const [gpsCoordinates, setGpsCoordinates] = useState([]);
             const [hasGpsData, setHasGpsData] = useState(false);
             const [finalGpsSummary, setFinalGpsSummary] = useState(null);
             const [shouldAutoStart, setShouldAutoStart] = useState(false);
+            const [showGpsResults, setShowGpsResults] = useState(false); // NUEVO: estado para mostrar el resumen de GPS (sin mapa)
 
             const statusRef = useRef(uiStatus);
             const idxRef = useRef(uiIdx);
@@ -492,7 +515,7 @@
             const gpsAnnounceLastTime = useRef(0);
             const gpsTotalDistance = useRef(0);
             const gpsTotalTime = useRef(0);
-            const hasGpsDataRef = useRef(false);
+            const hasGpsDataRef = useRef(hasGpsData);
             const isGpsActiveRef = useRef(isGpsActive);
             const stopGpsTrackingRef = useRef();
             const intervalIdRef = useRef(null);
@@ -533,7 +556,7 @@
                 setUiStatus('finished');
                 speak('Entrenamiento finalizado. ¡Buen trabajo!', true, () => {
                     if (hasGpsDataRef.current && finalGpsSummary) {
-                        setShowPostWorkoutMap(true);
+                        setShowGpsResults(true); // Mostrar el nuevo componente de resumen de GPS
                     } else {
                         if (!savedRef.current && workout) {
                             onComplete(workout.name, elapsedRef.current, null);
@@ -558,14 +581,40 @@
                 const finalDistance = gpsTotalDistance.current, finalTime = gpsTotalTime.current;
                 if (finalDistance > 0 && finalTime > 0 && gpsCoordinates.length > 1) {
                     setHasGpsData(true);
-                    setFinalGpsSummary({ distance:finalDistance, time:finalTime, pace:formatPace(finalDistance,finalTime), speed:formatSpeed(finalDistance,finalTime) });
+                    setFinalGpsSummary({
+                        distance: finalDistance,
+                        time: finalTime,
+                        distanceText: formatDistance(finalDistance), // Almacenar texto formateado
+                        timeText: formatTime(finalTime),             // Almacenar texto formateado
+                        pace: formatPace(finalDistance,finalTime),
+                        speed: formatSpeed(finalDistance,finalTime)
+                    });
                 } else { setHasGpsData(false); setFinalGpsSummary(null); }
+                
                 speak('Seguimiento finalizado.', true, () => {
                     if (finalDistance > 0 && finalTime > 0) announceGpsStats(finalDistance, finalTime);
-                    setIsGpsActive(false); setUiStatus('running');
-                    if (!isSkip) advanceToStep(idxRef.current + 1);
+                    setIsGpsActive(false);
+
+                    // Si se saltó el paso, o si la fase GPS es la última o no hay más fases después de GPS
+                    const nextStepIndex = idxRef.current + 1;
+                    if (isSkip || nextStepIndex >= stepsRef.current.length || stepsRef.current[nextStepIndex].phase === POST_GPS_REST_PHASE_KEY) {
+                        setUiStatus('finished'); // Establecer el estado para mostrar el resumen de GPS o el final de la rutina
+                        if (hasGpsDataRef.current) {
+                            setShowGpsResults(true);
+                        } else {
+                             // Si no hay datos GPS pero la actividad terminó, ir directamente a onExit
+                            if (!savedRef.current && workout) {
+                                onComplete(workout.name, elapsedRef.current, null);
+                                savedRef.current = true;
+                            }
+                            onExit();
+                        }
+                    } else {
+                        setUiStatus('running'); // Si hay más fases después de la actividad GPS, reanudar el entrenamiento normal
+                        advanceToStep(idxRef.current + 1);
+                    }
                 });
-            }, [advanceToStep, announceGpsStats, gpsCoordinates]);
+            }, [advanceToStep, announceGpsStats, gpsCoordinates, workout, onComplete, onExit, elapsedRef, finalGpsSummary]);
 
             useEffect(() => { stopGpsTrackingRef.current = stopGpsTracking; }, [stopGpsTracking]);
 
@@ -670,7 +719,9 @@
                 setUiStatus('ready'); setUiIdx(0); setElap(0); setTime(0);
                 savedRef.current = false; spokenInit.current = {}; lastSpokenKey.current = '';
                 workoutStartRef.current = null; stepStartRef.current = null; pausedAtRef.current = null;
-                setShowPostWorkoutMap(false); setGpsCoordinates([]); setHasGpsData(false); setFinalGpsSummary(null); setShouldAutoStart(false); setIsGpsActive(false);
+                // ELIMINADO: setShowPostWorkoutMap(false);
+                setShowGpsResults(false); // Reiniciar el estado del resumen de GPS
+                setGpsCoordinates([]); setHasGpsData(false); setFinalGpsSummary(null); setShouldAutoStart(false); setIsGpsActive(false);
                 if (gpsWatcherId.current) { navigator.geolocation.clearWatch(gpsWatcherId.current); gpsWatcherId.current = null; }
                 if (intervalIdRef.current) { clearInterval(intervalIdRef.current); intervalIdRef.current = null; }
                 if (!workout || !selectedPhases) { setSteps([]); return; }
@@ -715,15 +766,16 @@
                 return () => { clearInterval(interval); intervalIdRef.current = null; };
             }, [uiStatus, endWorkout, setElap, setTime, startGpsTracking, advanceToStep, handleSpeech]);
 
+            // Manejador para cuando se cierra el resumen de GPS (ya no hay un mapa que guardar)
             const handleGpsSummaryClosed = useCallback(() => {
-                setShowPostWorkoutMap(false);
-                const nextIdx = idxRef.current + 1;
-                if (nextIdx < stepsRef.current.length) { advanceToStep(nextIdx); }
-                else {
-                    if (!savedRef.current && workout) { onComplete(workout.name, elapsedRef.current, {coordinates:gpsCoordinates, summary:finalGpsSummary}); savedRef.current = true; }
-                    onExit();
+                setShowGpsResults(false); // Ocultar el resumen de GPS
+                // Guardar los datos de GPS en el historial antes de salir, si no se hizo ya
+                if (!savedRef.current && workout) {
+                    onComplete(workout.name, elapsedRef.current, { coordinates: gpsCoordinates, summary: finalGpsSummary });
+                    savedRef.current = true;
                 }
-            }, [advanceToStep, workout, onComplete, onExit, gpsCoordinates, finalGpsSummary]);
+                onExit(); // Salir del reproductor
+            }, [workout, onComplete, onExit, gpsCoordinates, finalGpsSummary, elapsedRef]);
 
             if (!workout) return React.createElement('div', { className:"h-screen flex items-center justify-center bg-slate-950 text-white/50 text-sm italic" }, "Error: Rutina no seleccionada.");
 
@@ -732,7 +784,13 @@
                 React.createElement('button', { onClick:onExit, className:"bg-white/10 text-white py-4 px-8 rounded-full font-black uppercase italic text-xs" }, "Volver")
             );
 
-            if (showPostWorkoutMap) return React.createElement(GpsMapSummary, { gpsCoordinates, finalGpsSummary, onSave:()=>{}, onShare:()=>{}, onClose:handleGpsSummaryClosed, isGoogleMapsLoaded });
+            // Mostrar el resumen de GPS después de una actividad GPS, en lugar del mapa
+            if (showGpsResults) return React.createElement(GpsSummaryDisplay, {
+                finalGpsSummary,
+                onSave: () => { /* Las acciones de guardar/compartir se gestionan dentro de GpsSummaryDisplay */ },
+                onShare: () => { /* Las acciones de guardar/compartir se gestionan dentro de GpsSummaryDisplay */ },
+                onClose: handleGpsSummaryClosed
+            });
 
             if (isGpsActive && uiStatus === 'gps-running') return React.createElement('div', { className:"h-screen flex flex-col items-center justify-center bg-slate-950 text-white p-6" },
                 React.createElement('h2', { className:"text-3xl font-black uppercase text-orange-500 mb-4" }, "Seguimiento GPS"),
@@ -867,12 +925,12 @@
             );
         }
 
-        // ─── Global Google Maps flag ───────────────────────────────────────────────────
-        let globalIsGoogleMapsLoaded = false;
-        window.initGoogleMaps = () => {
-            globalIsGoogleMapsLoaded = true;
-            window.dispatchEvent(new Event('googleMapsLoaded'));
-        };
+        // ─── ELIMINADO: Global Google Maps flag y su inicialización ───────────────────
+        // let globalIsGoogleMapsLoaded = false;
+        // window.initGoogleMaps = () => {
+        //     globalIsGoogleMapsLoaded = true;
+        //     window.dispatchEvent(new Event('googleMapsLoaded'));
+        // };
 
         // ─── App ──────────────────────────────────────────────────────────────────────
         // Flujo rediseñado:
@@ -887,15 +945,17 @@
             const [loading, setLoading] = useState(true);
             const [selectedWorkout, setSelectedWorkout] = useState(null);
             const [selectedPhases, setSelectedPhases] = useState(null);
-            const [isGoogleMapsLoaded, setIsGoogleMapsLoaded] = useState(globalIsGoogleMapsLoaded);
+            // ELIMINADO: isGoogleMapsLoaded y su useEffect
+            // const [isGoogleMapsLoaded, setIsGoogleMapsLoaded] = useState(globalIsGoogleMapsLoaded);
             const [editingWorkout, setEditingWorkout] = useState(null);
 
-            useEffect(() => {
-                const handler = () => setIsGoogleMapsLoaded(true);
-                if (globalIsGoogleMapsLoaded) setIsGoogleMapsLoaded(true);
-                else window.addEventListener('googleMapsLoaded', handler);
-                return () => window.removeEventListener('googleMapsLoaded', handler);
-            }, []);
+            // ELIMINADO: useEffect para cargar Google Maps
+            // useEffect(() => {
+            //     const handler = () => setIsGoogleMapsLoaded(true);
+            //     if (globalIsGoogleMapsLoaded) setIsGoogleMapsLoaded(true);
+            //     else window.addEventListener('googleMapsLoaded', handler);
+            //     return () => window.removeEventListener('googleMapsLoaded', handler);
+            // }, []);
 
             useEffect(() => {
                 const unsub = auth.onAuthStateChanged(u => {
@@ -978,7 +1038,7 @@
                             db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid)
                               .collection('history').add({ workoutName:name, totalTime:time, date:new Date().toISOString(), gpsData:gpsData||null });
                         },
-                        isGoogleMapsLoaded
+                        // ELIMINADO: isGoogleMapsLoaded
                     })
                 ),
 
