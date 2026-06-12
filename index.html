@@ -14,7 +14,7 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- ELIMINADO: Script de Google Maps -->
-    <!-- <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB7teEYbyemFiH0_nZxXvG3_-qumcnRMRE&libraries=geometry&callback=initGoogleMaps" async defer></script> -->
+    <!-- <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB7teEYbyemFiH0_nZxXvG3_-qumRMRE&libraries=geometry&callback=initGoogleMaps" async defer></script> -->
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
     <!-- Leaflet CSS -->
@@ -43,9 +43,10 @@
         /* AÑADIDO: Estilo para el contenedor del mapa Leaflet */
         .leaflet-map-container {
             width: 100%;
-            height: 100%; /* Ajusta según sea necesario para tu diseño */
+            /* MODIFICADO: Eliminado height: 100%; para que las clases de Tailwind lo controlen */
             border-radius: 1.5rem;
             overflow: hidden; /* Asegura que el mapa se ajuste a los bordes redondeados */
+            background-color: #0c0a09; /* AÑADIDO: Un color oscuro para depuración visual */
         }
         /* Ajuste para que el mapa se muestre correctamente */
         .leaflet-container {
@@ -446,8 +447,15 @@
 
                         L.control.zoom({ position: 'topright' }).addTo(mapInstance.current);
 
-                        // Invalidate size immediately after initialization
-                        mapInstance.current.invalidateSize();
+                        // MODIFICADO: Añadido setTimeout para invalidateSize y redraw
+                        setTimeout(() => {
+                            mapInstance.current?.invalidateSize();
+                            mapInstance.current?.eachLayer(layer => {
+                                if (layer instanceof L.TileLayer) {
+                                    layer.redraw(); // Forzar la recarga de las teselas
+                                }
+                            });
+                        }, 100); // Pequeño retardo para asegurar que el DOM esté listo
 
                         // Use ResizeObserver to automatically invalidate size if container changes
                         resizeObserverRef.current = new ResizeObserver(() => {
@@ -996,7 +1004,15 @@
                         
                         L.control.zoom({ position: 'topright' }).addTo(mapInstance.current);
 
-                        mapInstance.current.invalidateSize();
+                        // MODIFICADO: Añadido setTimeout para invalidateSize y redraw
+                        setTimeout(() => {
+                            mapInstance.current?.invalidateSize();
+                            mapInstance.current?.eachLayer(layer => {
+                                if (layer instanceof L.TileLayer) {
+                                    layer.redraw(); // Forzar la recarga de las teselas
+                                }
+                            });
+                        }, 100); // Pequeño retardo para asegurar que el DOM esté listo
 
                         resizeObserverRef.current = new ResizeObserver(() => {
                             mapInstance.current?.invalidateSize();
