@@ -600,7 +600,7 @@
                         React.createElement('div', null, React.createElement('span', { className: "text-[9px] opacity-40 block uppercase" }, "Distancia"), React.createElement('span', { className: "text-xl font-black text-sky-400" }, finalGpsSummary.distanceText)),
                         React.createElement('div', null, React.createElement('span', { className: "text-[9px] opacity-40 block uppercase" }, "Tiempo"), React.createElement('span', { className: "text-xl font-black text-emerald-400" }, finalGpsSummary.timeText)),
                         React.createElement('div', null, React.createElement('span', { className: "text-[9px] opacity-40 block uppercase" }, "Ritmo"), React.createElement('span', { className: "text-xl font-black text-purple-400" }, finalGpsSummary.pace, " /km")),
-                        React.createElement('div', null, React.createElement('span', { className: "text-[9px] opacity-40 block uppercase" }, "Velocidad"), React.createElement('span', { className: "text-xl font-black text-yellow-400" }, finalGpsSummary.speed))
+                        React.createElement('div', null, React.createElement('span', { className : "text-[9px] opacity-40 block uppercase" }, "Velocidad"), React.createElement('span', { className: "text-xl font-black text-yellow-400" }, finalGpsSummary.speed))
                     )
                 ),
                 React.createElement('div', { className: "flex gap-4 mb-4" },
@@ -1092,15 +1092,27 @@
                     filteredHistory.forEach(h=>{const k=new Date(h.date).toLocaleDateString('es-ES',{weekday:'short',day:'numeric'});agg.set(k,(agg.get(k)||0)+(h.totalTime||0));});
                     data = labels.map(l=>Math.floor((agg.get(l)||0)/60));
                 } else if (periodType==='mes') {
-                    let cur=startOfDay(new Date(currentPeriodRange.start)), wn=1;
-                    cur=startOfDay(new Date(cur.setDate(cur.getDate()-(cur.getDay()===0?6:cur.getDay()-1))));
-                    while (cur<=currentPeriodRange.end) {
-                        const ws=new Date(cur), we=endOfDay(new Date(cur.getFullYear(),cur.getMonth(),cur.getDate()+6));
-                        const es=startOfDay(new Date(Math.max(ws.getTime(),currentPeriodRange.start.getTime())));
-                        const ee=endOfDay(new Date(Math.min(we.getTime(),currentPeriodRange.end.getTime())));
-                        if (es<=ee) { labels.push(`Sem ${wn} (${es.getDate()}/${es.getMonth()+1})`); let wt=0; filteredHistory.forEach(h=>{const d=new Date(h.date);if(d>=es&&d<=ee)wt+=(h.totalTime||0);}); data.push(Math.floor(wt/60)); wn++; }
+                    let cur=startOfDay(new Date(currentPeriodRange.start));
+                    cur.setDate(cur.getDate()-(cur.getDay()===0?6:cur.getDay()-1)); // Start on Monday
+                    let wn=1;
+                    while (cur <= currentPeriodRange.end) {
+                        const ws=new Date(cur);
+                        const we=endOfDay(new Date(cur.getFullYear(),cur.getMonth(),cur.getDate()+6));
+                        
+                        // Ensure week range is within current month range
+                        const weekStartBound = startOfDay(new Date(Math.max(ws.getTime(), currentPeriodRange.start.getTime())));
+                        const weekEndBound = endOfDay(new Date(Math.min(we.getTime(), currentPeriodRange.end.getTime())));
+
+                        if (weekStartBound <= weekEndBound) { // Only process if the week segment is valid within the month
+                            labels.push(`Sem ${wn} (${weekStartBound.getDate()}/${weekStartBound.getMonth()+1})`);
+                            let wt=0;
+                            filteredHistory.forEach(h=>{const d=new Date(h.date);if(d>=weekStartBound&&d<=weekEndBound)wt+=(h.totalTime||0);});
+                            data.push(Math.floor(wt/60));
+                            wn++;
+                        }
                         cur.setDate(cur.getDate()+7);
-                        if (cur>currentPeriodRange.end&&cur.getMonth()!==currentPeriodRange.end.getMonth()) break;
+                        // Stop if we've moved to the next month not relevant to currentPeriodRange
+                        if (cur.getMonth() !== currentPeriodRange.end.getMonth() && cur > currentPeriodRange.end) break;
                     }
                 } else {
                     for (let i=0;i<12;i++) labels.push(new Date(currentPeriodRange.start.getFullYear(),i,1).toLocaleDateString('es-ES',{month:'short'}));

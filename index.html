@@ -389,11 +389,6 @@
         }
 
         // ─── MapDisplay ───────────────────────────────────────────────────────────────
-        // CORRECCIÓN PRINCIPAL: el mapa ahora recibe `heightPx` (número) en vez de
-        // depender de clases Tailwind externas para su altura.  Leaflet necesita que
-        // el div sobre el que se monta tenga dimensiones concretas en el momento en
-        // que se llama a L.map(); con flex-1 o h-* de Tailwind el tamaño puede ser 0
-        // durante el primer render, lo que provoca que el mapa quede en blanco.
         function MapDisplay({ gpsCoordinates, currentLocation, isLiveTracking, heightPx }) {
             const mapRef = useRef(null);
             const mapInstance = useRef(null);
@@ -403,20 +398,19 @@
             const endMarkerRef = useRef(null);
             const resizeObserverRef = useRef(null);
             const invalidateTimers = useRef([]);
+            const [mapFullyInitialized, setMapFullyInitialized] = useState(false); // Nuevo estado para rastrear si el mapa está listo
 
             const defaultCenter = [19.432608, -99.133209];
             const defaultZoom = 15;
 
             // Función auxiliar para forzar invalidateSize en varios momentos
             const scheduleInvalidate = useCallback(() => {
-                // Limpiar timers previos
                 invalidateTimers.current.forEach(t => clearTimeout(t));
                 invalidateTimers.current = [];
                 [50, 150, 300, 600, 1200, 2500].forEach(delay => {
                     const t = setTimeout(() => {
                         if (mapInstance.current) {
                             mapInstance.current.invalidateSize({ animate: false });
-                            // Forzar redibujado de teselas en cada invalidación
                             mapInstance.current.eachLayer(layer => {
                                 if (layer.redraw) layer.redraw();
                             });
@@ -426,54 +420,87 @@
                 });
             }, []);
 
-            // Inicialización del mapa (sólo una vez)
+            // Inicialización y limpieza del mapa
             useEffect(() => {
+                // Si mapRef no está disponible o la librería Leaflet no está cargada, salimos.
                 if (!mapRef.current || !window.L) return;
-                if (mapInstance.current) return; // ya inicializado
 
-                try {
-                    const initCoords = (gpsCoordinates && gpsCoordinates.length > 0)
-                        ? [gpsCoordinates[0].lat, gpsCoordinates[0].lng]
-                        : (currentLocation ? [currentLocation.lat, currentLocation.lng] : defaultCenter);
-
-                    mapInstance.current = L.map(mapRef.current, {
-                        center: initCoords,
-                        zoom: defaultZoom,
-                        zoomControl: false,
-                        attributionControl: false,
-                        // Desactivar animaciones en mobile para evitar race conditions
-                        fadeAnimation: false,
-                        markerZoomAnimation: false,
-                    });
-
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        maxZoom: 19,
-                        keepBuffer: 4,
-                        updateWhenIdle: false,
-                        updateWhenZooming: false,
-                        crossOrigin: true,
-                    }).addTo(mapInstance.current);
-
-                    L.control.zoom({ position: 'topright' }).addTo(mapInstance.current);
-
-                    // invalidateSize múltiple: el problema en mobile es que el contenedor
-                    // puede seguir cambiando de tamaño milisegundos después del mount.
-                    scheduleInvalidate();
-
-                    // ResizeObserver como respaldo continuo
-                    resizeObserverRef.current = new ResizeObserver(() => {
-                        if (mapInstance.current) {
-                            mapInstance.current.invalidateSize({ animate: false });
-                        }
-                    });
-                    resizeObserverRef.current.observe(mapRef.current);
-
-                } catch (err) {
-                    console.error('Error inicializando mapa Leaflet:', err);
+                // Si ya existe una instancia del mapa, no hacemos nada en este efecto.
+                // Las actualizaciones de tamaño se manejan en otros efectos.
+                if (mapInstance.current) {
+                    return;
                 }
 
+                let initAttempted = false; // Bandera para evitar múltiples inicializaciones
+                let checkIntervalId = null; // ID para el intervalo de reintentos
+
+                // Función para intentar inicializar el mapa
+                const tryInitMap = () => {
+                    if (initAttempted || mapInstance.current) {
+                        clearInterval(checkIntervalId); // Limpiamos el intervalo si ya se intentó o el mapa está listo
+                        return;
+                    }
+
+                    const container = mapRef.current;
+                    // Asegurarse de que el contenedor tenga dimensiones visibles antes de crear el mapa
+                    if (container.offsetWidth === 0 || container.offsetHeight === 0) {
+                        return; // Las dimensiones no están listas, intentamos de nuevo más tarde
+                    }
+                    
+                    initAttempted = true; // Marcamos el intento
+                    clearInterval(checkIntervalId); // Limpiamos el intervalo ya que vamos a inicializar
+
+                    try {
+                        const initCoords = (gpsCoordinates && gpsCoordinates.length > 0)
+                            ? [gpsCoordinates[0].lat, gpsCoordinates[0].lng]
+                            : (currentLocation ? [currentLocation.lat, currentLocation.lng] : defaultCenter);
+
+                        mapInstance.current = L.map(container, {
+                            center: initCoords,
+                            zoom: defaultZoom,
+                            zoomControl: false,
+                            attributionControl: false,
+                            fadeAnimation: false,
+                            markerZoomAnimation: false,
+                        });
+
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            maxZoom: 19,
+                            keepBuffer: 4,
+                            updateWhenIdle: false,
+                            updateWhenZooming: false,
+                            crossOrigin: true,
+                        }).addTo(mapInstance.current);
+
+                        L.control.zoom({ position: 'topright' }).addTo(mapInstance.current);
+
+                        scheduleInvalidate(); // Invalidación agresiva después de la creación inicial
+                        setMapFullyInitialized(true); // El mapa está completamente configurado
+
+                        // Configurar ResizeObserver para monitoreo continuo del tamaño
+                        resizeObserverRef.current = new ResizeObserver(() => {
+                            if (mapInstance.current) {
+                                mapInstance.current.invalidateSize({ animate: false });
+                            }
+                        });
+                        resizeObserverRef.current.observe(container);
+
+                    } catch (err) {
+                        console.error('Error inicializando mapa Leaflet:', err);
+                    }
+                };
+
+                // Intentar inicializar inmediatamente
+                tryInitMap();
+
+                // Configurar un intervalo como mecanismo de respaldo/reintento
+                checkIntervalId = setInterval(tryInitMap, 200); // Comprobar cada 200ms
+
                 return () => {
+                    // Función de limpieza
+                    clearInterval(checkIntervalId);
                     invalidateTimers.current.forEach(t => clearTimeout(t));
+
                     if (resizeObserverRef.current) {
                         resizeObserverRef.current.disconnect();
                         resizeObserverRef.current = null;
@@ -481,15 +508,16 @@
                     if (mapInstance.current) {
                         mapInstance.current.remove();
                         mapInstance.current = null;
+                        setMapFullyInitialized(false);
                     }
                 };
-            // eslint-disable-next-line react-hooks/exhaustive-deps
-            }, []); // intencional: solo al montar
+            }, []); // Array de dependencias vacío: se ejecuta una vez al montar, se limpia al desmontar.
 
-            // Actualización de capas cuando cambian coordenadas / ubicación
+            // Efecto para actualizar las capas del mapa (polilíneas, marcadores, centrado) cuando los datos cambian.
             useEffect(() => {
                 const map = mapInstance.current;
-                if (!map) return;
+                // Solo procedemos si el mapa está inicializado y listo
+                if (!map || !mapFullyInitialized) return;
 
                 // Limpiar capas previas
                 if (polylineInstance.current) { map.removeLayer(polylineInstance.current); polylineInstance.current = null; }
@@ -519,40 +547,34 @@
                     }
                 }
 
+                // Lógica de centrado
                 if (currentLocation && isLiveTracking) {
-                    // Marcador de posición actual (punto azul)
                     currentMarker.current = L.marker(
                         [currentLocation.lat, currentLocation.lng],
                         { icon: mkIcon('#60A5FA', 14), zIndexOffset: 1000 }
                     ).addTo(map);
-                    // Centrar sin animación para evitar race conditions en mobile
                     map.setView([currentLocation.lat, currentLocation.lng], defaultZoom, { animate: false });
                 } else if (isLiveTracking && latlngs.length === 1) {
-                    // Primer punto GPS: centrar el mapa aquí para que carguen las teselas correctas
                     map.setView(latlngs[0], defaultZoom, { animate: false });
                 } else if (!isLiveTracking && latlngs.length > 1 && polylineInstance.current) {
                     map.fitBounds(polylineInstance.current.getBounds(), { padding: [50, 50], animate: false });
                 } else if (!isLiveTracking && latlngs.length === 0) {
                     map.setView(defaultCenter, defaultZoom, { animate: false });
                 }
-
-                // Forzar invalidación y redibujado de teselas en múltiples momentos
-                [100, 400, 900].forEach(d => setTimeout(() => {
-                    if (mapInstance.current) {
-                        mapInstance.current.invalidateSize({ animate: false });
-                        mapInstance.current.eachLayer(layer => { if (layer.redraw) layer.redraw(); });
-                    }
-                }, d));
-
-            }, [gpsCoordinates, currentLocation, isLiveTracking]);
-
-            // Cuando cambia el heightPx también hay que invalidar
-            useEffect(() => {
+                
+                // Invalidación agresiva después de las actualizaciones de capas
                 scheduleInvalidate();
-            }, [heightPx, scheduleInvalidate]);
 
-            // La clave del fix: el div del mapa tiene height EXPLÍCITO en px,
-            // no depende de flex ni de Tailwind para calcular su altura.
+            }, [gpsCoordinates, currentLocation, isLiveTracking, mapFullyInitialized]); // Dependencias actualizadas
+
+            // Efecto para invalidar el tamaño cuando heightPx cambia, después de que el mapa esté inicializado
+            useEffect(() => {
+                if (mapFullyInitialized) {
+                   scheduleInvalidate();
+                }
+            }, [heightPx, mapFullyInitialized, scheduleInvalidate]);
+
+            // El div del contenedor del mapa con altura explícita
             return React.createElement('div', {
                 className: 'leaflet-map-wrapper',
                 style: { height: heightPx ? `${heightPx}px` : '100%' },
@@ -1146,7 +1168,7 @@
                     React.createElement('span', { className:"text-3xl font-black text-orange-500" }, formatTimeHnM(totalSec))
                 ),
                 React.createElement('div', { className:"flex gap-2" }, PERIOD_TYPES.map(p => React.createElement('button', { key:p, onClick:()=>{setPeriodType(p);setPeriodOffset(0);}, className:`flex-1 py-3 rounded-xl font-black uppercase text-[10px] transition-all ${periodType===p?'bg-orange-500 text-white':'bg-white/5 text-slate-400'}` }, p))),
-                React.createElement('div', { className:"flex items-center justify-between glass-card p-4" },
+                React.createElement('div', { className: "flex items-center justify-between glass-card p-4" },
                     React.createElement('button', { onClick:()=>setPeriodOffset(p=>p-1), className:"p-2 bg-white/5 text-slate-400 rounded-lg" }, React.createElement('svg',{width:"24",height:"24",viewBox:"0 0 24 24",fill:"currentColor"},React.createElement('path',{d:"M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"}))),
                     React.createElement('span', { className:"text-sm font-black uppercase italic text-orange-400" }, periodTitle),
                     React.createElement('button', { onClick:()=>setPeriodOffset(p=>p+1), disabled:periodOffset>=0, className:`p-2 rounded-lg ${periodOffset>=0?'bg-white/10 text-slate-600 cursor-not-allowed':'bg-white/5 text-slate-400'}` }, React.createElement('svg',{width:"24",height:"24",viewBox:"0 0 24 24",fill:"currentColor"},React.createElement('path',{d:"M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"})))
