@@ -145,7 +145,6 @@
         }, { passive: true });
         window.addEventListener('touchmove', (event) => {
             if (!event.touches || event.touches.length !== 1) return;
-            if (event.target && event.target.closest && event.target.closest('.leaflet-container')) return;
 
             const currentY = event.touches[0].clientY;
             const pullingDown = currentY > pullStartY;
@@ -726,6 +725,24 @@
                 }
             }, [heightPx, mapFullyInitialized, scheduleInvalidate]);
 
+            useEffect(() => {
+                const handleResume = () => {
+                    if (mapInstance.current) {
+                        scheduleInvalidate();
+                    }
+                };
+                window.addEventListener('pageshow', handleResume);
+                window.addEventListener('focus', handleResume);
+                document.addEventListener('visibilitychange', handleResume);
+                window.addEventListener('mientrenador-resume', handleResume);
+                return () => {
+                    window.removeEventListener('pageshow', handleResume);
+                    window.removeEventListener('focus', handleResume);
+                    document.removeEventListener('visibilitychange', handleResume);
+                    window.removeEventListener('mientrenador-resume', handleResume);
+                };
+            }, [scheduleInvalidate]);
+
             // El div del contenedor del mapa con altura explícita
             return React.createElement('div', {
                 className: 'leaflet-map-wrapper',
@@ -827,6 +844,7 @@
             const gpsTotalTime = useRef(0);
             const hasGpsDataRef = useRef(hasGpsData);
             const isGpsActiveRef = useRef(isGpsActive);
+            const gpsStoppingRef = useRef(false);
             const stopGpsTrackingRef = useRef();
             const intervalIdRef = useRef(null);
 
@@ -912,6 +930,8 @@
             }, [endWorkout, setTime]);
 
             const stopGpsTracking = useCallback((isSkip=false) => {
+                if (gpsStoppingRef.current) return;
+                gpsStoppingRef.current = true;
                 if (gpsWatcherId.current) { navigator.geolocation.clearWatch(gpsWatcherId.current); gpsWatcherId.current = null; }
                 const finalDistance = gpsTotalDistance.current, finalTime = gpsTotalTime.current;
                 const hasUsableGpsData = finalDistance > 0 && finalTime > 0 && gpsCoordinates.length > 1;
@@ -932,7 +952,10 @@
                     setFinalGpsSummary(null);
                 }
                 
-                speak('Seguimiento finalizado.', true, () => {
+                let finishedStopFlow = false;
+                const finishStopFlow = () => {
+                    if (finishedStopFlow) return;
+                    finishedStopFlow = true;
                     if (finalDistance > 0 && finalTime > 0) announceGpsStats(finalDistance, finalTime);
                     setIsGpsActive(false);
                     setCurrentLocation(null);
@@ -953,7 +976,9 @@
                         setUiStatus('running');
                         advanceToStep(idxRef.current + 1);
                     }
-                });
+                };
+                speak('Seguimiento finalizado.', true, finishStopFlow);
+                setTimeout(finishStopFlow, 1200);
             }, [advanceToStep, announceGpsStats, gpsCoordinates, workout, onComplete, onExit, elapsedRef, finalGpsSummary]);
 
             useEffect(() => { stopGpsTrackingRef.current = stopGpsTracking; }, [stopGpsTracking]);
@@ -983,6 +1008,7 @@
                 if (isGpsActiveRef.current) return;
                 speak('Iniciando seguimiento. Actualizaciones cada diez minutos.', true, () => { gpsAnnounceLastTime.current = Date.now(); });
                 setIsGpsActive(true); setUiStatus('gps-running');
+                gpsStoppingRef.current = false;
                 gpsStartTime.current = Date.now(); lastPosition.current = null;
                 gpsTotalDistance.current = 0; gpsTotalTime.current = 0;
                 setGpsCoordinates([]); setHasGpsData(false); setFinalGpsSummary(null);
@@ -1035,13 +1061,13 @@
             }, []);
             const requestWake = useCallback(async () => {
                 try {
-                    if (statusRef.current === 'running' && 'wakeLock' in navigator && !wakeLockRef.current)
+                    if ((statusRef.current === 'running' || statusRef.current === 'gps-running') && 'wakeLock' in navigator && !wakeLockRef.current)
                         wakeLockRef.current = await navigator.wakeLock.request('screen');
-                    else if (statusRef.current !== 'running' && wakeLockRef.current) releaseWake();
+                    else if (statusRef.current !== 'running' && statusRef.current !== 'gps-running' && wakeLockRef.current) releaseWake();
                 } catch(e) {}
             }, [releaseWake]);
 
-            useEffect(() => { if (uiStatus === 'running') requestWake(); else releaseWake(); return releaseWake; }, [uiStatus, requestWake, releaseWake]);
+            useEffect(() => { if (uiStatus === 'running' || uiStatus === 'gps-running') requestWake(); else releaseWake(); return releaseWake; }, [uiStatus, requestWake, releaseWake]);
 
             useEffect(() => {
                 const handleVisibility = () => {
@@ -1049,6 +1075,9 @@
                         if (statusRef.current === 'running') { pausedAtRef.current = Date.now(); setUiStatus('paused'); }
                         releaseWake();
                     } else {
+                        window.dispatchEvent(new Event('mientrenador-resume'));
+                        setTimeout(() => window.dispatchEvent(new Event('mientrenador-resume')), 300);
+                        if (statusRef.current === 'gps-running') requestWake();
                         if (statusRef.current === 'paused' && pausedAtRef.current !== null) {
                             const hiddenMs = Date.now() - pausedAtRef.current;
                             workoutStartRef.current = (workoutStartRef.current!=null&&!isNaN(workoutStartRef.current)) ? workoutStartRef.current+hiddenMs : Date.now();
@@ -1059,7 +1088,7 @@
                 };
                 document.addEventListener('visibilitychange', handleVisibility);
                 return () => document.removeEventListener('visibilitychange', handleVisibility);
-            }, [releaseWake]);
+            }, [releaseWake, requestWake]);
 
             useEffect(() => {
                 setUiStatus('ready'); setUiIdx(0); setElap(0); setTime(0);
@@ -1068,6 +1097,7 @@
                 setShowGpsResults(false);
                 setGpsCoordinates([]);
                 setCurrentLocation(null);
+                gpsStoppingRef.current = false;
                 setHasGpsData(false); setFinalGpsSummary(null); setShouldAutoStart(false); setIsGpsActive(false);
                 if (gpsWatcherId.current) { navigator.geolocation.clearWatch(gpsWatcherId.current); gpsWatcherId.current = null; }
                 if (intervalIdRef.current) { clearInterval(intervalIdRef.current); intervalIdRef.current = null; }
@@ -1178,6 +1208,11 @@
                 ),
                 React.createElement('button', {
                     onClick: () => stopGpsTrackingRef.current(),
+                    onTouchEnd: (event) => {
+                        event.preventDefault();
+                        stopGpsTrackingRef.current();
+                    },
+                    onPointerUp: () => stopGpsTrackingRef.current(),
                     className: "w-full shrink-0 bg-red-600/80 text-white py-5 rounded-full font-black uppercase active:scale-95 italic"
                 }, "TERMINAR ACTIVIDAD GPS")
             );
