@@ -62,6 +62,37 @@
             width: 100% !important;
             height: 100% !important;
         }
+        .leaflet-container img,
+        .leaflet-container .leaflet-tile,
+        .leaflet-container .leaflet-marker-icon,
+        .leaflet-container .leaflet-marker-shadow {
+            max-width: none !important;
+            max-height: none !important;
+        }
+        .leaflet-container .leaflet-tile {
+            width: 256px !important;
+            height: 256px !important;
+        }
+        .leaflet-pane,
+        .leaflet-tile,
+        .leaflet-marker-icon,
+        .leaflet-marker-shadow,
+        .leaflet-tile-container,
+        .leaflet-pane > svg,
+        .leaflet-pane > canvas,
+        .leaflet-zoom-box,
+        .leaflet-image-layer,
+        .leaflet-layer {
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+        .leaflet-tile,
+        .leaflet-marker-icon,
+        .leaflet-marker-shadow {
+            user-select: none;
+            -webkit-user-drag: none;
+        }
 
         /* Phase selector styles */
         .phase-card {
@@ -450,7 +481,6 @@
             const endMarkerRef = useRef(null);
             const resizeObserverRef = useRef(null);
             const invalidateTimers = useRef([]);
-            const userInteractingUntil = useRef(0);
             const [mapFullyInitialized, setMapFullyInitialized] = useState(false); // Nuevo estado para rastrear si el mapa está listo
             const [mapError, setMapError] = useState('');
 
@@ -536,18 +566,8 @@
                             zoom: defaultZoom,
                             zoomControl: false,
                             attributionControl: false,
-                            dragging: true,
-                            touchZoom: true,
-                            doubleClickZoom: true,
-                            scrollWheelZoom: false,
-                            boxZoom: false,
-                            tap: true,
                             fadeAnimation: false,
                             markerZoomAnimation: false,
-                        });
-
-                        mapInstance.current.on('zoomstart movestart dragstart', () => {
-                            userInteractingUntil.current = Date.now() + 8000;
                         });
 
                         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -641,15 +661,9 @@
                         [currentLocation.lat, currentLocation.lng],
                         { icon: mkIcon('#60A5FA', 14), zIndexOffset: 1000 }
                     ).addTo(map);
-                    if (Date.now() > userInteractingUntil.current) {
-                        const keepZoom = Math.max(map.getZoom() || defaultZoom, defaultZoom);
-                        map.setView([currentLocation.lat, currentLocation.lng], keepZoom, { animate: false });
-                    }
+                    map.setView([currentLocation.lat, currentLocation.lng], defaultZoom, { animate: false });
                 } else if (isLiveTracking && latlngs.length === 1) {
-                    if (Date.now() > userInteractingUntil.current) {
-                        const keepZoom = Math.max(map.getZoom() || defaultZoom, defaultZoom);
-                        map.setView(latlngs[0], keepZoom, { animate: false });
-                    }
+                    map.setView(latlngs[0], defaultZoom, { animate: false });
                 } else if (!isLiveTracking && latlngs.length > 1 && polylineInstance.current) {
                     map.fitBounds(polylineInstance.current.getBounds(), { padding: [50, 50], animate: false });
                 } else if (!isLiveTracking && latlngs.length === 0) {
@@ -671,13 +685,7 @@
             // El div del contenedor del mapa con altura explícita
             return React.createElement('div', {
                 className: 'leaflet-map-wrapper',
-                style: {
-                    height: heightPx ? `${heightPx}px` : '100%',
-                    minHeight: heightPx ? `${heightPx}px` : '280px',
-                    width: '100%',
-                    position: 'relative',
-                    display: 'block'
-                },
+                style: { height: heightPx ? `${heightPx}px` : '100%' },
             },
                 mapError && React.createElement('div', {
                     className: 'absolute inset-0 z-[1000] flex items-center justify-center bg-slate-900 text-center text-xs font-bold text-orange-300 p-4'
@@ -685,13 +693,6 @@
                 React.createElement('div', {
                     ref: mapRef,
                     className: 'leaflet-map-inner',
-                    style: {
-                        position: 'absolute',
-                        inset: 0,
-                        width: '100%',
-                        height: '100%',
-                        minHeight: heightPx ? `${heightPx}px` : '280px'
-                    }
                 })
             );
         }
@@ -1521,4 +1522,24 @@
                         React.createElement('div', { className:"grid grid-cols-2 gap-4" }, ENT_FIELDS.map(({f,label}) => React.createElement(InputField, { key:f, label, val:(phases.entrenamiento?.[f]??DEFAULT_PARAMS.entrenamiento[f]), set:v=>update('entrenamiento',f,v) })))
                     ),
                     React.createElement('div', { className:"glass-card p-6 space-y-4" },
-                        React.createElement('span', { className:"font-blac
+                        React.createElement('span', { className:"font-black uppercase text-xs text-orange-500 border-b border-white/5 block pb-2" }, "Estiramientos"),
+                        React.createElement('div', { className:"grid grid-cols-2 gap-4" }, STRETCH_FIELDS.map(({f,label}) => React.createElement(InputField, { key:f, label, val:(phases.entrenamiento?.[f]??DEFAULT_PARAMS.entrenamiento[f]), set:v=>update('entrenamiento',f,v) })))
+                    )
+                ),
+                React.createElement('div', { className:"p-6 bg-slate-950 border-t border-white/5 shrink-0" },
+                    React.createElement('button', { onClick:save, className:"w-full bg-white text-black py-6 rounded-full font-black uppercase", disabled:saving }, saving?'GUARDANDO...':'GUARDAR')
+                )
+            );
+        }
+
+        function InputField({ label, val, set }) {
+            return React.createElement('div', { className:"flex flex-col items-center" },
+                React.createElement('span', { className:"text-[8px] opacity-40 mb-2 uppercase" }, label),
+                React.createElement('input', { type:"number", className:"w-full bg-slate-800/40 p-4 rounded-xl text-center font-black text-white border border-white/5 outline-none", value:val, onChange:e=>set(e.target.value) })
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App, null));
+    </script>
+</body>
+</html>
