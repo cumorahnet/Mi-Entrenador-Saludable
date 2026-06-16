@@ -691,13 +691,17 @@
                 if (!isGpsActive || uiStatus !== 'gps-running') return;
                 const calcHeight = () => {
                     if (gpsScreenRef.current) {
-                        // La pantalla tiene padding 24px arriba/abajo (p-6 = 24px)
-                        // Header: ~52px, stats grid: ~100px, botón: ~80px, gaps ~32px
-                        // Total no-mapa: ~288px. Restamos del alto total de la pantalla.
                         const screenH = gpsScreenRef.current.clientHeight || window.innerHeight;
-                        const reserved = 52 + 100 + 80 + 32 + 48; // header + stats + btn + gaps + padding
-                        const mapH = Math.max(180, screenH - reserved);
-                        setGpsMapHeight(mapH);
+                        // Calcular la altura de los elementos *distintos* de la tarjeta del mapa, incluyendo márgenes/rellenos
+                        // El div raíz tiene `style={{ padding: '24px' }}` => 48px de relleno vertical.
+                        // h2 (text-2xl font-black uppercase text-orange-500 mb-3): ~30px (altura de línea) + 12px (mb-3) = 42px
+                        // Tarjeta de estadísticas (glass-card p-3 mb-3): 2*12px (p-3) + ~70px (contenido) + 12px (mb-3) = ~106px
+                        // Botón "TERMINAR ACTIVIDAD GPS" (w-full ... py-5 ...): 2*20px (py-5) + ~20px (contenido) = ~60px
+                        // Altura total fija: 48 (relleno raíz) + 42 (h2 + su margen) + 106 (tarjeta de estadísticas + su margen) + 60 (botón) = 256px
+                        const totalFixedHeight = 256;
+                        // Esta `mapElementHeight` es la *altura exacta en píxeles* que el div exterior de Leaflet (leaflet-map-wrapper) necesita.
+                        const mapElementHeight = Math.max(180, screenH - totalFixedHeight);
+                        setGpsMapHeight(mapElementHeight);
                     }
                 };
                 // Calcular inmediatamente y con pequeño delay para asegurar que el DOM esté listo
@@ -973,22 +977,29 @@
             const showOverlay = uiStatus === 'ready' || uiStatus === 'paused';
 
             // ─── PANTALLA GPS EN VIVO ─────────────────────────────────────────────────
-            // CORRECCIÓN: se usa ref en el contenedor para calcular gpsMapHeight,
-            // y se pasa heightPx explícito al MapDisplay en lugar de flex-1.
             if (isGpsActive && uiStatus === 'gps-running') return React.createElement('div', {
                 ref: gpsScreenRef,
                 className: "h-screen flex flex-col bg-slate-950 text-white",
                 style: { padding: '24px' },
             },
                 React.createElement('h2', { className:"text-2xl font-black uppercase text-orange-500 mb-3 text-center shrink-0" }, "Seguimiento GPS en vivo"),
-                // Mapa con altura calculada explícitamente
-                React.createElement('div', { className:"glass-card p-3 mb-3", style:{ flex: 1, display:'flex', flexDirection:'column', minHeight: 0 } },
+                // El contenedor `glass-card` ahora recibe su altura explícitamente,
+                // que es la altura del mapa `gpsMapHeight` más su padding vertical (`p-3` = 24px).
+                React.createElement('div', {
+                    className: "glass-card p-3 mb-3",
+                    style:{
+                        height: gpsMapHeight > 0 ? `${gpsMapHeight + 24}px` : '304px', // 280 (map default) + 24 (p-3)
+                        display:'flex',
+                        flexDirection:'column',
+                        minHeight: 0 // Permite que se encoja si es necesario
+                    }
+                },
+                    // MapDisplay ahora recibe la altura neta para su `leaflet-map-wrapper`.
                     React.createElement(MapDisplay, {
                         gpsCoordinates,
                         currentLocation,
                         isLiveTracking: true,
-                        // Si aún no se calculó, usamos una altura por defecto razonable
-                        heightPx: gpsMapHeight > 0 ? gpsMapHeight - 32 : 280,
+                        heightPx: gpsMapHeight > 0 ? gpsMapHeight : 280,
                     })
                 ),
                 // Estadísticas GPS
