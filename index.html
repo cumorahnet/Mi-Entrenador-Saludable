@@ -154,6 +154,23 @@
                 event.preventDefault();
             }
         }, { passive: false });
+        try {
+            const manifest = {
+                name: 'Mi Entrenador Saludable',
+                short_name: 'Entrenador',
+                start_url: '.',
+                scope: '.',
+                display: 'fullscreen',
+                background_color: '#020617',
+                theme_color: '#020617',
+                orientation: 'portrait'
+            };
+            const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+            const manifestLink = document.createElement('link');
+            manifestLink.rel = 'manifest';
+            manifestLink.href = URL.createObjectURL(manifestBlob);
+            document.head.appendChild(manifestLink);
+        } catch(e) {}
 
         const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
@@ -249,22 +266,58 @@
 
         const voiceQueue = [];
         let voiceBusy = false;
+        let voiceGeneration = 0;
+        let voiceTimeout = null;
         const flushVoice = () => {
             if (voiceBusy || voiceQueue.length === 0 || !window.speechSynthesis) return;
             voiceBusy = true;
             const item = voiceQueue.shift();
             const text = typeof item === 'string' ? item : item.text;
             const onEndCallback = typeof item === 'object' && item.onEnd ? item.onEnd : () => {};
+            const generation = typeof item === 'object' && item.generation ? item.generation : voiceGeneration;
             const msg = new SpeechSynthesisUtterance(text);
             msg.lang = 'es-ES'; msg.rate = 1.05;
-            msg.onend = msg.onerror = () => { voiceBusy = false; onEndCallback(); flushVoice(); };
-            window.speechSynthesis.speak(msg);
+            const finish = () => {
+                if (generation !== voiceGeneration) return;
+                if (voiceTimeout) { clearTimeout(voiceTimeout); voiceTimeout = null; }
+                voiceBusy = false;
+                onEndCallback();
+                flushVoice();
+            };
+            msg.onend = msg.onerror = finish;
+            voiceTimeout = setTimeout(finish, Math.max(2500, text.length * 95));
+            try {
+                window.speechSynthesis.resume?.();
+                window.speechSynthesis.speak(msg);
+            } catch (err) {
+                console.warn('No se pudo reproducir voz:', err);
+                finish();
+            }
         };
         const speak = (text, interrupt = false, onEnd = null) => {
             if (!window.speechSynthesis) { if (onEnd) onEnd(); return; }
-            if (interrupt) { window.speechSynthesis.cancel(); voiceQueue.length = 0; voiceBusy = false; }
-            if (text) voiceQueue.push(onEnd ? { text, onEnd } : text);
+            if (interrupt) {
+                voiceGeneration++;
+                if (voiceTimeout) { clearTimeout(voiceTimeout); voiceTimeout = null; }
+                window.speechSynthesis.cancel();
+                voiceQueue.length = 0;
+                voiceBusy = false;
+            }
+            if (text) voiceQueue.push({ text, onEnd, generation: voiceGeneration });
             flushVoice();
+        };
+        const resumeVoice = () => {
+            try { window.speechSynthesis?.resume?.(); } catch(e) {}
+        };
+        const requestAppFullscreen = async () => {
+            try {
+                const el = document.documentElement;
+                if (document.fullscreenElement) return;
+                if (el.requestFullscreen) await el.requestFullscreen();
+                else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+            } catch (err) {
+                console.warn('Pantalla completa no disponible:', err);
+            }
         };
 
         const startOfDay = (date) => { const d = new Date(date); d.setHours(0,0,0,0); return d; };
@@ -844,9 +897,11 @@
             const gpsTotalTime = useRef(0);
             const hasGpsDataRef = useRef(hasGpsData);
             const isGpsActiveRef = useRef(isGpsActive);
+            const gpsStartingRef = useRef(false);
             const gpsStoppingRef = useRef(false);
             const stopGpsTrackingRef = useRef();
             const intervalIdRef = useRef(null);
+            const gpsAnnounceIntervalRef = useRef(null);
 
             useEffect(() => { statusRef.current = uiStatus; }, [uiStatus]);
             useEffect(() => { idxRef.current = uiIdx; }, [uiIdx]);
@@ -884,7 +939,7 @@
             }, [isGpsActive, uiStatus]);
 
             const announceGpsStats = useCallback((distance, timeSec) => {
-                speak(`Distancia: ${formatDistance(distance)}. Velocidad: ${formatSpeed(distance, timeSec)}. Ritmo: ${formatPace(distance, timeSec)}.`, true);
+                speak(`Distancia: ${formatDistance(distance)}. Velocidad: ${formatSpeed(distance, timeSec)}. Ritmo: ${formatPace(distance, timeSec)}.`, false);
             }, []);
 
             const handleSpeech = useCallback((step, stepIdx, remaining) => {
@@ -932,7 +987,9 @@
             const stopGpsTracking = useCallback((isSkip=false) => {
                 if (gpsStoppingRef.current) return;
                 gpsStoppingRef.current = true;
+                gpsStartingRef.current = false;
                 if (gpsWatcherId.current) { navigator.geolocation.clearWatch(gpsWatcherId.current); gpsWatcherId.current = null; }
+                if (gpsAnnounceIntervalRef.current) { clearInterval(gpsAnnounceIntervalRef.current); gpsAnnounceIntervalRef.current = null; }
                 const finalDistance = gpsTotalDistance.current, finalTime = gpsTotalTime.current;
                 const hasUsableGpsData = finalDistance > 0 && finalTime > 0 && gpsCoordinates.length > 1;
                 if (hasUsableGpsData) {
@@ -995,25 +1052,41 @@
             }, [endWorkout, advanceToStep, handleSpeech]);
 
             const startGpsTracking = useCallback(async () => {
+                if (gpsStartingRef.current || isGpsActiveRef.current) return;
+                gpsStartingRef.current = true;
                 if (intervalIdRef.current) { clearInterval(intervalIdRef.current); intervalIdRef.current = null; }
-                if (!('geolocation' in navigator)) { speak('Geolocalización no disponible.', true); setIsGpsActive(false); setUiStatus('running'); skipStep(); return; }
+                if (!('geolocation' in navigator)) { gpsStartingRef.current = false; speak('Geolocalización no disponible.', true); setIsGpsActive(false); setUiStatus('running'); skipStep(); return; }
                 if (navigator.permissions && navigator.permissions.query) {
                     try {
                         const perm = await navigator.permissions.query({name:'geolocation'});
-                        if (perm.state === 'denied') { speak('Permiso de ubicación denegado.', true); setIsGpsActive(false); setUiStatus('running'); skipStep(); return; }
+                        if (perm.state === 'denied') { gpsStartingRef.current = false; speak('Permiso de ubicación denegado.', true); setIsGpsActive(false); setUiStatus('running'); skipStep(); return; }
                     } catch(e) {
                         console.warn('No se pudo consultar el permiso de ubicación. Se solicitará al iniciar el GPS.', e);
                     }
                 }
-                if (isGpsActiveRef.current) return;
                 speak('Iniciando seguimiento. Actualizaciones cada diez minutos.', true, () => { gpsAnnounceLastTime.current = Date.now(); });
                 setIsGpsActive(true); setUiStatus('gps-running');
+                isGpsActiveRef.current = true;
+                gpsStartingRef.current = false;
                 gpsStoppingRef.current = false;
                 gpsStartTime.current = Date.now(); lastPosition.current = null;
                 gpsTotalDistance.current = 0; gpsTotalTime.current = 0;
                 setGpsCoordinates([]); setHasGpsData(false); setFinalGpsSummary(null);
-                gpsWatcherId.current = navigator.geolocation.watchPosition(
-                    (position) => {
+                if (gpsAnnounceIntervalRef.current) { clearInterval(gpsAnnounceIntervalRef.current); gpsAnnounceIntervalRef.current = null; }
+                gpsAnnounceIntervalRef.current = setInterval(() => {
+                    if (statusRef.current !== 'gps-running' || gpsStoppingRef.current) return;
+                    resumeVoice();
+                    const now = Date.now();
+                    const currentGpsTotalTime = Math.floor((now - (gpsStartTime.current || now)) / 1000);
+                    gpsTotalTime.current = currentGpsTotalTime;
+                    if (currentGpsTotalTime > 0 && (now - gpsAnnounceLastTime.current) >= 600000) {
+                        announceGpsStats(gpsTotalDistance.current, currentGpsTotalTime);
+                        gpsAnnounceLastTime.current = now;
+                    }
+                }, 5000);
+                try {
+                    gpsWatcherId.current = navigator.geolocation.watchPosition(
+                        (position) => {
                         const {latitude, longitude} = position.coords;
                         const now = Date.now();
                         const currentGpsTotalTime = Math.floor((now - (gpsStartTime.current||now))/1000);
@@ -1032,14 +1105,21 @@
                             announceGpsStats(gpsTotalDistance.current, currentGpsTotalTime);
                             gpsAnnounceLastTime.current = now;
                         }
-                    },
-                    (error) => { speak(`Error de GPS: ${error.message}.`, true); stopGpsTrackingRef.current(); },
-                    {enableHighAccuracy:true, timeout:10000, maximumAge:0}
-                );
+                        },
+                        (error) => { gpsStartingRef.current = false; speak(`Error de GPS: ${error.message}.`, true); stopGpsTrackingRef.current(); },
+                        {enableHighAccuracy:true, timeout:10000, maximumAge:0}
+                    );
+                } catch (err) {
+                    gpsStartingRef.current = false;
+                    speak(`Error de GPS: ${err.message}.`, true);
+                    stopGpsTrackingRef.current();
+                }
             }, [skipStep, announceGpsStats, setElap]);
 
             const togglePlay = useCallback(() => {
                 if (!workout || stepsRef.current.length === 0) return;
+                requestAppFullscreen();
+                resumeVoice();
                 const current = statusRef.current;
                 if (current === 'ready') {
                     const now = Date.now(); workoutStartRef.current = now; stepStartRef.current = now; setUiStatus('running');
@@ -1075,6 +1155,7 @@
                         if (statusRef.current === 'running') { pausedAtRef.current = Date.now(); setUiStatus('paused'); }
                         releaseWake();
                     } else {
+                        resumeVoice();
                         window.dispatchEvent(new Event('mientrenador-resume'));
                         setTimeout(() => window.dispatchEvent(new Event('mientrenador-resume')), 300);
                         if (statusRef.current === 'gps-running') requestWake();
@@ -1097,10 +1178,12 @@
                 setShowGpsResults(false);
                 setGpsCoordinates([]);
                 setCurrentLocation(null);
+                gpsStartingRef.current = false;
                 gpsStoppingRef.current = false;
                 setHasGpsData(false); setFinalGpsSummary(null); setShouldAutoStart(false); setIsGpsActive(false);
                 if (gpsWatcherId.current) { navigator.geolocation.clearWatch(gpsWatcherId.current); gpsWatcherId.current = null; }
                 if (intervalIdRef.current) { clearInterval(intervalIdRef.current); intervalIdRef.current = null; }
+                if (gpsAnnounceIntervalRef.current) { clearInterval(gpsAnnounceIntervalRef.current); gpsAnnounceIntervalRef.current = null; }
                 if (!workout || !selectedPhases) { setSteps([]); return; }
 
                 const generated = generateWorkoutSteps(workout, DEFAULT_PARAMS, selectedPhases);
@@ -1111,6 +1194,7 @@
                 return () => {
                     if (isGpsActiveRef.current && stopGpsTrackingRef.current) stopGpsTrackingRef.current(true);
                     if (intervalIdRef.current) { clearInterval(intervalIdRef.current); intervalIdRef.current = null; }
+                    if (gpsAnnounceIntervalRef.current) { clearInterval(gpsAnnounceIntervalRef.current); gpsAnnounceIntervalRef.current = null; }
                 };
             }, [workout, selectedPhases]);
 
@@ -1443,6 +1527,7 @@
             }, [user]);
 
             const handlePhasesSelected = useCallback((phases) => {
+                requestAppFullscreen();
                 if (window.speechSynthesis) {
                     const silent = new SpeechSynthesisUtterance(' ');
                     silent.volume = 0; window.speechSynthesis.speak(silent);
@@ -1457,6 +1542,7 @@
             }, []);
 
             const handleStartWorkout = useCallback((workout) => {
+                requestAppFullscreen();
                 setSelectedWorkout(workout);
                 setView('play');
             }, []);
