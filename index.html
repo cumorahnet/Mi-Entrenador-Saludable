@@ -69,9 +69,9 @@
             max-width: none !important;
             max-height: none !important;
         }
-        .leaflet-container .leaflet-tile {
-            width: 256px !important;
-            height: 256px !important;
+        .leaflet-container,
+        .leaflet-tile-pane {
+            background: #e5e7eb !important;
         }
         .leaflet-pane,
         .leaflet-tile,
@@ -481,6 +481,7 @@
             const endMarkerRef = useRef(null);
             const resizeObserverRef = useRef(null);
             const invalidateTimers = useRef([]);
+            const userMovingMapUntil = useRef(0);
             const [mapFullyInitialized, setMapFullyInitialized] = useState(false); // Nuevo estado para rastrear si el mapa está listo
             const [mapError, setMapError] = useState('');
 
@@ -567,17 +568,22 @@
                             zoomControl: false,
                             attributionControl: false,
                             fadeAnimation: false,
+                            zoomAnimation: false,
                             markerZoomAnimation: false,
                         });
 
                         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                             maxZoom: 19,
                             attribution: '&copy; OpenStreetMap',
-                            keepBuffer: 4,
-                            updateWhenIdle: false,
-                            updateWhenZooming: false,
+                            keepBuffer: 8,
+                            updateWhenIdle: true,
+                            updateWhenZooming: true,
                             crossOrigin: true,
                         }).addTo(mapInstance.current);
+
+                        mapInstance.current.on('dragstart zoomstart', () => {
+                            userMovingMapUntil.current = Date.now() + 10000;
+                        });
 
                         L.control.zoom({ position: 'topright' }).addTo(mapInstance.current);
 
@@ -661,17 +667,20 @@
                         [currentLocation.lat, currentLocation.lng],
                         { icon: mkIcon('#60A5FA', 14), zIndexOffset: 1000 }
                     ).addTo(map);
-                    map.setView([currentLocation.lat, currentLocation.lng], defaultZoom, { animate: false });
+                    if (Date.now() > userMovingMapUntil.current) {
+                        map.setView([currentLocation.lat, currentLocation.lng], map.getZoom() || defaultZoom, { animate: false });
+                    }
                 } else if (isLiveTracking && latlngs.length === 1) {
-                    map.setView(latlngs[0], defaultZoom, { animate: false });
+                    if (Date.now() > userMovingMapUntil.current) {
+                        map.setView(latlngs[0], map.getZoom() || defaultZoom, { animate: false });
+                    }
                 } else if (!isLiveTracking && latlngs.length > 1 && polylineInstance.current) {
                     map.fitBounds(polylineInstance.current.getBounds(), { padding: [50, 50], animate: false });
                 } else if (!isLiveTracking && latlngs.length === 0) {
                     map.setView(defaultCenter, defaultZoom, { animate: false });
                 }
                 
-                // Invalidación agresiva después de las actualizaciones de capas
-                scheduleInvalidate();
+                // No invalidamos el tamaño en cada punto GPS: hacerlo durante pan/zoom provoca parpadeos en móvil.
 
             }, [gpsCoordinates, currentLocation, isLiveTracking, mapFullyInitialized]); // Dependencias actualizadas
 
