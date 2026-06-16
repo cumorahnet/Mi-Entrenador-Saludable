@@ -399,6 +399,7 @@
             const resizeObserverRef = useRef(null);
             const invalidateTimers = useRef([]);
             const [mapFullyInitialized, setMapFullyInitialized] = useState(false); // Nuevo estado para rastrear si el mapa está listo
+            const [mapError, setMapError] = useState('');
 
             const defaultCenter = [19.432608, -99.133209];
             const defaultZoom = 15;
@@ -410,10 +411,14 @@
                 [50, 150, 300, 600, 1200, 2500].forEach(delay => {
                     const t = setTimeout(() => {
                         if (mapInstance.current) {
-                            mapInstance.current.invalidateSize({ animate: false });
-                            mapInstance.current.eachLayer(layer => {
-                                if (layer.redraw) layer.redraw();
-                            });
+                            try {
+                                mapInstance.current.invalidateSize({ animate: false });
+                                mapInstance.current.eachLayer(layer => {
+                                    if (layer.redraw) layer.redraw();
+                                });
+                            } catch (err) {
+                                console.warn('No se pudo recalcular el tamaño del mapa:', err);
+                            }
                         }
                     }, delay);
                     invalidateTimers.current.push(t);
@@ -423,7 +428,11 @@
             // Inicialización y limpieza del mapa
             useEffect(() => {
                 // Si mapRef no está disponible o la librería Leaflet no está cargada, salimos.
-                if (!mapRef.current || !window.L) return;
+                if (!mapRef.current) return;
+                if (!window.L) {
+                    setMapError('No se pudo cargar Leaflet. Revisa tu conexión a internet.');
+                    return;
+                }
 
                 // Si ya existe una instancia del mapa, no hacemos nada en este efecto.
                 // Las actualizaciones de tamaño se manejan en otros efectos.
@@ -451,6 +460,7 @@
                     clearInterval(checkIntervalId); // Limpiamos el intervalo ya que vamos a inicializar
 
                     try {
+                        setMapError('');
                         const initCoords = (gpsCoordinates && gpsCoordinates.length > 0)
                             ? [gpsCoordinates[0].lat, gpsCoordinates[0].lng]
                             : (currentLocation ? [currentLocation.lat, currentLocation.lng] : defaultCenter);
@@ -466,6 +476,7 @@
 
                         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                             maxZoom: 19,
+                            attribution: '&copy; OpenStreetMap',
                             keepBuffer: 4,
                             updateWhenIdle: false,
                             updateWhenZooming: false,
@@ -487,6 +498,7 @@
 
                     } catch (err) {
                         console.error('Error inicializando mapa Leaflet:', err);
+                        setMapError('No se pudo inicializar el mapa.');
                     }
                 };
 
@@ -508,7 +520,6 @@
                     if (mapInstance.current) {
                         mapInstance.current.remove();
                         mapInstance.current = null;
-                        setMapFullyInitialized(false);
                     }
                 };
             }, []); // Array de dependencias vacío: se ejecuta una vez al montar, se limpia al desmontar.
@@ -579,6 +590,9 @@
                 className: 'leaflet-map-wrapper',
                 style: { height: heightPx ? `${heightPx}px` : '100%' },
             },
+                mapError && React.createElement('div', {
+                    className: 'absolute inset-0 z-[1000] flex items-center justify-center bg-slate-900 text-center text-xs font-bold text-orange-300 p-4'
+                }, mapError),
                 React.createElement('div', {
                     ref: mapRef,
                     className: 'leaflet-map-inner',
@@ -759,8 +773,10 @@
             const stopGpsTracking = useCallback((isSkip=false) => {
                 if (gpsWatcherId.current) { navigator.geolocation.clearWatch(gpsWatcherId.current); gpsWatcherId.current = null; }
                 const finalDistance = gpsTotalDistance.current, finalTime = gpsTotalTime.current;
-                if (finalDistance > 0 && finalTime > 0 && gpsCoordinates.length > 1) {
+                const hasUsableGpsData = finalDistance > 0 && finalTime > 0 && gpsCoordinates.length > 1;
+                if (hasUsableGpsData) {
                     setHasGpsData(true);
+                    hasGpsDataRef.current = true;
                     setFinalGpsSummary({
                         distance: finalDistance,
                         time: finalTime,
@@ -769,7 +785,11 @@
                         pace: formatPace(finalDistance,finalTime),
                         speed: formatSpeed(finalDistance,finalTime)
                     });
-                } else { setHasGpsData(false); setFinalGpsSummary(null); }
+                } else {
+                    setHasGpsData(false);
+                    hasGpsDataRef.current = false;
+                    setFinalGpsSummary(null);
+                }
                 
                 speak('Seguimiento finalizado.', true, () => {
                     if (finalDistance > 0 && finalTime > 0) announceGpsStats(finalDistance, finalTime);
@@ -779,7 +799,7 @@
                     const nextStepIndex = idxRef.current + 1;
                     if (isSkip || nextStepIndex >= stepsRef.current.length || stepsRef.current[nextStepIndex].phase === POST_GPS_REST_PHASE_KEY) {
                         setUiStatus('finished');
-                        if (hasGpsDataRef.current) {
+                        if (hasUsableGpsData) {
                             setShowGpsResults(true);
                         } else {
                             if (!savedRef.current && workout) {
@@ -811,10 +831,14 @@
             const startGpsTracking = useCallback(async () => {
                 if (intervalIdRef.current) { clearInterval(intervalIdRef.current); intervalIdRef.current = null; }
                 if (!('geolocation' in navigator)) { speak('Geolocalización no disponible.', true); setIsGpsActive(false); setUiStatus('running'); skipStep(); return; }
-                try {
-                    const perm = await navigator.permissions.query({name:'geolocation'});
-                    if (perm.state === 'denied') { speak('Permiso de ubicación denegado.', true); setIsGpsActive(false); setUiStatus('running'); skipStep(); return; }
-                } catch(e) { speak('Error de permisos de ubicación.', true); setIsGpsActive(false); setUiStatus('running'); skipStep(); return; }
+                if (navigator.permissions && navigator.permissions.query) {
+                    try {
+                        const perm = await navigator.permissions.query({name:'geolocation'});
+                        if (perm.state === 'denied') { speak('Permiso de ubicación denegado.', true); setIsGpsActive(false); setUiStatus('running'); skipStep(); return; }
+                    } catch(e) {
+                        console.warn('No se pudo consultar el permiso de ubicación. Se solicitará al iniciar el GPS.', e);
+                    }
+                }
                 if (isGpsActiveRef.current) return;
                 speak('Iniciando seguimiento. Actualizaciones cada diez minutos.', true, () => { gpsAnnounceLastTime.current = Date.now(); });
                 setIsGpsActive(true); setUiStatus('gps-running');
