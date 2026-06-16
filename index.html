@@ -389,6 +389,58 @@
         }
 
         // ─── MapDisplay ───────────────────────────────────────────────────────────────
+        const LEAFLET_ASSETS = [
+            {
+                css: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
+                js: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+            },
+            {
+                css: 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css',
+                js: 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js'
+            },
+            {
+                css: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css',
+                js: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js'
+            }
+        ];
+
+        const loadStylesheetOnce = (href) => {
+            if (document.querySelector(`link[href="${href}"]`)) return;
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = href;
+            link.crossOrigin = '';
+            document.head.appendChild(link);
+        };
+
+        const loadScriptOnce = (src) => new Promise((resolve, reject) => {
+            const existing = document.querySelector(`script[src="${src}"]`);
+            if (existing) {
+                if (window.L) resolve(window.L);
+                else existing.remove();
+            }
+            const script = document.createElement('script');
+            script.src = src;
+            script.crossOrigin = '';
+            script.onload = () => window.L ? resolve(window.L) : reject(new Error('Leaflet no quedó disponible.'));
+            script.onerror = () => reject(new Error(`No se pudo cargar ${src}`));
+            document.head.appendChild(script);
+        });
+
+        const ensureLeafletLoaded = () => {
+            if (window.L) return Promise.resolve(window.L);
+            if (window.__leafletLoadPromise) return window.__leafletLoadPromise;
+
+            window.__leafletLoadPromise = LEAFLET_ASSETS.reduce((promise, asset) => {
+                return promise.catch(() => {
+                    loadStylesheetOnce(asset.css);
+                    return loadScriptOnce(asset.js);
+                });
+            }, Promise.reject()).then(() => window.L);
+
+            return window.__leafletLoadPromise;
+        };
+
         function MapDisplay({ gpsCoordinates, currentLocation, isLiveTracking, heightPx }) {
             const mapRef = useRef(null);
             const mapInstance = useRef(null);
@@ -429,10 +481,6 @@
             useEffect(() => {
                 // Si mapRef no está disponible o la librería Leaflet no está cargada, salimos.
                 if (!mapRef.current) return;
-                if (!window.L) {
-                    setMapError('No se pudo cargar Leaflet. Revisa tu conexión a internet.');
-                    return;
-                }
 
                 // Si ya existe una instancia del mapa, no hacemos nada en este efecto.
                 // Las actualizaciones de tamaño se manejan en otros efectos.
@@ -440,8 +488,23 @@
                     return;
                 }
 
+                let cancelled = false;
                 let initAttempted = false; // Bandera para evitar múltiples inicializaciones
                 let checkIntervalId = null; // ID para el intervalo de reintentos
+
+                if (!window.L) {
+                    setMapError('Cargando mapa...');
+                    ensureLeafletLoaded()
+                        .then(() => {
+                            if (cancelled) return;
+                            setMapError('');
+                            tryInitMap();
+                        })
+                        .catch((err) => {
+                            console.error('No se pudo cargar Leaflet desde los CDN de respaldo:', err);
+                            if (!cancelled) setMapError('No se pudo cargar el mapa. Revisa tu conexión o prueba recargar la página.');
+                        });
+                }
 
                 // Función para intentar inicializar el mapa
                 const tryInitMap = () => {
@@ -449,8 +512,10 @@
                         clearInterval(checkIntervalId); // Limpiamos el intervalo si ya se intentó o el mapa está listo
                         return;
                     }
+                    if (!window.L) return;
 
                     const container = mapRef.current;
+                    if (!container) return;
                     // Asegurarse de que el contenedor tenga dimensiones visibles antes de crear el mapa
                     if (container.offsetWidth === 0 || container.offsetHeight === 0) {
                         return; // Las dimensiones no están listas, intentamos de nuevo más tarde
@@ -510,6 +575,7 @@
 
                 return () => {
                     // Función de limpieza
+                    cancelled = true;
                     clearInterval(checkIntervalId);
                     invalidateTimers.current.forEach(t => clearTimeout(t));
 
