@@ -22,12 +22,28 @@
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+        html {
+            overscroll-behavior: none;
+            overscroll-behavior-y: none;
+            height: 100%;
+            overflow: hidden;
+        }
         body {
             font-family: 'Inter', sans-serif; background-color: #020617; color: white;
             margin: 0; padding: 0; overflow: hidden; -webkit-tap-highlight-color: transparent;
             position: fixed; width: 100%; height: 100%;
+            overscroll-behavior: none;
+            overscroll-behavior-y: none;
         }
-        #root { height: 100%; width: 100%; display: flex; flex-direction: column; }
+        #root {
+            height: 100%;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            overscroll-behavior: none;
+            overscroll-behavior-y: none;
+        }
         .glass-card {
             background: rgba(255,255,255,0.03); backdrop-filter: blur(10px);
             border: 1px solid rgba(255,255,255,0.05); border-radius: 1.5rem;
@@ -62,6 +78,37 @@
             width: 100% !important;
             height: 100% !important;
         }
+        .leaflet-container img,
+        .leaflet-container .leaflet-tile,
+        .leaflet-container .leaflet-marker-icon,
+        .leaflet-container .leaflet-marker-shadow {
+            max-width: none !important;
+            max-height: none !important;
+        }
+        .leaflet-container,
+        .leaflet-tile-pane {
+            background: #e5e7eb !important;
+        }
+        .leaflet-pane,
+        .leaflet-tile,
+        .leaflet-marker-icon,
+        .leaflet-marker-shadow,
+        .leaflet-tile-container,
+        .leaflet-pane > svg,
+        .leaflet-pane > canvas,
+        .leaflet-zoom-box,
+        .leaflet-image-layer,
+        .leaflet-layer {
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+        .leaflet-tile,
+        .leaflet-marker-icon,
+        .leaflet-marker-shadow {
+            user-select: none;
+            -webkit-user-drag: none;
+        }
 
         /* Phase selector styles */
         .phase-card {
@@ -89,6 +136,41 @@
             console.error('GLOBAL JS ERROR:', { message, source, lineno, colno, error });
             return true;
         };
+
+        let pullStartY = 0;
+        window.addEventListener('touchstart', (event) => {
+            if (event.touches && event.touches.length === 1) {
+                pullStartY = event.touches[0].clientY;
+            }
+        }, { passive: true });
+        window.addEventListener('touchmove', (event) => {
+            if (!event.touches || event.touches.length !== 1) return;
+
+            const currentY = event.touches[0].clientY;
+            const pullingDown = currentY > pullStartY;
+            const atTop = window.scrollY <= 0 && document.documentElement.scrollTop <= 0 && document.body.scrollTop <= 0;
+
+            if (atTop && pullingDown) {
+                event.preventDefault();
+            }
+        }, { passive: false });
+        try {
+            const manifest = {
+                name: 'Mi Entrenador Saludable',
+                short_name: 'Entrenador',
+                start_url: '.',
+                scope: '.',
+                display: 'fullscreen',
+                background_color: '#020617',
+                theme_color: '#020617',
+                orientation: 'portrait'
+            };
+            const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+            const manifestLink = document.createElement('link');
+            manifestLink.rel = 'manifest';
+            manifestLink.href = URL.createObjectURL(manifestBlob);
+            document.head.appendChild(manifestLink);
+        } catch(e) {}
 
         const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
@@ -184,22 +266,102 @@
 
         const voiceQueue = [];
         let voiceBusy = false;
+        let voiceGeneration = 0;
+        let voiceTimeout = null;
         const flushVoice = () => {
             if (voiceBusy || voiceQueue.length === 0 || !window.speechSynthesis) return;
             voiceBusy = true;
             const item = voiceQueue.shift();
             const text = typeof item === 'string' ? item : item.text;
             const onEndCallback = typeof item === 'object' && item.onEnd ? item.onEnd : () => {};
+            const generation = typeof item === 'object' && item.generation ? item.generation : voiceGeneration;
             const msg = new SpeechSynthesisUtterance(text);
             msg.lang = 'es-ES'; msg.rate = 1.05;
-            msg.onend = msg.onerror = () => { voiceBusy = false; onEndCallback(); flushVoice(); };
-            window.speechSynthesis.speak(msg);
+            const finish = () => {
+                if (generation !== voiceGeneration) return;
+                if (voiceTimeout) { clearTimeout(voiceTimeout); voiceTimeout = null; }
+                voiceBusy = false;
+                onEndCallback();
+                flushVoice();
+            };
+            msg.onend = msg.onerror = finish;
+            voiceTimeout = setTimeout(finish, Math.max(2500, text.length * 95));
+            try {
+                window.speechSynthesis.resume?.();
+                window.speechSynthesis.speak(msg);
+            } catch (err) {
+                console.warn('No se pudo reproducir voz:', err);
+                finish();
+            }
         };
         const speak = (text, interrupt = false, onEnd = null) => {
             if (!window.speechSynthesis) { if (onEnd) onEnd(); return; }
-            if (interrupt) { window.speechSynthesis.cancel(); voiceQueue.length = 0; voiceBusy = false; }
-            if (text) voiceQueue.push(onEnd ? { text, onEnd } : text);
+            if (interrupt) {
+                voiceGeneration++;
+                if (voiceTimeout) { clearTimeout(voiceTimeout); voiceTimeout = null; }
+                window.speechSynthesis.cancel();
+                voiceQueue.length = 0;
+                voiceBusy = false;
+            }
+            if (text) voiceQueue.push({ text, onEnd, generation: voiceGeneration });
             flushVoice();
+        };
+        const resumeVoice = () => {
+            try { window.speechSynthesis?.resume?.(); } catch(e) {}
+        };
+        const requestAppFullscreen = async () => {
+            // En Chrome Android, forzar Fullscreen API desde una página normal puede volver
+            // inestable la pestaña al apagar/encender pantalla. El modo sin barras debe venir
+            // de instalar la app como PWA, usando el manifest fullscreen.
+            return;
+        };
+        const getCapacitorPlugins = () => window.Capacitor?.Plugins || {};
+        const isNativeRuntime = () => !!window.Capacitor?.isNativePlatform?.();
+        const startLocationWatch = async (onPosition, onError) => {
+            const { Geolocation } = getCapacitorPlugins();
+            const options = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
+
+            if (isNativeRuntime() && Geolocation?.watchPosition) {
+                try {
+                    await Geolocation.requestPermissions?.();
+                    const id = await Geolocation.watchPosition(options, (position, err) => {
+                        if (err) { onError(err); return; }
+                        if (position?.coords) {
+                            onPosition({
+                                coords: {
+                                    latitude: position.coords.latitude,
+                                    longitude: position.coords.longitude
+                                }
+                            });
+                        }
+                    });
+                    return { type: 'capacitor', id };
+                } catch (err) {
+                    onError(err);
+                    return null;
+                }
+            }
+
+            if (!('geolocation' in navigator)) {
+                onError(new Error('Geolocalización no disponible.'));
+                return null;
+            }
+
+            const id = navigator.geolocation.watchPosition(onPosition, onError, options);
+            return { type: 'web', id };
+        };
+        const clearLocationWatch = async (watchHandle) => {
+            if (!watchHandle) return;
+            if (watchHandle.type === 'capacitor') {
+                try {
+                    const { Geolocation } = getCapacitorPlugins();
+                    await Geolocation?.clearWatch?.({ id: watchHandle.id });
+                } catch(e) {}
+                return;
+            }
+            if (watchHandle.type === 'web' && 'geolocation' in navigator) {
+                navigator.geolocation.clearWatch(watchHandle.id);
+            }
         };
 
         const startOfDay = (date) => { const d = new Date(date); d.setHours(0,0,0,0); return d; };
@@ -389,6 +551,58 @@
         }
 
         // ─── MapDisplay ───────────────────────────────────────────────────────────────
+        const LEAFLET_ASSETS = [
+            {
+                css: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
+                js: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+            },
+            {
+                css: 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css',
+                js: 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js'
+            },
+            {
+                css: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css',
+                js: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js'
+            }
+        ];
+
+        const loadStylesheetOnce = (href) => {
+            if (document.querySelector(`link[href="${href}"]`)) return;
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = href;
+            link.crossOrigin = '';
+            document.head.appendChild(link);
+        };
+
+        const loadScriptOnce = (src) => new Promise((resolve, reject) => {
+            const existing = document.querySelector(`script[src="${src}"]`);
+            if (existing) {
+                if (window.L) resolve(window.L);
+                else existing.remove();
+            }
+            const script = document.createElement('script');
+            script.src = src;
+            script.crossOrigin = '';
+            script.onload = () => window.L ? resolve(window.L) : reject(new Error('Leaflet no quedó disponible.'));
+            script.onerror = () => reject(new Error(`No se pudo cargar ${src}`));
+            document.head.appendChild(script);
+        });
+
+        const ensureLeafletLoaded = () => {
+            if (window.L) return Promise.resolve(window.L);
+            if (window.__leafletLoadPromise) return window.__leafletLoadPromise;
+
+            window.__leafletLoadPromise = LEAFLET_ASSETS.reduce((promise, asset) => {
+                return promise.catch(() => {
+                    loadStylesheetOnce(asset.css);
+                    return loadScriptOnce(asset.js);
+                });
+            }, Promise.reject()).then(() => window.L);
+
+            return window.__leafletLoadPromise;
+        };
+
         function MapDisplay({ gpsCoordinates, currentLocation, isLiveTracking, heightPx }) {
             const mapRef = useRef(null);
             const mapInstance = useRef(null);
@@ -398,7 +612,9 @@
             const endMarkerRef = useRef(null);
             const resizeObserverRef = useRef(null);
             const invalidateTimers = useRef([]);
+            const userMovingMapUntil = useRef(0);
             const [mapFullyInitialized, setMapFullyInitialized] = useState(false); // Nuevo estado para rastrear si el mapa está listo
+            const [mapError, setMapError] = useState('');
 
             const defaultCenter = [19.432608, -99.133209];
             const defaultZoom = 15;
@@ -410,10 +626,14 @@
                 [50, 150, 300, 600, 1200, 2500].forEach(delay => {
                     const t = setTimeout(() => {
                         if (mapInstance.current) {
-                            mapInstance.current.invalidateSize({ animate: false });
-                            mapInstance.current.eachLayer(layer => {
-                                if (layer.redraw) layer.redraw();
-                            });
+                            try {
+                                mapInstance.current.invalidateSize({ animate: false });
+                                mapInstance.current.eachLayer(layer => {
+                                    if (layer.redraw) layer.redraw();
+                                });
+                            } catch (err) {
+                                console.warn('No se pudo recalcular el tamaño del mapa:', err);
+                            }
                         }
                     }, delay);
                     invalidateTimers.current.push(t);
@@ -423,7 +643,7 @@
             // Inicialización y limpieza del mapa
             useEffect(() => {
                 // Si mapRef no está disponible o la librería Leaflet no está cargada, salimos.
-                if (!mapRef.current || !window.L) return;
+                if (!mapRef.current) return;
 
                 // Si ya existe una instancia del mapa, no hacemos nada en este efecto.
                 // Las actualizaciones de tamaño se manejan en otros efectos.
@@ -431,8 +651,23 @@
                     return;
                 }
 
+                let cancelled = false;
                 let initAttempted = false; // Bandera para evitar múltiples inicializaciones
                 let checkIntervalId = null; // ID para el intervalo de reintentos
+
+                if (!window.L) {
+                    setMapError('Cargando mapa...');
+                    ensureLeafletLoaded()
+                        .then(() => {
+                            if (cancelled) return;
+                            setMapError('');
+                            tryInitMap();
+                        })
+                        .catch((err) => {
+                            console.error('No se pudo cargar Leaflet desde los CDN de respaldo:', err);
+                            if (!cancelled) setMapError('No se pudo cargar el mapa. Revisa tu conexión o prueba recargar la página.');
+                        });
+                }
 
                 // Función para intentar inicializar el mapa
                 const tryInitMap = () => {
@@ -440,8 +675,10 @@
                         clearInterval(checkIntervalId); // Limpiamos el intervalo si ya se intentó o el mapa está listo
                         return;
                     }
+                    if (!window.L) return;
 
                     const container = mapRef.current;
+                    if (!container) return;
                     // Asegurarse de que el contenedor tenga dimensiones visibles antes de crear el mapa
                     if (container.offsetWidth === 0 || container.offsetHeight === 0) {
                         return; // Las dimensiones no están listas, intentamos de nuevo más tarde
@@ -451,6 +688,7 @@
                     clearInterval(checkIntervalId); // Limpiamos el intervalo ya que vamos a inicializar
 
                     try {
+                        setMapError('');
                         const initCoords = (gpsCoordinates && gpsCoordinates.length > 0)
                             ? [gpsCoordinates[0].lat, gpsCoordinates[0].lng]
                             : (currentLocation ? [currentLocation.lat, currentLocation.lng] : defaultCenter);
@@ -461,16 +699,22 @@
                             zoomControl: false,
                             attributionControl: false,
                             fadeAnimation: false,
+                            zoomAnimation: false,
                             markerZoomAnimation: false,
                         });
 
                         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                             maxZoom: 19,
-                            keepBuffer: 4,
-                            updateWhenIdle: false,
-                            updateWhenZooming: false,
+                            attribution: '&copy; OpenStreetMap',
+                            keepBuffer: 8,
+                            updateWhenIdle: true,
+                            updateWhenZooming: true,
                             crossOrigin: true,
                         }).addTo(mapInstance.current);
+
+                        mapInstance.current.on('dragstart zoomstart', () => {
+                            userMovingMapUntil.current = Date.now() + 10000;
+                        });
 
                         L.control.zoom({ position: 'topright' }).addTo(mapInstance.current);
 
@@ -487,6 +731,7 @@
 
                     } catch (err) {
                         console.error('Error inicializando mapa Leaflet:', err);
+                        setMapError('No se pudo inicializar el mapa.');
                     }
                 };
 
@@ -498,6 +743,7 @@
 
                 return () => {
                     // Función de limpieza
+                    cancelled = true;
                     clearInterval(checkIntervalId);
                     invalidateTimers.current.forEach(t => clearTimeout(t));
 
@@ -508,7 +754,6 @@
                     if (mapInstance.current) {
                         mapInstance.current.remove();
                         mapInstance.current = null;
-                        setMapFullyInitialized(false);
                     }
                 };
             }, []); // Array de dependencias vacío: se ejecuta una vez al montar, se limpia al desmontar.
@@ -553,17 +798,20 @@
                         [currentLocation.lat, currentLocation.lng],
                         { icon: mkIcon('#60A5FA', 14), zIndexOffset: 1000 }
                     ).addTo(map);
-                    map.setView([currentLocation.lat, currentLocation.lng], defaultZoom, { animate: false });
+                    if (Date.now() > userMovingMapUntil.current) {
+                        map.setView([currentLocation.lat, currentLocation.lng], map.getZoom() || defaultZoom, { animate: false });
+                    }
                 } else if (isLiveTracking && latlngs.length === 1) {
-                    map.setView(latlngs[0], defaultZoom, { animate: false });
+                    if (Date.now() > userMovingMapUntil.current) {
+                        map.setView(latlngs[0], map.getZoom() || defaultZoom, { animate: false });
+                    }
                 } else if (!isLiveTracking && latlngs.length > 1 && polylineInstance.current) {
                     map.fitBounds(polylineInstance.current.getBounds(), { padding: [50, 50], animate: false });
                 } else if (!isLiveTracking && latlngs.length === 0) {
                     map.setView(defaultCenter, defaultZoom, { animate: false });
                 }
                 
-                // Invalidación agresiva después de las actualizaciones de capas
-                scheduleInvalidate();
+                // No invalidamos el tamaño en cada punto GPS: hacerlo durante pan/zoom provoca parpadeos en móvil.
 
             }, [gpsCoordinates, currentLocation, isLiveTracking, mapFullyInitialized]); // Dependencias actualizadas
 
@@ -574,11 +822,32 @@
                 }
             }, [heightPx, mapFullyInitialized, scheduleInvalidate]);
 
+            useEffect(() => {
+                const handleResume = () => {
+                    if (mapInstance.current) {
+                        scheduleInvalidate();
+                    }
+                };
+                window.addEventListener('pageshow', handleResume);
+                window.addEventListener('focus', handleResume);
+                document.addEventListener('visibilitychange', handleResume);
+                window.addEventListener('mientrenador-resume', handleResume);
+                return () => {
+                    window.removeEventListener('pageshow', handleResume);
+                    window.removeEventListener('focus', handleResume);
+                    document.removeEventListener('visibilitychange', handleResume);
+                    window.removeEventListener('mientrenador-resume', handleResume);
+                };
+            }, [scheduleInvalidate]);
+
             // El div del contenedor del mapa con altura explícita
             return React.createElement('div', {
                 className: 'leaflet-map-wrapper',
                 style: { height: heightPx ? `${heightPx}px` : '100%' },
             },
+                mapError && React.createElement('div', {
+                    className: 'absolute inset-0 z-[1000] flex items-center justify-center bg-slate-900 text-center text-xs font-bold text-orange-300 p-4'
+                }, mapError),
                 React.createElement('div', {
                     ref: mapRef,
                     className: 'leaflet-map-inner',
@@ -672,8 +941,11 @@
             const gpsTotalTime = useRef(0);
             const hasGpsDataRef = useRef(hasGpsData);
             const isGpsActiveRef = useRef(isGpsActive);
+            const gpsStartingRef = useRef(false);
+            const gpsStoppingRef = useRef(false);
             const stopGpsTrackingRef = useRef();
             const intervalIdRef = useRef(null);
+            const gpsAnnounceIntervalRef = useRef(null);
 
             useEffect(() => { statusRef.current = uiStatus; }, [uiStatus]);
             useEffect(() => { idxRef.current = uiIdx; }, [uiIdx]);
@@ -691,13 +963,17 @@
                 if (!isGpsActive || uiStatus !== 'gps-running') return;
                 const calcHeight = () => {
                     if (gpsScreenRef.current) {
-                        // La pantalla tiene padding 24px arriba/abajo (p-6 = 24px)
-                        // Header: ~52px, stats grid: ~100px, botón: ~80px, gaps ~32px
-                        // Total no-mapa: ~288px. Restamos del alto total de la pantalla.
                         const screenH = gpsScreenRef.current.clientHeight || window.innerHeight;
-                        const reserved = 52 + 100 + 80 + 32 + 48; // header + stats + btn + gaps + padding
-                        const mapH = Math.max(180, screenH - reserved);
-                        setGpsMapHeight(mapH);
+                        // Calcular la altura de los elementos *distintos* de la tarjeta del mapa, incluyendo márgenes/rellenos
+                        // El div raíz tiene `style={{ padding: '24px' }}` => 48px de relleno vertical.
+                        // h2 (text-2xl font-black uppercase text-orange-500 mb-3): ~30px (altura de línea) + 12px (mb-3) = 42px
+                        // Tarjeta de estadísticas (glass-card p-3 mb-3): 2*12px (p-3) + ~70px (contenido) + 12px (mb-3) = ~106px
+                        // Botón "TERMINAR ACTIVIDAD GPS" (w-full ... py-5 ...): 2*20px (py-5) + ~20px (contenido) = ~60px
+                        // Altura total fija: 48 (relleno raíz) + 42 (h2 + su margen) + 106 (tarjeta de estadísticas + su margen) + 60 (botón) = 256px
+                        const totalFixedHeight = 256;
+                        // Esta `mapElementHeight` es la *altura exacta en píxeles* que el div exterior de Leaflet (leaflet-map-wrapper) necesita.
+                        const mapElementHeight = Math.max(180, screenH - totalFixedHeight);
+                        setGpsMapHeight(mapElementHeight);
                     }
                 };
                 // Calcular inmediatamente y con pequeño delay para asegurar que el DOM esté listo
@@ -707,7 +983,7 @@
             }, [isGpsActive, uiStatus]);
 
             const announceGpsStats = useCallback((distance, timeSec) => {
-                speak(`Distancia: ${formatDistance(distance)}. Velocidad: ${formatSpeed(distance, timeSec)}. Ritmo: ${formatPace(distance, timeSec)}.`, true);
+                speak(`Distancia: ${formatDistance(distance)}. Velocidad: ${formatSpeed(distance, timeSec)}. Ritmo: ${formatPace(distance, timeSec)}.`, false);
             }, []);
 
             const handleSpeech = useCallback((step, stepIdx, remaining) => {
@@ -753,10 +1029,16 @@
             }, [endWorkout, setTime]);
 
             const stopGpsTracking = useCallback((isSkip=false) => {
-                if (gpsWatcherId.current) { navigator.geolocation.clearWatch(gpsWatcherId.current); gpsWatcherId.current = null; }
+                if (gpsStoppingRef.current) return;
+                gpsStoppingRef.current = true;
+                gpsStartingRef.current = false;
+                if (gpsWatcherId.current) { clearLocationWatch(gpsWatcherId.current); gpsWatcherId.current = null; }
+                if (gpsAnnounceIntervalRef.current) { clearInterval(gpsAnnounceIntervalRef.current); gpsAnnounceIntervalRef.current = null; }
                 const finalDistance = gpsTotalDistance.current, finalTime = gpsTotalTime.current;
-                if (finalDistance > 0 && finalTime > 0 && gpsCoordinates.length > 1) {
+                const hasUsableGpsData = finalDistance > 0 && finalTime > 0 && gpsCoordinates.length > 1;
+                if (hasUsableGpsData) {
                     setHasGpsData(true);
+                    hasGpsDataRef.current = true;
                     setFinalGpsSummary({
                         distance: finalDistance,
                         time: finalTime,
@@ -765,9 +1047,16 @@
                         pace: formatPace(finalDistance,finalTime),
                         speed: formatSpeed(finalDistance,finalTime)
                     });
-                } else { setHasGpsData(false); setFinalGpsSummary(null); }
+                } else {
+                    setHasGpsData(false);
+                    hasGpsDataRef.current = false;
+                    setFinalGpsSummary(null);
+                }
                 
-                speak('Seguimiento finalizado.', true, () => {
+                let finishedStopFlow = false;
+                const finishStopFlow = () => {
+                    if (finishedStopFlow) return;
+                    finishedStopFlow = true;
                     if (finalDistance > 0 && finalTime > 0) announceGpsStats(finalDistance, finalTime);
                     setIsGpsActive(false);
                     setCurrentLocation(null);
@@ -775,7 +1064,7 @@
                     const nextStepIndex = idxRef.current + 1;
                     if (isSkip || nextStepIndex >= stepsRef.current.length || stepsRef.current[nextStepIndex].phase === POST_GPS_REST_PHASE_KEY) {
                         setUiStatus('finished');
-                        if (hasGpsDataRef.current) {
+                        if (hasUsableGpsData) {
                             setShowGpsResults(true);
                         } else {
                             if (!savedRef.current && workout) {
@@ -788,7 +1077,9 @@
                         setUiStatus('running');
                         advanceToStep(idxRef.current + 1);
                     }
-                });
+                };
+                speak('Seguimiento finalizado.', true, finishStopFlow);
+                setTimeout(finishStopFlow, 1200);
             }, [advanceToStep, announceGpsStats, gpsCoordinates, workout, onComplete, onExit, elapsedRef, finalGpsSummary]);
 
             useEffect(() => { stopGpsTrackingRef.current = stopGpsTracking; }, [stopGpsTracking]);
@@ -805,20 +1096,41 @@
             }, [endWorkout, advanceToStep, handleSpeech]);
 
             const startGpsTracking = useCallback(async () => {
+                if (gpsStartingRef.current || isGpsActiveRef.current) return;
+                gpsStartingRef.current = true;
                 if (intervalIdRef.current) { clearInterval(intervalIdRef.current); intervalIdRef.current = null; }
-                if (!('geolocation' in navigator)) { speak('Geolocalización no disponible.', true); setIsGpsActive(false); setUiStatus('running'); skipStep(); return; }
-                try {
-                    const perm = await navigator.permissions.query({name:'geolocation'});
-                    if (perm.state === 'denied') { speak('Permiso de ubicación denegado.', true); setIsGpsActive(false); setUiStatus('running'); skipStep(); return; }
-                } catch(e) { speak('Error de permisos de ubicación.', true); setIsGpsActive(false); setUiStatus('running'); skipStep(); return; }
-                if (isGpsActiveRef.current) return;
+                if (!isNativeRuntime() && !('geolocation' in navigator)) { gpsStartingRef.current = false; speak('Geolocalización no disponible.', true); setIsGpsActive(false); setUiStatus('running'); skipStep(); return; }
+                if (!isNativeRuntime() && navigator.permissions && navigator.permissions.query) {
+                    try {
+                        const perm = await navigator.permissions.query({name:'geolocation'});
+                        if (perm.state === 'denied') { gpsStartingRef.current = false; speak('Permiso de ubicación denegado.', true); setIsGpsActive(false); setUiStatus('running'); skipStep(); return; }
+                    } catch(e) {
+                        console.warn('No se pudo consultar el permiso de ubicación. Se solicitará al iniciar el GPS.', e);
+                    }
+                }
                 speak('Iniciando seguimiento. Actualizaciones cada diez minutos.', true, () => { gpsAnnounceLastTime.current = Date.now(); });
                 setIsGpsActive(true); setUiStatus('gps-running');
+                isGpsActiveRef.current = true;
+                gpsStartingRef.current = false;
+                gpsStoppingRef.current = false;
                 gpsStartTime.current = Date.now(); lastPosition.current = null;
                 gpsTotalDistance.current = 0; gpsTotalTime.current = 0;
                 setGpsCoordinates([]); setHasGpsData(false); setFinalGpsSummary(null);
-                gpsWatcherId.current = navigator.geolocation.watchPosition(
-                    (position) => {
+                if (gpsAnnounceIntervalRef.current) { clearInterval(gpsAnnounceIntervalRef.current); gpsAnnounceIntervalRef.current = null; }
+                gpsAnnounceIntervalRef.current = setInterval(() => {
+                    if (statusRef.current !== 'gps-running' || gpsStoppingRef.current) return;
+                    resumeVoice();
+                    const now = Date.now();
+                    const currentGpsTotalTime = Math.floor((now - (gpsStartTime.current || now)) / 1000);
+                    gpsTotalTime.current = currentGpsTotalTime;
+                    if (currentGpsTotalTime > 0 && (now - gpsAnnounceLastTime.current) >= 600000) {
+                        announceGpsStats(gpsTotalDistance.current, currentGpsTotalTime);
+                        gpsAnnounceLastTime.current = now;
+                    }
+                }, 5000);
+                try {
+                    gpsWatcherId.current = await startLocationWatch(
+                        (position) => {
                         const {latitude, longitude} = position.coords;
                         const now = Date.now();
                         const currentGpsTotalTime = Math.floor((now - (gpsStartTime.current||now))/1000);
@@ -837,14 +1149,20 @@
                             announceGpsStats(gpsTotalDistance.current, currentGpsTotalTime);
                             gpsAnnounceLastTime.current = now;
                         }
-                    },
-                    (error) => { speak(`Error de GPS: ${error.message}.`, true); stopGpsTrackingRef.current(); },
-                    {enableHighAccuracy:true, timeout:10000, maximumAge:0}
-                );
+                        },
+                        (error) => { gpsStartingRef.current = false; speak(`Error de GPS: ${error.message || error}.`, true); stopGpsTrackingRef.current(); }
+                    );
+                } catch (err) {
+                    gpsStartingRef.current = false;
+                    speak(`Error de GPS: ${err.message}.`, true);
+                    stopGpsTrackingRef.current();
+                }
             }, [skipStep, announceGpsStats, setElap]);
 
             const togglePlay = useCallback(() => {
                 if (!workout || stepsRef.current.length === 0) return;
+                requestAppFullscreen();
+                resumeVoice();
                 const current = statusRef.current;
                 if (current === 'ready') {
                     const now = Date.now(); workoutStartRef.current = now; stepStartRef.current = now; setUiStatus('running');
@@ -866,20 +1184,24 @@
             }, []);
             const requestWake = useCallback(async () => {
                 try {
-                    if (statusRef.current === 'running' && 'wakeLock' in navigator && !wakeLockRef.current)
+                    if ((statusRef.current === 'running' || statusRef.current === 'gps-running') && 'wakeLock' in navigator && !wakeLockRef.current)
                         wakeLockRef.current = await navigator.wakeLock.request('screen');
-                    else if (statusRef.current !== 'running' && wakeLockRef.current) releaseWake();
+                    else if (statusRef.current !== 'running' && statusRef.current !== 'gps-running' && wakeLockRef.current) releaseWake();
                 } catch(e) {}
             }, [releaseWake]);
 
-            useEffect(() => { if (uiStatus === 'running') requestWake(); else releaseWake(); return releaseWake; }, [uiStatus, requestWake, releaseWake]);
+            useEffect(() => { if (uiStatus === 'running' || uiStatus === 'gps-running') requestWake(); else releaseWake(); return releaseWake; }, [uiStatus, requestWake, releaseWake]);
 
             useEffect(() => {
                 const handleVisibility = () => {
                     if (document.hidden) {
                         if (statusRef.current === 'running') { pausedAtRef.current = Date.now(); setUiStatus('paused'); }
-                        releaseWake();
+                        if (statusRef.current !== 'gps-running') releaseWake();
                     } else {
+                        resumeVoice();
+                        window.dispatchEvent(new Event('mientrenador-resume'));
+                        setTimeout(() => window.dispatchEvent(new Event('mientrenador-resume')), 300);
+                        if (statusRef.current === 'gps-running') requestWake();
                         if (statusRef.current === 'paused' && pausedAtRef.current !== null) {
                             const hiddenMs = Date.now() - pausedAtRef.current;
                             workoutStartRef.current = (workoutStartRef.current!=null&&!isNaN(workoutStartRef.current)) ? workoutStartRef.current+hiddenMs : Date.now();
@@ -890,7 +1212,7 @@
                 };
                 document.addEventListener('visibilitychange', handleVisibility);
                 return () => document.removeEventListener('visibilitychange', handleVisibility);
-            }, [releaseWake]);
+            }, [releaseWake, requestWake]);
 
             useEffect(() => {
                 setUiStatus('ready'); setUiIdx(0); setElap(0); setTime(0);
@@ -899,9 +1221,12 @@
                 setShowGpsResults(false);
                 setGpsCoordinates([]);
                 setCurrentLocation(null);
+                gpsStartingRef.current = false;
+                gpsStoppingRef.current = false;
                 setHasGpsData(false); setFinalGpsSummary(null); setShouldAutoStart(false); setIsGpsActive(false);
-                if (gpsWatcherId.current) { navigator.geolocation.clearWatch(gpsWatcherId.current); gpsWatcherId.current = null; }
+                if (gpsWatcherId.current) { clearLocationWatch(gpsWatcherId.current); gpsWatcherId.current = null; }
                 if (intervalIdRef.current) { clearInterval(intervalIdRef.current); intervalIdRef.current = null; }
+                if (gpsAnnounceIntervalRef.current) { clearInterval(gpsAnnounceIntervalRef.current); gpsAnnounceIntervalRef.current = null; }
                 if (!workout || !selectedPhases) { setSteps([]); return; }
 
                 const generated = generateWorkoutSteps(workout, DEFAULT_PARAMS, selectedPhases);
@@ -912,6 +1237,7 @@
                 return () => {
                     if (isGpsActiveRef.current && stopGpsTrackingRef.current) stopGpsTrackingRef.current(true);
                     if (intervalIdRef.current) { clearInterval(intervalIdRef.current); intervalIdRef.current = null; }
+                    if (gpsAnnounceIntervalRef.current) { clearInterval(gpsAnnounceIntervalRef.current); gpsAnnounceIntervalRef.current = null; }
                 };
             }, [workout, selectedPhases]);
 
@@ -973,22 +1299,29 @@
             const showOverlay = uiStatus === 'ready' || uiStatus === 'paused';
 
             // ─── PANTALLA GPS EN VIVO ─────────────────────────────────────────────────
-            // CORRECCIÓN: se usa ref en el contenedor para calcular gpsMapHeight,
-            // y se pasa heightPx explícito al MapDisplay en lugar de flex-1.
             if (isGpsActive && uiStatus === 'gps-running') return React.createElement('div', {
                 ref: gpsScreenRef,
                 className: "h-screen flex flex-col bg-slate-950 text-white",
                 style: { padding: '24px' },
             },
                 React.createElement('h2', { className:"text-2xl font-black uppercase text-orange-500 mb-3 text-center shrink-0" }, "Seguimiento GPS en vivo"),
-                // Mapa con altura calculada explícitamente
-                React.createElement('div', { className:"glass-card p-3 mb-3", style:{ flex: 1, display:'flex', flexDirection:'column', minHeight: 0 } },
+                // El contenedor `glass-card` ahora recibe su altura explícitamente,
+                // que es la altura del mapa `gpsMapHeight` más su padding vertical (`p-3` = 24px).
+                React.createElement('div', {
+                    className: "glass-card p-3 mb-3",
+                    style:{
+                        height: gpsMapHeight > 0 ? `${gpsMapHeight + 24}px` : '304px', // 280 (map default) + 24 (p-3)
+                        display:'flex',
+                        flexDirection:'column',
+                        minHeight: 0 // Permite que se encoja si es necesario
+                    }
+                },
+                    // MapDisplay ahora recibe la altura neta para su `leaflet-map-wrapper`.
                     React.createElement(MapDisplay, {
                         gpsCoordinates,
                         currentLocation,
                         isLiveTracking: true,
-                        // Si aún no se calculó, usamos una altura por defecto razonable
-                        heightPx: gpsMapHeight > 0 ? gpsMapHeight - 32 : 280,
+                        heightPx: gpsMapHeight > 0 ? gpsMapHeight : 280,
                     })
                 ),
                 // Estadísticas GPS
@@ -1002,6 +1335,11 @@
                 ),
                 React.createElement('button', {
                     onClick: () => stopGpsTrackingRef.current(),
+                    onTouchEnd: (event) => {
+                        event.preventDefault();
+                        stopGpsTrackingRef.current();
+                    },
+                    onPointerUp: () => stopGpsTrackingRef.current(),
                     className: "w-full shrink-0 bg-red-600/80 text-white py-5 rounded-full font-black uppercase active:scale-95 italic"
                 }, "TERMINAR ACTIVIDAD GPS")
             );
@@ -1232,6 +1570,7 @@
             }, [user]);
 
             const handlePhasesSelected = useCallback((phases) => {
+                requestAppFullscreen();
                 if (window.speechSynthesis) {
                     const silent = new SpeechSynthesisUtterance(' ');
                     silent.volume = 0; window.speechSynthesis.speak(silent);
@@ -1246,6 +1585,7 @@
             }, []);
 
             const handleStartWorkout = useCallback((workout) => {
+                requestAppFullscreen();
                 setSelectedWorkout(workout);
                 setView('play');
             }, []);
