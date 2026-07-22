@@ -479,6 +479,13 @@
             return steps;
         };
 
+        // ─── Componente para placeholder de anuncios ──────────────────────────────────
+        const AdBannerPlaceholder = () => React.createElement('div', {
+            className: "glass-card p-4 text-center text-xs text-slate-500 italic",
+            style: { minHeight: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+        }, "Espacio para anuncios o mensajes futuros");
+        // ──────────────────────────────────────────────────────────────────────────────
+
         // ─── PhaseSelectionScreen ─────────────────────────────────────────────────────
         function PhaseSelectionScreen({ onPhasesSelected, user, workouts, onCreateWorkout }) {
             const [selectedPhases, setSelectedPhases] = useState([]);
@@ -540,6 +547,7 @@
                     )
                 ),
                 React.createElement('div', { className: "p-5 pb-10 shrink-0 space-y-3" },
+                    React.createElement(AdBannerPlaceholder, null), // Añadido el campo de anuncio aquí
                     React.createElement('button', {
                         onClick: handleStart,
                         disabled: selectedPhases.length === 0,
@@ -1663,6 +1671,7 @@
                             )
                         ))
                 ),
+                React.createElement(AdBannerPlaceholder, null), // Añadido el campo de anuncio aquí
                 React.createElement('button', { onClick:onCreate, className:"w-full mt-4 bg-white/5 border border-white/10 py-6 rounded-full font-black uppercase italic" }, "➕ NUEVA RUTINA")
             );
         }
