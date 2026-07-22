@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+subir cambios<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -15,9 +15,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
-    <!-- Leaflet CSS -->
+    <!-- Leaflet CSS and JS are now loaded dynamically if not present, but keeping these as fallbacks/primary load -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQPDQwr7xKEkmV3S8gawQ9G4Bsn4APw=" crossorigin="" />
-    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZQXNrHE1BlClZlAWyowE0/fiPzS=" crossorigin=""></script>
 
     <style>
@@ -64,9 +63,11 @@
         .leaflet-map-wrapper {
             position: relative;
             width: 100%;
+            /* height: 100%; Removed explicit height, parent must define it */
             border-radius: 1.25rem;
             overflow: hidden;
             background-color: #0f172a;
+            flex: 1; /* Added flex:1 to adapt to parent's flex layout */
         }
         /* El div interno al que Leaflet se monta */
         .leaflet-map-wrapper .leaflet-map-inner {
@@ -576,10 +577,10 @@
         };
 
         const loadScriptOnce = (src) => new Promise((resolve, reject) => {
-            const existing = document.querySelector(`script[src="${src}"]`);
-            if (existing) {
-                if (window.L) resolve(window.L);
-                else existing.remove();
+            if (document.querySelector(`script[src="${src}"]`)) {
+                if (window.L) return resolve(window.L);
+                // If script exists but L is not ready, it might be loading or failed. Remove and retry.
+                document.querySelector(`script[src="${src}"]`).remove();
             }
             const script = document.createElement('script');
             script.src = src;
@@ -591,19 +592,20 @@
 
         const ensureLeafletLoaded = () => {
             if (window.L) return Promise.resolve(window.L);
-            if (window.__leafletLoadPromise) return window.__leafletLoadPromise;
+            if (window.__leafletLoadPromise) return window.__leafletLoadPromise; // Reuse existing promise
 
+            // Try loading from multiple CDNs sequentially
             window.__leafletLoadPromise = LEAFLET_ASSETS.reduce((promise, asset) => {
                 return promise.catch(() => {
                     loadStylesheetOnce(asset.css);
                     return loadScriptOnce(asset.js);
                 });
-            }, Promise.reject()).then(() => window.L);
+            }, Promise.reject(new Error('Initial Leaflet load attempt'))).then(() => window.L);
 
             return window.__leafletLoadPromise;
         };
 
-        function MapDisplay({ gpsCoordinates, currentLocation, isLiveTracking, heightPx }) {
+        function MapDisplay({ gpsCoordinates, currentLocation, isLiveTracking }) {
             const mapRef = useRef(null);
             const mapInstance = useRef(null);
             const polylineInstance = useRef(null);
@@ -611,90 +613,55 @@
             const startMarkerRef = useRef(null);
             const endMarkerRef = useRef(null);
             const resizeObserverRef = useRef(null);
-            const invalidateTimers = useRef([]);
             const userMovingMapUntil = useRef(0);
-            const [mapFullyInitialized, setMapFullyInitialized] = useState(false); // Nuevo estado para rastrear si el mapa está listo
             const [mapError, setMapError] = useState('');
+            const [leafletReady, setLeafletReady] = useState(!!window.L);
+            const mapFullyInitialized = useRef(false);
 
             const defaultCenter = [19.432608, -99.133209];
             const defaultZoom = 15;
 
-            // Función auxiliar para forzar invalidateSize en varios momentos
-            const scheduleInvalidate = useCallback(() => {
-                invalidateTimers.current.forEach(t => clearTimeout(t));
-                invalidateTimers.current = [];
-                [50, 150, 300, 600, 1200, 2500].forEach(delay => {
-                    const t = setTimeout(() => {
-                        if (mapInstance.current) {
-                            try {
-                                mapInstance.current.invalidateSize({ animate: false });
-                                mapInstance.current.eachLayer(layer => {
-                                    if (layer.redraw) layer.redraw();
-                                });
-                            } catch (err) {
-                                console.warn('No se pudo recalcular el tamaño del mapa:', err);
-                            }
-                        }
-                    }, delay);
-                    invalidateTimers.current.push(t);
-                });
-            }, []);
-
-            // Inicialización y limpieza del mapa
+            // Initialize map and setup resize observer
             useEffect(() => {
-                // Si mapRef no está disponible o la librería Leaflet no está cargada, salimos.
                 if (!mapRef.current) return;
+                let cleanupInterval;
+                let initAttempted = false;
 
-                // Si ya existe una instancia del mapa, no hacemos nada en este efecto.
-                // Las actualizaciones de tamaño se manejan en otros efectos.
-                if (mapInstance.current) {
-                    return;
-                }
-
-                let cancelled = false;
-                let initAttempted = false; // Bandera para evitar múltiples inicializaciones
-                let checkIntervalId = null; // ID para el intervalo de reintentos
-
-                if (!window.L) {
-                    setMapError('Cargando mapa...');
-                    ensureLeafletLoaded()
-                        .then(() => {
-                            if (cancelled) return;
-                            setMapError('');
-                            tryInitMap();
-                        })
-                        .catch((err) => {
-                            console.error('No se pudo cargar Leaflet desde los CDN de respaldo:', err);
-                            if (!cancelled) setMapError('No se pudo cargar el mapa. Revisa tu conexión o prueba recargar la página.');
-                        });
-                }
-
-                // Función para intentar inicializar el mapa
-                const tryInitMap = () => {
+                const attemptMapInitialization = async () => {
                     if (initAttempted || mapInstance.current) {
-                        clearInterval(checkIntervalId); // Limpiamos el intervalo si ya se intentó o el mapa está listo
+                        clearInterval(cleanupInterval);
                         return;
                     }
-                    if (!window.L) return;
+
+                    if (!window.L) {
+                        setMapError('Cargando mapa...');
+                        try {
+                            await ensureLeafletLoaded();
+                            setLeafletReady(true);
+                            setMapError('');
+                        } catch (err) {
+                            console.error('No se pudo cargar Leaflet:', err);
+                            setMapError('No se pudo cargar el mapa. Revisa tu conexión.');
+                            return; // Stop further attempts if Leaflet failed to load
+                        }
+                    } else if (!leafletReady) {
+                        setLeafletReady(true); // Leaflet became available externally
+                    }
+
+                    if (!window.L || !mapRef.current) return; // Re-check after potential load
 
                     const container = mapRef.current;
-                    if (!container) return;
-                    // Asegurarse de que el contenedor tenga dimensiones visibles antes de crear el mapa
+                    // Ensure container has visible dimensions
                     if (container.offsetWidth === 0 || container.offsetHeight === 0) {
-                        return; // Las dimensiones no están listas, intentamos de nuevo más tarde
+                        return; // Dimensions not ready, try again
                     }
-                    
-                    initAttempted = true; // Marcamos el intento
-                    clearInterval(checkIntervalId); // Limpiamos el intervalo ya que vamos a inicializar
+
+                    initAttempted = true;
+                    clearInterval(cleanupInterval); // Clear interval once attempt is made
 
                     try {
-                        setMapError('');
-                        const initCoords = (gpsCoordinates && gpsCoordinates.length > 0)
-                            ? [gpsCoordinates[0].lat, gpsCoordinates[0].lng]
-                            : (currentLocation ? [currentLocation.lat, currentLocation.lng] : defaultCenter);
-
                         mapInstance.current = L.map(container, {
-                            center: initCoords,
+                            center: defaultCenter,
                             zoom: defaultZoom,
                             zoomControl: false,
                             attributionControl: false,
@@ -718,10 +685,9 @@
 
                         L.control.zoom({ position: 'topright' }).addTo(mapInstance.current);
 
-                        scheduleInvalidate(); // Invalidación agresiva después de la creación inicial
-                        setMapFullyInitialized(true); // El mapa está completamente configurado
+                        mapFullyInitialized.current = true;
+                        mapInstance.current.invalidateSize({ animate: false }); // Initial invalidation
 
-                        // Configurar ResizeObserver para monitoreo continuo del tamaño
                         resizeObserverRef.current = new ResizeObserver(() => {
                             if (mapInstance.current) {
                                 mapInstance.current.invalidateSize({ animate: false });
@@ -735,18 +701,13 @@
                     }
                 };
 
-                // Intentar inicializar inmediatamente
-                tryInitMap();
-
-                // Configurar un intervalo como mecanismo de respaldo/reintento
-                checkIntervalId = setInterval(tryInitMap, 200); // Comprobar cada 200ms
+                // Attempt immediate initialization
+                attemptMapInitialization();
+                // Setup interval for retries until map is initialized
+                cleanupInterval = setInterval(attemptMapInitialization, 200);
 
                 return () => {
-                    // Función de limpieza
-                    cancelled = true;
-                    clearInterval(checkIntervalId);
-                    invalidateTimers.current.forEach(t => clearTimeout(t));
-
+                    clearInterval(cleanupInterval);
                     if (resizeObserverRef.current) {
                         resizeObserverRef.current.disconnect();
                         resizeObserverRef.current = null;
@@ -754,30 +715,32 @@
                     if (mapInstance.current) {
                         mapInstance.current.remove();
                         mapInstance.current = null;
+                        mapFullyInitialized.current = false;
                     }
                 };
-            }, []); // Array de dependencias vacío: se ejecuta una vez al montar, se limpia al desmontar.
+            }, [leafletReady]);
 
-            // Efecto para actualizar las capas del mapa (polilíneas, marcadores, centrado) cuando los datos cambian.
+            // Effect for updating map layers and view
             useEffect(() => {
                 const map = mapInstance.current;
-                // Solo procedemos si el mapa está inicializado y listo
-                if (!map || !mapFullyInitialized) return;
-
-                // Limpiar capas previas
-                if (polylineInstance.current) { map.removeLayer(polylineInstance.current); polylineInstance.current = null; }
-                if (currentMarker.current)    { map.removeLayer(currentMarker.current);    currentMarker.current = null; }
-                if (startMarkerRef.current)   { map.removeLayer(startMarkerRef.current);   startMarkerRef.current = null; }
-                if (endMarkerRef.current)     { map.removeLayer(endMarkerRef.current);     endMarkerRef.current = null; }
+                if (!map || !mapFullyInitialized.current) return;
 
                 const coords = gpsCoordinates || [];
                 const latlngs = coords.map(c => [c.lat, c.lng]);
 
+                // Update or create polyline
                 if (latlngs.length > 1) {
-                    polylineInstance.current = L.polyline(latlngs, { color: '#f97316', weight: 5, opacity: 1.0 }).addTo(map);
+                    if (polylineInstance.current) {
+                        polylineInstance.current.setLatLngs(latlngs);
+                    } else {
+                        polylineInstance.current = L.polyline(latlngs, { color: '#f97316', weight: 5, opacity: 1.0 }).addTo(map);
+                    }
+                } else if (polylineInstance.current) {
+                    map.removeLayer(polylineInstance.current);
+                    polylineInstance.current = null;
                 }
 
-                // Iconos personalizados con divIcon (sin dependencia de imágenes externas)
+                // Custom icon for markers
                 const mkIcon = (color, size) => L.divIcon({
                     className: '',
                     html: `<div style="background:${color};width:${size}px;height:${size}px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 4px rgba(0,0,0,.5);"></div>`,
@@ -785,47 +748,61 @@
                     iconAnchor: [size/2, size/2],
                 });
 
+                // Update or create start marker
                 if (latlngs.length > 0) {
-                    startMarkerRef.current = L.marker(latlngs[0], { icon: mkIcon('#EF4444', 16) }).addTo(map);
-                    if (!isLiveTracking && latlngs.length > 1) {
-                        endMarkerRef.current = L.marker(latlngs[latlngs.length - 1], { icon: mkIcon('#4ADE80', 16) }).addTo(map);
+                    if (startMarkerRef.current) {
+                        startMarkerRef.current.setLatLng(latlngs[0]);
+                    } else {
+                        startMarkerRef.current = L.marker(latlngs[0], { icon: mkIcon('#EF4444', 16) }).addTo(map);
                     }
+                } else if (startMarkerRef.current) {
+                    map.removeLayer(startMarkerRef.current);
+                    startMarkerRef.current = null;
                 }
 
-                // Lógica de centrado
+                // Update or create end marker (only if not live tracking and more than 1 point)
+                if (!isLiveTracking && latlngs.length > 1) {
+                    const lastLatLng = latlngs[latlngs.length - 1];
+                    if (endMarkerRef.current) {
+                        endMarkerRef.current.setLatLng(lastLatLng);
+                    } else {
+                        endMarkerRef.current = L.marker(lastLatLng, { icon: mkIcon('#4ADE80', 16) }).addTo(map);
+                    }
+                } else if (endMarkerRef.current) {
+                    map.removeLayer(endMarkerRef.current);
+                    endMarkerRef.current = null;
+                }
+
+                // Update or create current location marker (only for live tracking)
                 if (currentLocation && isLiveTracking) {
-                    currentMarker.current = L.marker(
-                        [currentLocation.lat, currentLocation.lng],
-                        { icon: mkIcon('#60A5FA', 14), zIndexOffset: 1000 }
-                    ).addTo(map);
-                    if (Date.now() > userMovingMapUntil.current) {
-                        map.setView([currentLocation.lat, currentLocation.lng], map.getZoom() || defaultZoom, { animate: false });
+                    const currentLatLng = [currentLocation.lat, currentLocation.lng];
+                    if (currentMarker.current) {
+                        currentMarker.current.setLatLng(currentLatLng);
+                    } else {
+                        currentMarker.current = L.marker(currentLatLng, { icon: mkIcon('#60A5FA', 14), zIndexOffset: 1000 }).addTo(map);
                     }
-                } else if (isLiveTracking && latlngs.length === 1) {
                     if (Date.now() > userMovingMapUntil.current) {
-                        map.setView(latlngs[0], map.getZoom() || defaultZoom, { animate: false });
+                        map.setView(currentLatLng, map.getZoom() || defaultZoom, { animate: false });
                     }
-                } else if (!isLiveTracking && latlngs.length > 1 && polylineInstance.current) {
+                } else if (currentMarker.current) {
+                    map.removeLayer(currentMarker.current);
+                    currentMarker.current = null;
+                }
+
+                // Fit bounds or set view based on state
+                if (!isLiveTracking && latlngs.length > 1 && polylineInstance.current) {
                     map.fitBounds(polylineInstance.current.getBounds(), { padding: [50, 50], animate: false });
                 } else if (!isLiveTracking && latlngs.length === 0) {
                     map.setView(defaultCenter, defaultZoom, { animate: false });
                 }
-                
-                // No invalidamos el tamaño en cada punto GPS: hacerlo durante pan/zoom provoca parpadeos en móvil.
 
-            }, [gpsCoordinates, currentLocation, isLiveTracking, mapFullyInitialized]); // Dependencias actualizadas
+            }, [gpsCoordinates, currentLocation, isLiveTracking, leafletReady]);
 
-            // Efecto para invalidar el tamaño cuando heightPx cambia, después de que el mapa esté inicializado
-            useEffect(() => {
-                if (mapFullyInitialized) {
-                   scheduleInvalidate();
-                }
-            }, [heightPx, mapFullyInitialized, scheduleInvalidate]);
-
+            // Re-invalidate size on app resume or visibility change
             useEffect(() => {
                 const handleResume = () => {
                     if (mapInstance.current) {
-                        scheduleInvalidate();
+                        mapInstance.current.invalidateSize({ animate: false });
                     }
                 };
                 window.addEventListener('pageshow', handleResume);
@@ -838,12 +815,10 @@
                     document.removeEventListener('visibilitychange', handleResume);
                     window.removeEventListener('mientrenador-resume', handleResume);
                 };
-            }, [scheduleInvalidate]);
+            }, []);
 
-            // El div del contenedor del mapa con altura explícita
             return React.createElement('div', {
-                className: 'leaflet-map-wrapper',
-                style: { height: heightPx ? `${heightPx}px` : '100%' },
+                className: 'leaflet-map-wrapper', // Height is now controlled by parent's CSS (e.g., flex-1)
             },
                 mapError && React.createElement('div', {
                     className: 'absolute inset-0 z-[1000] flex items-center justify-center bg-slate-900 text-center text-xs font-bold text-orange-300 p-4'
@@ -880,25 +855,24 @@
 
             return React.createElement('div', { className: "h-screen flex flex-col bg-slate-950 text-white p-6" },
                 React.createElement('h2', { className: "text-3xl font-black italic text-orange-500 mb-4 text-center" }, "Tu Actividad GPS"),
-                React.createElement('div', { className: "glass-card p-4 mb-4" },
+                React.createElement('div', { className: "glass-card p-4 mb-4 flex-1 flex flex-col min-h-0" }, /* Added flex-1 flex flex-col min-h-0 */
                     showMap && gpsCoordinates && gpsCoordinates.length > 0 &&
                         React.createElement(MapDisplay, {
                             gpsCoordinates,
                             isLiveTracking: false,
-                            heightPx: 256,  // equivale a h-64
                         }),
-                    React.createElement('div', { className: "grid grid-cols-2 gap-4 text-center mt-4" },
+                    React.createElement('div', { className: "grid grid-cols-2 gap-4 text-center mt-4 shrink-0" }, /* Added shrink-0 */
                         React.createElement('div', null, React.createElement('span', { className: "text-[9px] opacity-40 block uppercase" }, "Distancia"), React.createElement('span', { className: "text-xl font-black text-sky-400" }, finalGpsSummary.distanceText)),
                         React.createElement('div', null, React.createElement('span', { className: "text-[9px] opacity-40 block uppercase" }, "Tiempo"), React.createElement('span', { className: "text-xl font-black text-emerald-400" }, finalGpsSummary.timeText)),
                         React.createElement('div', null, React.createElement('span', { className: "text-[9px] opacity-40 block uppercase" }, "Ritmo"), React.createElement('span', { className: "text-xl font-black text-purple-400" }, finalGpsSummary.pace, " /km")),
                         React.createElement('div', null, React.createElement('span', { className : "text-[9px] opacity-40 block uppercase" }, "Velocidad"), React.createElement('span', { className: "text-xl font-black text-yellow-400" }, finalGpsSummary.speed))
                     )
                 ),
-                React.createElement('div', { className: "flex gap-4 mb-4" },
+                React.createElement('div', { className: "flex gap-4 mb-4 shrink-0" }, /* Added shrink-0 */
                     React.createElement('button', { onClick: handleSave, className: "flex-1 bg-white/10 text-white py-4 rounded-full font-black uppercase italic active:scale-95 text-xs flex items-center justify-center gap-2" }, React.createElement(IconSave), "GUARDAR"),
                     React.createElement('button', { onClick: handleShare, className: "flex-1 bg-white/10 text-white py-4 rounded-full font-black uppercase italic active:scale-95 text-xs flex items-center justify-center gap-2" }, React.createElement(IconShare), "COMPARTIR")
                 ),
-                React.createElement('button', { onClick: onClose, className: "w-full bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic mt-auto" }, "FINALIZAR")
+                React.createElement('button', { onClick: onClose, className: "w-full bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic mt-auto shrink-0" }, "FINALIZAR") /* Added shrink-0 */
             );
         }
 
@@ -916,9 +890,7 @@
             const [finalGpsSummary, setFinalGpsSummary] = useState(null);
             const [shouldAutoStart, setShouldAutoStart] = useState(false);
             const [showGpsResults, setShowGpsResults] = useState(false);
-            // Altura del mapa GPS en vivo calculada dinámicamente
-            const [gpsMapHeight, setGpsMapHeight] = useState(0);
-            const gpsScreenRef = useRef(null);
+            // Removed gpsMapHeight state and related useEffect
 
             const statusRef = useRef(uiStatus);
             const idxRef = useRef(uiIdx);
@@ -957,30 +929,7 @@
             const setTime = useCallback((t) => { setUiTimeLeft(isNaN(t) ? 0 : t); }, []);
             const setElap = useCallback((e) => { setUiElapsed(isNaN(e) ? 0 : e); }, []);
 
-            // Calcular la altura del mapa GPS basada en el espacio disponible real
-            // Esto se ejecuta después de que la pantalla GPS se haya renderizado
-            useEffect(() => {
-                if (!isGpsActive || uiStatus !== 'gps-running') return;
-                const calcHeight = () => {
-                    if (gpsScreenRef.current) {
-                        const screenH = gpsScreenRef.current.clientHeight || window.innerHeight;
-                        // Calcular la altura de los elementos *distintos* de la tarjeta del mapa, incluyendo márgenes/rellenos
-                        // El div raíz tiene `style={{ padding: '24px' }}` => 48px de relleno vertical.
-                        // h2 (text-2xl font-black uppercase text-orange-500 mb-3): ~30px (altura de línea) + 12px (mb-3) = 42px
-                        // Tarjeta de estadísticas (glass-card p-3 mb-3): 2*12px (p-3) + ~70px (contenido) + 12px (mb-3) = ~106px
-                        // Botón "TERMINAR ACTIVIDAD GPS" (w-full ... py-5 ...): 2*20px (py-5) + ~20px (contenido) = ~60px
-                        // Altura total fija: 48 (relleno raíz) + 42 (h2 + su margen) + 106 (tarjeta de estadísticas + su margen) + 60 (botón) = 256px
-                        const totalFixedHeight = 256;
-                        // Esta `mapElementHeight` es la *altura exacta en píxeles* que el div exterior de Leaflet (leaflet-map-wrapper) necesita.
-                        const mapElementHeight = Math.max(180, screenH - totalFixedHeight);
-                        setGpsMapHeight(mapElementHeight);
-                    }
-                };
-                // Calcular inmediatamente y con pequeño delay para asegurar que el DOM esté listo
-                calcHeight();
-                const t = setTimeout(calcHeight, 100);
-                return () => clearTimeout(t);
-            }, [isGpsActive, uiStatus]);
+            // Removed useEffect for gpsMapHeight
 
             const announceGpsStats = useCallback((distance, timeSec) => {
                 speak(`Distancia: ${formatDistance(distance)}. Velocidad: ${formatSpeed(distance, timeSec)}. Ritmo: ${formatPace(distance, timeSec)}.`, false);
@@ -1300,28 +1249,17 @@
 
             // ─── PANTALLA GPS EN VIVO ─────────────────────────────────────────────────
             if (isGpsActive && uiStatus === 'gps-running') return React.createElement('div', {
-                ref: gpsScreenRef,
-                className: "h-screen flex flex-col bg-slate-950 text-white",
-                style: { padding: '24px' },
+                className: "h-screen flex flex-col bg-slate-950 text-white p-6", // Removed ref from here
             },
                 React.createElement('h2', { className:"text-2xl font-black uppercase text-orange-500 mb-3 text-center shrink-0" }, "Seguimiento GPS en vivo"),
-                // El contenedor `glass-card` ahora recibe su altura explícitamente,
-                // que es la altura del mapa `gpsMapHeight` más su padding vertical (`p-3` = 24px).
                 React.createElement('div', {
-                    className: "glass-card p-3 mb-3",
-                    style:{
-                        height: gpsMapHeight > 0 ? `${gpsMapHeight + 24}px` : '304px', // 280 (map default) + 24 (p-3)
-                        display:'flex',
-                        flexDirection:'column',
-                        minHeight: 0 // Permite que se encoja si es necesario
-                    }
+                    className: "glass-card p-3 mb-3 flex-1 flex flex-col min-h-0", // Adjusted to flex-1 flex flex-col min-h-0
                 },
-                    // MapDisplay ahora recibe la altura neta para su `leaflet-map-wrapper`.
                     React.createElement(MapDisplay, {
                         gpsCoordinates,
                         currentLocation,
                         isLiveTracking: true,
-                        heightPx: gpsMapHeight > 0 ? gpsMapHeight : 280,
+                        // heightPx prop removed
                     })
                 ),
                 // Estadísticas GPS
@@ -1403,22 +1341,21 @@
                     React.createElement('h2', { className: "text-xl font-black italic text-orange-500" }, "Ruta Histórica"),
                     React.createElement('button', { onClick: onClose, className: "text-white opacity-60 text-3xl font-black" }, "✕")
                 ),
-                React.createElement('div', { className: "glass-card p-4 mb-4 flex-1 flex flex-col min-h-0" },
+                React.createElement('div', { className: "glass-card p-4 mb-4 flex-1 flex flex-col min-h-0" }, // Added flex-1 flex flex-col min-h-0
                     // Mapa con altura que ocupa el espacio disponible menos las estadísticas
                     React.createElement(MapDisplay, {
                         gpsCoordinates: routeCoordinates,
                         isLiveTracking: false,
-                        // Altura aproximada: pantalla - header - stats - padding - botón
-                        heightPx: Math.max(200, window.innerHeight - 320),
+                        // heightPx prop removed
                     }),
-                    routeSummary && React.createElement('div', { className: "grid grid-cols-2 gap-4 text-center mt-4 shrink-0" },
+                    routeSummary && React.createElement('div', { className: "grid grid-cols-2 gap-4 text-center mt-4 shrink-0" }, // Added shrink-0
                         React.createElement('div', null, React.createElement('span', { className: "text-[9px] opacity-40 block uppercase" }, "Distancia"), React.createElement('span', { className: "text-xl font-black text-sky-400" }, routeSummary.distanceText)),
                         React.createElement('div', null, React.createElement('span', { className: "text-[9px] opacity-40 block uppercase" }, "Tiempo"), React.createElement('span', { className: "text-xl font-black text-emerald-400" }, routeSummary.timeText)),
                         React.createElement('div', null, React.createElement('span', { className: "text-[9px] opacity-40 block uppercase" }, "Ritmo"), React.createElement('span', { className: "text-xl font-black text-purple-400" }, routeSummary.pace, " /km")),
                         React.createElement('div', null, React.createElement('span', { className: "text-[9px] opacity-40 block uppercase" }, "Velocidad"), React.createElement('span', { className: "text-xl font-black text-yellow-400" }, routeSummary.speed))
                     )
                 ),
-                React.createElement('button', { onClick: onClose, className: "w-full max-w-sm mx-auto bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic shrink-0" }, "CERRAR MAPA")
+                React.createElement('button', { onClick: onClose, className: "w-full max-w-sm mx-auto bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic shrink-0" }, "CERRAR MAPA") // Added shrink-0
             );
         }
 
