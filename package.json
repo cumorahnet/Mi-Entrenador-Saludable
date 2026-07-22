@@ -1,0 +1,35 @@
+{
+  "name": "mi-entrenador-saludable",
+  "version": "1.0.0",
+  "description": "App Android hibrida para entrenamiento saludable con GPS.",
+  "main": "www/index.html",
+  "scripts": {
+    "start": "npx cap serve",
+    "android:add": "npx cap add android",
+    "android:sync": "npx cap sync android",
+    "android:open": "npx cap open android",
+    "android:copy": "npx cap copy android"
+  },
+  "keywords": [
+    "capacitor",
+    "android",
+    "gps",
+    "fitness"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/app": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/geolocation": "^7.0.0",
+    "@capacitor/haptics": "^7.0.0",
+    "@capacitor/local-notifications": "^7.0.0",
+    "@capacitor/splash-screen": "^7.0.0",
+    "@capacitor/status-bar": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.0.0"
+  }
+}

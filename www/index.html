@@ -55,12 +55,12 @@
         }
         @media (orientation: landscape) { .timer-huge { font-size: 75vh; } }
 
-        /* ── CORRECCIÓN MAPA LEAFLET ──────────────────────────────────────────────
+        /* â”€â”€ CORRECCIÃ“N MAPA LEAFLET â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
            El contenedor del mapa DEBE tener dimensiones concretas para que Leaflet
-           pueda calcular su tamaño en el primer render. Se usa height explícito
-           en lugar de depender sólo de Tailwind flex/h-*, que Leaflet no lee bien
+           pueda calcular su tamaÃ±o en el primer render. Se usa height explÃ­cito
+           en lugar de depender sÃ³lo de Tailwind flex/h-*, que Leaflet no lee bien
            en el primer ciclo de vida.
-        ─────────────────────────────────────────────────────────────────────────── */
+        â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
         .leaflet-map-wrapper {
             position: relative;
             width: 100%;
@@ -207,7 +207,7 @@
             { label: 'CINTURA IZQUIERDA', voice: 'Cintura a la izquierda' },
             { label: 'BRAZO DERECHO', voice: 'Brazo derecho' },
             { label: 'BRAZO IZQUIERDO', voice: 'Brazo izquierdo' },
-            { label: 'CUELLO ADELANTE Y ATRÁS', voice: 'Cuello adelante y atrás' },
+            { label: 'CUELLO ADELANTE Y ATRÃS', voice: 'Cuello adelante y atrÃ¡s' },
             { label: 'CUELLO DER. E IZQ.', voice: 'Cuello derecha e izquierda' },
         ];
 
@@ -238,9 +238,9 @@
 
         const getDistance = (lat1, lon1, lat2, lon2) => {
             const R = 6371e3;
-            const φ1 = lat1 * Math.PI/180, φ2 = lat2 * Math.PI/180;
-            const Δφ = (lat2-lat1) * Math.PI/180, Δλ = (lon2-lon1) * Math.PI/180;
-            const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+            const Ï†1 = lat1 * Math.PI/180, Ï†2 = lat2 * Math.PI/180;
+            const Î”Ï† = (lat2-lat1) * Math.PI/180, Î”Î» = (lon2-lon1) * Math.PI/180;
+            const a = Math.sin(Î”Ï†/2)**2 + Math.cos(Ï†1)*Math.cos(Ï†2)*Math.sin(Î”Î»/2)**2;
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         };
 
@@ -310,8 +310,8 @@
             try { window.speechSynthesis?.resume?.(); } catch(e) {}
         };
         const requestAppFullscreen = async () => {
-            // En Chrome Android, forzar Fullscreen API desde una página normal puede volver
-            // inestable la pestaña al apagar/encender pantalla. El modo sin barras debe venir
+            // En Chrome Android, forzar Fullscreen API desde una pÃ¡gina normal puede volver
+            // inestable la pestaÃ±a al apagar/encender pantalla. El modo sin barras debe venir
             // de instalar la app como PWA, usando el manifest fullscreen.
             return;
         };
@@ -343,7 +343,7 @@
             }
 
             if (!('geolocation' in navigator)) {
-                onError(new Error('Geolocalización no disponible.'));
+                onError(new Error('GeolocalizaciÃ³n no disponible.'));
                 return null;
             }
 
@@ -370,10 +370,10 @@
         const getMonthRange = (date, offset=0) => { const d=startOfDay(new Date(date)); d.setMonth(d.getMonth()+offset); return {start:startOfDay(new Date(d.getFullYear(),d.getMonth(),1)),end:endOfDay(new Date(d.getFullYear(),d.getMonth()+1,0))}; };
         const getYearRange  = (date, offset=0) => { const d=startOfDay(new Date(date)); d.setFullYear(d.getFullYear()+offset); return {start:startOfDay(new Date(d.getFullYear(),0,1)),end:endOfDay(new Date(d.getFullYear(),11,31))}; };
 
-        // ─── Generadores de segmentos ─────────────────────────────────────────────────
+        // â”€â”€â”€ Generadores de segmentos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         const generateWarmupSegment = (ent, nextPhaseIntro=null) => {
             const s = [];
-            s.push({ label:'PREPÁRATE', seconds:15, color:'bg-yellow-400', phase:'inicio', voiceInitial:'Prepárate para el calentamiento', whistleOnStart:false, voiceCountdown:true });
+            s.push({ label:'PREPÃRATE', seconds:15, color:'bg-yellow-400', phase:'inicio', voiceInitial:'PrepÃ¡rate para el calentamiento', whistleOnStart:false, voiceCountdown:true });
             WARMUP_STEPS.forEach((ws, i) => {
                 s.push({ label:ws.label, seconds:30, color:'bg-yellow-400', phase:'calentamiento', voiceInitial:ws.voice||ws.label.toLowerCase(), whistleOnStart:true, voiceCountdown:true });
                 if (i < WARMUP_STEPS.length-1)
@@ -414,7 +414,7 @@
 
         const generateStretchSegment = (ent, nextPhaseIntro=null) => {
             const s = [];
-            s.push({ label:'DESCANSO', seconds:30, color:'bg-blue-200', phase:'pre-stretches', voiceInitial:'Descanso. Prepárate para los estiramientos', whistleOnStart:false, voiceCountdown:true });
+            s.push({ label:'DESCANSO', seconds:30, color:'bg-blue-200', phase:'pre-stretches', voiceInitial:'Descanso. PrepÃ¡rate para los estiramientos', whistleOnStart:false, voiceCountdown:true });
             for (let i=0; i<ent.stretchSteps; i++) {
                 s.push({ label:`ESTIRAMIENTO ${i+1}`, seconds:ent.stretchAction, color:'bg-blue-400', phase:'estiramientos', voiceInitial:`Estiramiento ${i+1}`, whistleOnStart:true, voiceCountdown:true });
                 if (i < ent.stretchSteps-1)
@@ -424,10 +424,10 @@
         };
 
         const SELECTABLE_PHASES = [
-            { key: 'training', label: 'Entrenamiento Principal', icon: '🏋️', desc: 'Piernas, brazos y tronco en ciclos' },
-            { key: 'walk',     label: 'Caminata',               icon: '🚶', desc: 'Seguimiento GPS de tu caminata' },
-            { key: 'run',      label: 'Carrera',                icon: '🏃', desc: 'Seguimiento GPS de tu carrera' },
-            { key: 'stretch',  label: 'Estiramientos',          icon: '🧘', desc: 'Rutina completa de estiramientos' },
+            { key: 'training', label: 'Entrenamiento Principal', icon: 'ðŸ‹ï¸', desc: 'Piernas, brazos y tronco en ciclos' },
+            { key: 'walk',     label: 'Caminata',               icon: 'ðŸš¶', desc: 'Seguimiento GPS de tu caminata' },
+            { key: 'run',      label: 'Carrera',                icon: 'ðŸƒ', desc: 'Seguimiento GPS de tu carrera' },
+            { key: 'stretch',  label: 'Estiramientos',          icon: 'ðŸ§˜', desc: 'Rutina completa de estiramientos' },
         ];
 
         const ALL_SEGMENT_GENERATORS = {
@@ -441,7 +441,7 @@
 
         const generateWorkoutSteps = (workout, defaultParams, selectedPhasesKeys) => {
             if (!selectedPhasesKeys || selectedPhasesKeys.length === 0)
-                return [{ label:'NO HAY FASES', seconds:5, color:'bg-red-500', phase:'error', voiceInitial:'No se seleccionó ninguna fase.', whistleOnStart:false, voiceCountdown:false }];
+                return [{ label:'NO HAY FASES', seconds:5, color:'bg-red-500', phase:'error', voiceInitial:'No se seleccionÃ³ ninguna fase.', whistleOnStart:false, voiceCountdown:false }];
             if (!workout)
                 return [{ label:'ERROR DE RUTINA', seconds:5, color:'bg-red-500', phase:'error', voiceInitial:'Error: Rutina no encontrada.', whistleOnStart:false, voiceCountdown:false }];
 
@@ -462,7 +462,7 @@
                 let introForNext = null;
                 if (nextKey) {
                     const nextLabel = SELECTABLE_PHASES.find(p => p.key === nextKey)?.label || key;
-                    introForNext = `A continuación, ${nextLabel.toLowerCase()}.`;
+                    introForNext = `A continuaciÃ³n, ${nextLabel.toLowerCase()}.`;
                 } else {
                     introForNext = 'Rutina finalizada.';
                 }
@@ -471,13 +471,13 @@
             }
 
             if (steps.length === 0)
-                return [{ label:'ERROR DE GENERACIÓN', seconds:5, color:'bg-red-500', phase:'error', voiceInitial:'Error al generar la rutina.', whistleOnStart:false, voiceCountdown:false }];
+                return [{ label:'ERROR DE GENERACIÃ“N', seconds:5, color:'bg-red-500', phase:'error', voiceInitial:'Error al generar la rutina.', whistleOnStart:false, voiceCountdown:false }];
 
             steps.push({ label:'FINAL DE LA RUTINA', seconds:10, color:'bg-green-500', phase:'finished', voiceInitial:'Rutina finalizada.', whistleOnStart:false, voiceCountdown:false });
             return steps;
         };
 
-        // ─── PhaseSelectionScreen ─────────────────────────────────────────────────────
+        // â”€â”€â”€ PhaseSelectionScreen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         function PhaseSelectionScreen({ onPhasesSelected, user, workouts, onCreateWorkout }) {
             const [selectedPhases, setSelectedPhases] = useState([]);
 
@@ -498,8 +498,8 @@
             return React.createElement('div', { className: "h-screen flex flex-col bg-slate-950 overflow-hidden" },
                 React.createElement('div', { className: "p-6 pt-12 text-center shrink-0" },
                     React.createElement('p', { className: "text-[10px] font-black uppercase text-orange-500 tracking-widest mb-1" }, "Mi Entrenador Saludable"),
-                    React.createElement('h1', { className: "text-3xl font-black italic uppercase text-white leading-tight" }, "¿Qué haremos hoy?"),
-                    React.createElement('p', { className: "text-[11px] text-slate-500 mt-2 font-medium" }, "El calentamiento siempre se incluye automáticamente")
+                    React.createElement('h1', { className: "text-3xl font-black italic uppercase text-white leading-tight" }, "Â¿QuÃ© haremos hoy?"),
+                    React.createElement('p', { className: "text-[11px] text-slate-500 mt-2 font-medium" }, "El calentamiento siempre se incluye automÃ¡ticamente")
                 ),
                 React.createElement('div', { className: "flex-1 overflow-y-auto scrollbar-hide px-5 py-2 space-y-3" },
                     SELECTABLE_PHASES.map(phase =>
@@ -529,7 +529,7 @@
                                 React.createElement('path', { d:"M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" })
                             )
                         ),
-                        React.createElement('span', { className: "phase-icon" }, "🔥"),
+                        React.createElement('span', { className: "phase-icon" }, "ðŸ”¥"),
                         React.createElement('div', { className: "flex-1 text-left" },
                             React.createElement('p', { className: "font-black uppercase italic text-sm text-white leading-tight" }, "Calentamiento"),
                             React.createElement('p', { className: "text-[10px] text-slate-500 mt-0.5" }, "Siempre incluido al inicio")
@@ -543,14 +543,14 @@
                         disabled: selectedPhases.length === 0,
                         className: `w-full py-5 rounded-full font-black uppercase italic text-white transition-all active:scale-95 ${selectedPhases.length > 0 ? 'bg-orange-500 shadow-lg shadow-orange-500/30' : 'bg-slate-800 opacity-40 cursor-not-allowed'}`
                     }, selectedPhases.length > 0
-                        ? `COMENZAR${selectedPhases.includes('training') ? ' → ELEGIR RUTINA' : ''}`
+                        ? `COMENZAR${selectedPhases.includes('training') ? ' â†’ ELEGIR RUTINA' : ''}`
                         : 'ELIGE AL MENOS UNA FASE'
                     )
                 )
             );
         }
 
-        // ─── MapDisplay ───────────────────────────────────────────────────────────────
+        // â”€â”€â”€ MapDisplay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         const LEAFLET_ASSETS = [
             {
                 css: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
@@ -584,7 +584,7 @@
             const script = document.createElement('script');
             script.src = src;
             script.crossOrigin = '';
-            script.onload = () => window.L ? resolve(window.L) : reject(new Error('Leaflet no quedó disponible.'));
+            script.onload = () => window.L ? resolve(window.L) : reject(new Error('Leaflet no quedÃ³ disponible.'));
             script.onerror = () => reject(new Error(`No se pudo cargar ${src}`));
             document.head.appendChild(script);
         });
@@ -613,13 +613,13 @@
             const resizeObserverRef = useRef(null);
             const invalidateTimers = useRef([]);
             const userMovingMapUntil = useRef(0);
-            const [mapFullyInitialized, setMapFullyInitialized] = useState(false); // Nuevo estado para rastrear si el mapa está listo
+            const [mapFullyInitialized, setMapFullyInitialized] = useState(false); // Nuevo estado para rastrear si el mapa estÃ¡ listo
             const [mapError, setMapError] = useState('');
 
             const defaultCenter = [19.432608, -99.133209];
             const defaultZoom = 15;
 
-            // Función auxiliar para forzar invalidateSize en varios momentos
+            // FunciÃ³n auxiliar para forzar invalidateSize en varios momentos
             const scheduleInvalidate = useCallback(() => {
                 invalidateTimers.current.forEach(t => clearTimeout(t));
                 invalidateTimers.current = [];
@@ -632,7 +632,7 @@
                                     if (layer.redraw) layer.redraw();
                                 });
                             } catch (err) {
-                                console.warn('No se pudo recalcular el tamaño del mapa:', err);
+                                console.warn('No se pudo recalcular el tamaÃ±o del mapa:', err);
                             }
                         }
                     }, delay);
@@ -640,19 +640,19 @@
                 });
             }, []);
 
-            // Inicialización y limpieza del mapa
+            // InicializaciÃ³n y limpieza del mapa
             useEffect(() => {
-                // Si mapRef no está disponible o la librería Leaflet no está cargada, salimos.
+                // Si mapRef no estÃ¡ disponible o la librerÃ­a Leaflet no estÃ¡ cargada, salimos.
                 if (!mapRef.current) return;
 
                 // Si ya existe una instancia del mapa, no hacemos nada en este efecto.
-                // Las actualizaciones de tamaño se manejan en otros efectos.
+                // Las actualizaciones de tamaÃ±o se manejan en otros efectos.
                 if (mapInstance.current) {
                     return;
                 }
 
                 let cancelled = false;
-                let initAttempted = false; // Bandera para evitar múltiples inicializaciones
+                let initAttempted = false; // Bandera para evitar mÃºltiples inicializaciones
                 let checkIntervalId = null; // ID para el intervalo de reintentos
 
                 if (!window.L) {
@@ -665,14 +665,14 @@
                         })
                         .catch((err) => {
                             console.error('No se pudo cargar Leaflet desde los CDN de respaldo:', err);
-                            if (!cancelled) setMapError('No se pudo cargar el mapa. Revisa tu conexión o prueba recargar la página.');
+                            if (!cancelled) setMapError('No se pudo cargar el mapa. Revisa tu conexiÃ³n o prueba recargar la pÃ¡gina.');
                         });
                 }
 
-                // Función para intentar inicializar el mapa
+                // FunciÃ³n para intentar inicializar el mapa
                 const tryInitMap = () => {
                     if (initAttempted || mapInstance.current) {
-                        clearInterval(checkIntervalId); // Limpiamos el intervalo si ya se intentó o el mapa está listo
+                        clearInterval(checkIntervalId); // Limpiamos el intervalo si ya se intentÃ³ o el mapa estÃ¡ listo
                         return;
                     }
                     if (!window.L) return;
@@ -681,7 +681,7 @@
                     if (!container) return;
                     // Asegurarse de que el contenedor tenga dimensiones visibles antes de crear el mapa
                     if (container.offsetWidth === 0 || container.offsetHeight === 0) {
-                        return; // Las dimensiones no están listas, intentamos de nuevo más tarde
+                        return; // Las dimensiones no estÃ¡n listas, intentamos de nuevo mÃ¡s tarde
                     }
                     
                     initAttempted = true; // Marcamos el intento
@@ -718,10 +718,10 @@
 
                         L.control.zoom({ position: 'topright' }).addTo(mapInstance.current);
 
-                        scheduleInvalidate(); // Invalidación agresiva después de la creación inicial
-                        setMapFullyInitialized(true); // El mapa está completamente configurado
+                        scheduleInvalidate(); // InvalidaciÃ³n agresiva despuÃ©s de la creaciÃ³n inicial
+                        setMapFullyInitialized(true); // El mapa estÃ¡ completamente configurado
 
-                        // Configurar ResizeObserver para monitoreo continuo del tamaño
+                        // Configurar ResizeObserver para monitoreo continuo del tamaÃ±o
                         resizeObserverRef.current = new ResizeObserver(() => {
                             if (mapInstance.current) {
                                 mapInstance.current.invalidateSize({ animate: false });
@@ -742,7 +742,7 @@
                 checkIntervalId = setInterval(tryInitMap, 200); // Comprobar cada 200ms
 
                 return () => {
-                    // Función de limpieza
+                    // FunciÃ³n de limpieza
                     cancelled = true;
                     clearInterval(checkIntervalId);
                     invalidateTimers.current.forEach(t => clearTimeout(t));
@@ -756,12 +756,12 @@
                         mapInstance.current = null;
                     }
                 };
-            }, []); // Array de dependencias vacío: se ejecuta una vez al montar, se limpia al desmontar.
+            }, []); // Array de dependencias vacÃ­o: se ejecuta una vez al montar, se limpia al desmontar.
 
-            // Efecto para actualizar las capas del mapa (polilíneas, marcadores, centrado) cuando los datos cambian.
+            // Efecto para actualizar las capas del mapa (polilÃ­neas, marcadores, centrado) cuando los datos cambian.
             useEffect(() => {
                 const map = mapInstance.current;
-                // Solo procedemos si el mapa está inicializado y listo
+                // Solo procedemos si el mapa estÃ¡ inicializado y listo
                 if (!map || !mapFullyInitialized) return;
 
                 // Limpiar capas previas
@@ -777,7 +777,7 @@
                     polylineInstance.current = L.polyline(latlngs, { color: '#f97316', weight: 5, opacity: 1.0 }).addTo(map);
                 }
 
-                // Iconos personalizados con divIcon (sin dependencia de imágenes externas)
+                // Iconos personalizados con divIcon (sin dependencia de imÃ¡genes externas)
                 const mkIcon = (color, size) => L.divIcon({
                     className: '',
                     html: `<div style="background:${color};width:${size}px;height:${size}px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 4px rgba(0,0,0,.5);"></div>`,
@@ -792,7 +792,7 @@
                     }
                 }
 
-                // Lógica de centrado
+                // LÃ³gica de centrado
                 if (currentLocation && isLiveTracking) {
                     currentMarker.current = L.marker(
                         [currentLocation.lat, currentLocation.lng],
@@ -811,11 +811,11 @@
                     map.setView(defaultCenter, defaultZoom, { animate: false });
                 }
                 
-                // No invalidamos el tamaño en cada punto GPS: hacerlo durante pan/zoom provoca parpadeos en móvil.
+                // No invalidamos el tamaÃ±o en cada punto GPS: hacerlo durante pan/zoom provoca parpadeos en mÃ³vil.
 
             }, [gpsCoordinates, currentLocation, isLiveTracking, mapFullyInitialized]); // Dependencias actualizadas
 
-            // Efecto para invalidar el tamaño cuando heightPx cambia, después de que el mapa esté inicializado
+            // Efecto para invalidar el tamaÃ±o cuando heightPx cambia, despuÃ©s de que el mapa estÃ© inicializado
             useEffect(() => {
                 if (mapFullyInitialized) {
                    scheduleInvalidate();
@@ -840,7 +840,7 @@
                 };
             }, [scheduleInvalidate]);
 
-            // El div del contenedor del mapa con altura explícita
+            // El div del contenedor del mapa con altura explÃ­cita
             return React.createElement('div', {
                 className: 'leaflet-map-wrapper',
                 style: { height: heightPx ? `${heightPx}px` : '100%' },
@@ -855,7 +855,7 @@
             );
         }
 
-        // ─── GpsActivityDisplay ───────────────────────────────────────────────────────
+        // â”€â”€â”€ GpsActivityDisplay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         function GpsActivityDisplay({ gpsCoordinates, finalGpsSummary, onSave, onShare, onClose, showMap = true }) {
             const handleSave = useCallback(() => {
                 alert(`Guardando resumen de actividad:\nDistancia: ${finalGpsSummary.distanceText}\nTiempo: ${finalGpsSummary.timeText}\nRitmo: ${finalGpsSummary.pace} /km\nVelocidad: ${finalGpsSummary.speed}`);
@@ -868,7 +868,7 @@
                 try {
                     navigator.share({
                         title: 'Mi ruta de entrenamiento',
-                        text: `¡Mi actividad de hoy!\nDistancia: ${finalGpsSummary.distanceText}\nTiempo: ${finalGpsSummary.timeText}\nRitmo: ${finalGpsSummary.pace} /km\nVelocidad: ${finalGpsSummary.speed}`
+                        text: `Â¡Mi actividad de hoy!\nDistancia: ${finalGpsSummary.distanceText}\nTiempo: ${finalGpsSummary.timeText}\nRitmo: ${finalGpsSummary.pace} /km\nVelocidad: ${finalGpsSummary.speed}`
                     });
                     if (onShare) onShare();
                 } catch (err) {
@@ -902,7 +902,7 @@
             );
         }
 
-        // ─── PlayerView ─────────────────────────────────────────────────────────────────
+        // â”€â”€â”€ PlayerView â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         function PlayerView({ workout, selectedPhases, onExit, onComplete }) {
             const [uiStatus, setUiStatus] = useState('ready');
             const [uiIdx, setUiIdx] = useState(0);
@@ -916,7 +916,7 @@
             const [finalGpsSummary, setFinalGpsSummary] = useState(null);
             const [shouldAutoStart, setShouldAutoStart] = useState(false);
             const [showGpsResults, setShowGpsResults] = useState(false);
-            // Altura del mapa GPS en vivo calculada dinámicamente
+            // Altura del mapa GPS en vivo calculada dinÃ¡micamente
             const [gpsMapHeight, setGpsMapHeight] = useState(0);
             const gpsScreenRef = useRef(null);
 
@@ -958,25 +958,25 @@
             const setElap = useCallback((e) => { setUiElapsed(isNaN(e) ? 0 : e); }, []);
 
             // Calcular la altura del mapa GPS basada en el espacio disponible real
-            // Esto se ejecuta después de que la pantalla GPS se haya renderizado
+            // Esto se ejecuta despuÃ©s de que la pantalla GPS se haya renderizado
             useEffect(() => {
                 if (!isGpsActive || uiStatus !== 'gps-running') return;
                 const calcHeight = () => {
                     if (gpsScreenRef.current) {
                         const screenH = gpsScreenRef.current.clientHeight || window.innerHeight;
-                        // Calcular la altura de los elementos *distintos* de la tarjeta del mapa, incluyendo márgenes/rellenos
-                        // El div raíz tiene `style={{ padding: '24px' }}` => 48px de relleno vertical.
-                        // h2 (text-2xl font-black uppercase text-orange-500 mb-3): ~30px (altura de línea) + 12px (mb-3) = 42px
-                        // Tarjeta de estadísticas (glass-card p-3 mb-3): 2*12px (p-3) + ~70px (contenido) + 12px (mb-3) = ~106px
-                        // Botón "TERMINAR ACTIVIDAD GPS" (w-full ... py-5 ...): 2*20px (py-5) + ~20px (contenido) = ~60px
-                        // Altura total fija: 48 (relleno raíz) + 42 (h2 + su margen) + 106 (tarjeta de estadísticas + su margen) + 60 (botón) = 256px
+                        // Calcular la altura de los elementos *distintos* de la tarjeta del mapa, incluyendo mÃ¡rgenes/rellenos
+                        // El div raÃ­z tiene `style={{ padding: '24px' }}` => 48px de relleno vertical.
+                        // h2 (text-2xl font-black uppercase text-orange-500 mb-3): ~30px (altura de lÃ­nea) + 12px (mb-3) = 42px
+                        // Tarjeta de estadÃ­sticas (glass-card p-3 mb-3): 2*12px (p-3) + ~70px (contenido) + 12px (mb-3) = ~106px
+                        // BotÃ³n "TERMINAR ACTIVIDAD GPS" (w-full ... py-5 ...): 2*20px (py-5) + ~20px (contenido) = ~60px
+                        // Altura total fija: 48 (relleno raÃ­z) + 42 (h2 + su margen) + 106 (tarjeta de estadÃ­sticas + su margen) + 60 (botÃ³n) = 256px
                         const totalFixedHeight = 256;
-                        // Esta `mapElementHeight` es la *altura exacta en píxeles* que el div exterior de Leaflet (leaflet-map-wrapper) necesita.
+                        // Esta `mapElementHeight` es la *altura exacta en pÃ­xeles* que el div exterior de Leaflet (leaflet-map-wrapper) necesita.
                         const mapElementHeight = Math.max(180, screenH - totalFixedHeight);
                         setGpsMapHeight(mapElementHeight);
                     }
                 };
-                // Calcular inmediatamente y con pequeño delay para asegurar que el DOM esté listo
+                // Calcular inmediatamente y con pequeÃ±o delay para asegurar que el DOM estÃ© listo
                 calcHeight();
                 const t = setTimeout(calcHeight, 100);
                 return () => clearTimeout(t);
@@ -1006,7 +1006,7 @@
             const endWorkout = useCallback(() => {
                 if (intervalIdRef.current) { clearInterval(intervalIdRef.current); intervalIdRef.current = null; }
                 setUiStatus('finished');
-                speak('Entrenamiento finalizado. ¡Buen trabajo!', true, () => {
+                speak('Entrenamiento finalizado. Â¡Buen trabajo!', true, () => {
                     if (hasGpsDataRef.current && finalGpsSummary) {
                         setShowGpsResults(true);
                     } else {
@@ -1099,13 +1099,13 @@
                 if (gpsStartingRef.current || isGpsActiveRef.current) return;
                 gpsStartingRef.current = true;
                 if (intervalIdRef.current) { clearInterval(intervalIdRef.current); intervalIdRef.current = null; }
-                if (!isNativeRuntime() && !('geolocation' in navigator)) { gpsStartingRef.current = false; speak('Geolocalización no disponible.', true); setIsGpsActive(false); setUiStatus('running'); skipStep(); return; }
+                if (!isNativeRuntime() && !('geolocation' in navigator)) { gpsStartingRef.current = false; speak('GeolocalizaciÃ³n no disponible.', true); setIsGpsActive(false); setUiStatus('running'); skipStep(); return; }
                 if (!isNativeRuntime() && navigator.permissions && navigator.permissions.query) {
                     try {
                         const perm = await navigator.permissions.query({name:'geolocation'});
-                        if (perm.state === 'denied') { gpsStartingRef.current = false; speak('Permiso de ubicación denegado.', true); setIsGpsActive(false); setUiStatus('running'); skipStep(); return; }
+                        if (perm.state === 'denied') { gpsStartingRef.current = false; speak('Permiso de ubicaciÃ³n denegado.', true); setIsGpsActive(false); setUiStatus('running'); skipStep(); return; }
                     } catch(e) {
-                        console.warn('No se pudo consultar el permiso de ubicación. Se solicitará al iniciar el GPS.', e);
+                        console.warn('No se pudo consultar el permiso de ubicaciÃ³n. Se solicitarÃ¡ al iniciar el GPS.', e);
                     }
                 }
                 speak('Iniciando seguimiento. Actualizaciones cada diez minutos.', true, () => { gpsAnnounceLastTime.current = Date.now(); });
@@ -1175,7 +1175,7 @@
                     stepStartRef.current = (stepStartRef.current != null && !isNaN(stepStartRef.current)) ? stepStartRef.current + pausedMs : now;
                     pausedAtRef.current = null; setUiStatus('running');
                 } else if (current === 'gps-running') {
-                    speak('Para detener el GPS usa el botón dedicado.', true);
+                    speak('Para detener el GPS usa el botÃ³n dedicado.', true);
                 }
             }, [workout]);
 
@@ -1298,15 +1298,15 @@
             const curr = steps[uiIdx] || { label:'Cargando...', color:'bg-slate-950' };
             const showOverlay = uiStatus === 'ready' || uiStatus === 'paused';
 
-            // ─── PANTALLA GPS EN VIVO ─────────────────────────────────────────────────
+            // â”€â”€â”€ PANTALLA GPS EN VIVO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             if (isGpsActive && uiStatus === 'gps-running') return React.createElement('div', {
                 ref: gpsScreenRef,
                 className: "h-screen flex flex-col bg-slate-950 text-white",
                 style: { padding: '24px' },
             },
                 React.createElement('h2', { className:"text-2xl font-black uppercase text-orange-500 mb-3 text-center shrink-0" }, "Seguimiento GPS en vivo"),
-                // El contenedor `glass-card` ahora recibe su altura explícitamente,
-                // que es la altura del mapa `gpsMapHeight` más su padding vertical (`p-3` = 24px).
+                // El contenedor `glass-card` ahora recibe su altura explÃ­citamente,
+                // que es la altura del mapa `gpsMapHeight` mÃ¡s su padding vertical (`p-3` = 24px).
                 React.createElement('div', {
                     className: "glass-card p-3 mb-3",
                     style:{
@@ -1324,7 +1324,7 @@
                         heightPx: gpsMapHeight > 0 ? gpsMapHeight : 280,
                     })
                 ),
-                // Estadísticas GPS
+                // EstadÃ­sticas GPS
                 React.createElement('div', { className:"glass-card p-3 mb-3 shrink-0" },
                     React.createElement('div', { className:"grid grid-cols-2 gap-3 text-center" },
                         React.createElement('div', null, React.createElement('span',{className:"text-[9px] opacity-40 block uppercase"},"Distancia"), React.createElement('span',{className:"text-lg font-black text-sky-400"},formatDistance(gpsTotalDistance.current))),
@@ -1343,10 +1343,10 @@
                     className: "w-full shrink-0 bg-red-600/80 text-white py-5 rounded-full font-black uppercase active:scale-95 italic"
                 }, "TERMINAR ACTIVIDAD GPS")
             );
-            // ─────────────────────────────────────────────────────────────────────────
+            // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
             if (uiStatus === 'finished') return React.createElement('div', { className:"h-screen flex flex-col items-center justify-center p-8 bg-slate-950 text-white text-center" },
-                React.createElement('h1', { className:"text-5xl font-black italic mb-4" }, "¡HECHO!"),
+                React.createElement('h1', { className:"text-5xl font-black italic mb-4" }, "Â¡HECHO!"),
                 React.createElement('button', { onClick:onExit, className:"w-full max-w-sm bg-white text-black py-6 rounded-full font-black uppercase" }, "Finalizar")
             );
 
@@ -1359,7 +1359,7 @@
                     React.createElement('div', { className:"text-center" },
                         React.createElement('h2', { className:"text-[10px] font-black uppercase italic truncate max-w-[120px] tracking-tight" }, workout.name||'Rutina')
                     ),
-                    React.createElement('button', { onClick:onExit, className:"opacity-40 text-xl font-black px-2" }, "✕")
+                    React.createElement('button', { onClick:onExit, className:"opacity-40 text-xl font-black px-2" }, "âœ•")
                 ),
                 React.createElement('div', { className:"flex-1 flex flex-col items-center justify-center text-center px-4 min-h-0 relative" },
                     showOverlay && React.createElement('div', { className:"absolute inset-0 z-40 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center" },
@@ -1392,7 +1392,7 @@
             );
         }
 
-        // ─── MapPlayback ───────────────────────────────────────────────────────────────
+        // â”€â”€â”€ MapPlayback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         function MapPlayback({ routeCoordinates, routeSummary, onClose }) {
             if (!routeCoordinates || routeCoordinates.length === 0) {
                 return React.createElement('div', { className: "text-center p-4 text-white/50" }, "No hay datos de ruta disponibles.");
@@ -1400,15 +1400,15 @@
 
             return React.createElement('div', { className: "fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex flex-col p-6" },
                 React.createElement('div', { className: "flex justify-between items-center mb-4 shrink-0" },
-                    React.createElement('h2', { className: "text-xl font-black italic text-orange-500" }, "Ruta Histórica"),
-                    React.createElement('button', { onClick: onClose, className: "text-white opacity-60 text-3xl font-black" }, "✕")
+                    React.createElement('h2', { className: "text-xl font-black italic text-orange-500" }, "Ruta HistÃ³rica"),
+                    React.createElement('button', { onClick: onClose, className: "text-white opacity-60 text-3xl font-black" }, "âœ•")
                 ),
                 React.createElement('div', { className: "glass-card p-4 mb-4 flex-1 flex flex-col min-h-0" },
-                    // Mapa con altura que ocupa el espacio disponible menos las estadísticas
+                    // Mapa con altura que ocupa el espacio disponible menos las estadÃ­sticas
                     React.createElement(MapDisplay, {
                         gpsCoordinates: routeCoordinates,
                         isLiveTracking: false,
-                        // Altura aproximada: pantalla - header - stats - padding - botón
+                        // Altura aproximada: pantalla - header - stats - padding - botÃ³n
                         heightPx: Math.max(200, window.innerHeight - 320),
                     }),
                     routeSummary && React.createElement('div', { className: "grid grid-cols-2 gap-4 text-center mt-4 shrink-0" },
@@ -1422,7 +1422,7 @@
             );
         }
 
-        // ─── AvanceView ───────────────────────────────────────────────────────────────
+        // â”€â”€â”€ AvanceView â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         function AvanceView({ history }) {
             const [periodType, setPeriodType] = useState('semana');
             const [periodOffset, setPeriodOffset] = useState(0);
@@ -1430,7 +1430,7 @@
             const [selectedHistoricalGpsData, setSelectedHistoricalGpsData] = useState(null);
             const chartRef = useRef(null);
             const chartInst = useRef(null);
-            const PERIOD_TYPES = ['semana', 'mes', 'año'];
+            const PERIOD_TYPES = ['semana', 'mes', 'aÃ±o'];
             const formatTimeHnM = useCallback((seconds) => { const h=Math.floor(seconds/3600),m=Math.floor((seconds%3600)/60); return `${h}h ${m}m`; }, []);
             const totalSec = useMemo(() => history.reduce((a,h)=>a+(h.totalTime||0),0),[history]);
             const currentPeriodRange = useMemo(() => {
@@ -1487,7 +1487,7 @@
                 const {start,end} = currentPeriodRange, sf={day:'numeric',month:'short'};
                 if (periodType==='semana') { const cw=getWeekRange(new Date(),0); if(start.getTime()===cw.start.getTime()) return 'Semana Actual'; if(start.getTime()===getWeekRange(new Date(),-1).start.getTime()) return 'Semana Anterior'; return start.getMonth()===end.getMonth()?`${start.getDate()} - ${end.toLocaleDateString('es-ES',{day:'numeric'})}`:`${start.toLocaleDateString('es-ES',sf)} - ${end.toLocaleDateString('es-ES',sf)}`; }
                 if (periodType==='mes') { if(start.getTime()===getMonthRange(new Date(),0).start.getTime()) return 'Mes Actual'; if(start.getTime()===getMonthRange(new Date(),-1).start.getTime()) return 'Mes Anterior'; return start.toLocaleDateString('es-ES',{month:'long',year:'numeric'}); }
-                if(start.getTime()===getYearRange(new Date(),0).start.getTime()) return 'Año Actual'; if(start.getTime()===getYearRange(new Date(),-1).start.getTime()) return 'Año Anterior'; return `${start.getFullYear()}`;
+                if(start.getTime()===getYearRange(new Date(),0).start.getTime()) return 'AÃ±o Actual'; if(start.getTime()===getYearRange(new Date(),-1).start.getTime()) return 'AÃ±o Anterior'; return `${start.getFullYear()}`;
             }, [currentPeriodRange, periodType]);
 
             const handleShowMap = useCallback((gpsData) => {
@@ -1542,7 +1542,7 @@
             );
         }
 
-        // ─── App ──────────────────────────────────────────────────────────────────────
+        // â”€â”€â”€ App â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         function App() {
             const [user, setUser] = useState(null);
             const [view, setView] = useState('phases');
@@ -1579,7 +1579,7 @@
                 if (phases.includes('training')) {
                     setView('workouts');
                 } else {
-                    setSelectedWorkout({ id:'_no_training', name:'Sesión', phases: DEFAULT_PARAMS });
+                    setSelectedWorkout({ id:'_no_training', name:'SesiÃ³n', phases: DEFAULT_PARAMS });
                     setView('play');
                 }
             }, []);
@@ -1631,13 +1631,13 @@
                     })
                 ),
                 (view === 'phases' || view === 'workouts' || view === 'avance') && React.createElement('nav', { className:"bg-slate-900 border-t border-white/5 p-4 flex justify-around items-center shrink-0" },
-                    React.createElement('button', { onClick:()=>setView('phases'),   className:`flex flex-col items-center text-[9px] font-black ${(view==='phases'||view==='workouts')?'text-orange-500':'text-slate-500'}` }, React.createElement('span',{className:"text-xl mb-1"},"🏠"), "INICIO"),
-                    React.createElement('button', { onClick:()=>setView('avance'),   className:`flex flex-col items-center text-[9px] font-black ${view==='avance'?'text-orange-500':'text-slate-500'}` }, React.createElement('span',{className:"text-xl mb-1"},"📊"), "AVANCE")
+                    React.createElement('button', { onClick:()=>setView('phases'),   className:`flex flex-col items-center text-[9px] font-black ${(view==='phases'||view==='workouts')?'text-orange-500':'text-slate-500'}` }, React.createElement('span',{className:"text-xl mb-1"},"ðŸ "), "INICIO"),
+                    React.createElement('button', { onClick:()=>setView('avance'),   className:`flex flex-col items-center text-[9px] font-black ${view==='avance'?'text-orange-500':'text-slate-500'}` }, React.createElement('span',{className:"text-xl mb-1"},"ðŸ“Š"), "AVANCE")
                 )
             );
         }
 
-        // ─── AuthView ─────────────────────────────────────────────────────────────────
+        // â”€â”€â”€ AuthView â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         function AuthView({ APP_TITLE, APP_VERSION }) {
             const [isReg, setIsReg] = useState(false);
             const [email, setEmail] = useState('');
@@ -1650,7 +1650,7 @@
                 } catch(err) { alert("Error: " + err.message); }
             }, [isReg, email, pass]);
             return React.createElement('div', { className:"h-screen flex flex-col items-center bg-slate-950 p-10 pt-20 text-center" },
-                React.createElement('div', { className:"text-7xl mb-6" }, "🏃‍♂️"),
+                React.createElement('div', { className:"text-7xl mb-6" }, "ðŸƒâ€â™‚ï¸"),
                 React.createElement('h1', { className:"text-4xl font-black italic uppercase text-white" }, APP_TITLE),
                 React.createElement('p', { className:"text-[8px] text-slate-600 uppercase mb-8" }, "V ", APP_VERSION),
                 React.createElement('form', { onSubmit:handle, className:"space-y-4 w-full max-w-sm" },
@@ -1662,16 +1662,16 @@
             );
         }
 
-        // ─── WorkoutsView ─────────────────────────────────────────────────────────────
+        // â”€â”€â”€ WorkoutsView â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         function WorkoutsView({ workouts, user, selectedPhases, onStart, onEdit, onCreate }) {
             const phaseLabels = selectedPhases
-                ? ['Calentamiento', ...selectedPhases.map(k => SELECTABLE_PHASES.find(p=>p.key===k)?.label||k)].join(' → ')
+                ? ['Calentamiento', ...selectedPhases.map(k => SELECTABLE_PHASES.find(p=>p.key===k)?.label||k)].join(' â†’ ')
                 : '';
             return React.createElement('div', { className:"flex-1 overflow-y-auto scrollbar-hide p-4 pb-32" },
                 React.createElement('div', { className:"glass-card p-4 mb-4" },
-                    React.createElement('p', { className:"text-[9px] text-orange-400 font-black uppercase mb-1" }, "Tu sesión de hoy"),
+                    React.createElement('p', { className:"text-[9px] text-orange-400 font-black uppercase mb-1" }, "Tu sesiÃ³n de hoy"),
                     React.createElement('p', { className:"text-xs text-white font-bold italic" }, phaseLabels),
-                    React.createElement('p', { className:"text-[9px] text-slate-500 mt-1" }, "Elige la rutina con la que entrenarás:")
+                    React.createElement('p', { className:"text-[9px] text-slate-500 mt-1" }, "Elige la rutina con la que entrenarÃ¡s:")
                 ),
                 React.createElement('div', { className:"space-y-4" },
                     workouts.length === 0
@@ -1687,11 +1687,11 @@
                             )
                         ))
                 ),
-                React.createElement('button', { onClick:onCreate, className:"w-full mt-4 bg-white/5 border border-white/10 py-6 rounded-full font-black uppercase italic" }, "➕ NUEVA RUTINA")
+                React.createElement('button', { onClick:onCreate, className:"w-full mt-4 bg-white/5 border border-white/10 py-6 rounded-full font-black uppercase italic" }, "âž• NUEVA RUTINA")
             );
         }
 
-        // ─── CreateView ───────────────────────────────────────────────────────────────
+        // â”€â”€â”€ CreateView â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         function CreateView({ user, workoutToEdit, onCancel }) {
             const initialPhases = workoutToEdit?.phases
                 ? {...DEFAULT_PARAMS, ...workoutToEdit.phases, entrenamiento:{...DEFAULT_PARAMS.entrenamiento,...(workoutToEdit.phases.entrenamiento||{})}}
@@ -1712,15 +1712,15 @@
                 } catch(e) { alert("Error al guardar: " + e.message); setSaving(false); }
             }, [name, saving, phases, user, workoutToEdit, onCancel]);
             const ENT_FIELDS = [
-                {f:'action',label:'Acción (s)'},{f:'change',label:'Cambio (s)'},{f:'rounds',label:'Rondas'},
+                {f:'action',label:'AcciÃ³n (s)'},{f:'change',label:'Cambio (s)'},{f:'rounds',label:'Rondas'},
                 {f:'cycles',label:'Ciclos'},{f:'rest',label:'Descanso Ciclo (s)'},{f:'zoneRest',label:'Descanso Zona (s)'}
             ];
             const STRETCH_FIELDS = [
-                {f:'stretchSteps',label:'Pasos Estir.'},{f:'stretchAction',label:'Duración Estir. (s)'},{f:'stretchChange',label:'Cambio Estir. (s)'}
+                {f:'stretchSteps',label:'Pasos Estir.'},{f:'stretchAction',label:'DuraciÃ³n Estir. (s)'},{f:'stretchChange',label:'Cambio Estir. (s)'}
             ];
             return React.createElement('div', { className:"flex-1 flex flex-col bg-slate-950 overflow-hidden text-center italic" },
                 React.createElement('header', { className:"p-6 flex items-center border-b border-white/5 shrink-0" },
-                    React.createElement('button', { onClick:onCancel, className:"p-3 bg-slate-900 rounded-2xl shadow-lg text-white" }, "⬅"),
+                    React.createElement('button', { onClick:onCancel, className:"p-3 bg-slate-900 rounded-2xl shadow-lg text-white" }, "â¬…"),
                     React.createElement('h2', { className:"text-xl font-black uppercase flex-1" }, "Configurar Rutina")
                 ),
                 React.createElement('div', { className:"flex-1 overflow-y-auto scrollbar-hide p-4 space-y-6 pb-28" },

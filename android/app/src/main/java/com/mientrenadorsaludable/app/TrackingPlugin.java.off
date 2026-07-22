@@ -1,0 +1,45 @@
+package com.mientrenadorsaludable.app;
+
+import android.content.Intent;
+import android.os.Build;
+
+import androidx.core.content.ContextCompat;
+
+import com.getcapacitor.JSObject;
+import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.CapacitorPlugin;
+
+@CapacitorPlugin(name = "NativeTracking")
+public class TrackingPlugin extends Plugin {
+    @PluginMethod
+    public void start(PluginCall call) {
+        String title = call.getString("title", "Seguimiento GPS activo");
+        String text = call.getString("text", "Mi Entrenador Saludable esta registrando tu actividad.");
+
+        Intent intent = new Intent(getContext(), TrackingForegroundService.class);
+        intent.putExtra("title", title);
+        intent.putExtra("text", text);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            ContextCompat.startForegroundService(getContext(), intent);
+        } else {
+            getContext().startService(intent);
+        }
+
+        JSObject result = new JSObject();
+        result.put("active", true);
+        call.resolve(result);
+    }
+
+    @PluginMethod
+    public void stop(PluginCall call) {
+        Intent intent = new Intent(getContext(), TrackingForegroundService.class);
+        getContext().stopService(intent);
+
+        JSObject result = new JSObject();
+        result.put("active", false);
+        call.resolve(result);
+    }
+}
