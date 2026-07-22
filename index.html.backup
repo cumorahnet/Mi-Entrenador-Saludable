@@ -1,4 +1,4 @@
-subir cambios<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -15,8 +15,9 @@ subir cambios<!DOCTYPE html>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
-    <!-- Leaflet CSS and JS are now loaded dynamically if not present, but keeping these as fallbacks/primary load -->
+    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQPDQwr7xKEkmV3S8gawQ9G4Bsn4APw=" crossorigin="" />
+    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZQXNrHE1BlClZlAWyowE0/fiPzS=" crossorigin=""></script>
 
     <style>
@@ -661,7 +662,7 @@ subir cambios<!DOCTYPE html>
 
                     try {
                         mapInstance.current = L.map(container, {
-                            center: defaultCenter,
+                            center: initCoords,
                             zoom: defaultZoom,
                             zoomControl: false,
                             attributionControl: false,
@@ -890,7 +891,9 @@ subir cambios<!DOCTYPE html>
             const [finalGpsSummary, setFinalGpsSummary] = useState(null);
             const [shouldAutoStart, setShouldAutoStart] = useState(false);
             const [showGpsResults, setShowGpsResults] = useState(false);
-            // Removed gpsMapHeight state and related useEffect
+            // Altura del mapa GPS en vivo calculada dinámicamente
+            // const [gpsMapHeight, setGpsMapHeight] = useState(0); // REMOVED
+            const gpsScreenRef = useRef(null);
 
             const statusRef = useRef(uiStatus);
             const idxRef = useRef(uiIdx);
@@ -929,7 +932,7 @@ subir cambios<!DOCTYPE html>
             const setTime = useCallback((t) => { setUiTimeLeft(isNaN(t) ? 0 : t); }, []);
             const setElap = useCallback((e) => { setUiElapsed(isNaN(e) ? 0 : e); }, []);
 
-            // Removed useEffect for gpsMapHeight
+            // REMOVED useEffect for gpsMapHeight
 
             const announceGpsStats = useCallback((distance, timeSec) => {
                 speak(`Distancia: ${formatDistance(distance)}. Velocidad: ${formatSpeed(distance, timeSec)}. Ritmo: ${formatPace(distance, timeSec)}.`, false);
@@ -1249,7 +1252,8 @@ subir cambios<!DOCTYPE html>
 
             // ─── PANTALLA GPS EN VIVO ─────────────────────────────────────────────────
             if (isGpsActive && uiStatus === 'gps-running') return React.createElement('div', {
-                className: "h-screen flex flex-col bg-slate-950 text-white p-6", // Removed ref from here
+                className: "h-screen flex flex-col bg-slate-950 text-white",
+                style: { padding: '24px' },
             },
                 React.createElement('h2', { className:"text-2xl font-black uppercase text-orange-500 mb-3 text-center shrink-0" }, "Seguimiento GPS en vivo"),
                 React.createElement('div', {
@@ -1577,25 +1581,56 @@ subir cambios<!DOCTYPE html>
         // ─── AuthView ─────────────────────────────────────────────────────────────────
         function AuthView({ APP_TITLE, APP_VERSION }) {
             const [isReg, setIsReg] = useState(false);
+            const [showPasswordRecovery, setShowPasswordRecovery] = useState(false); // Nuevo estado
             const [email, setEmail] = useState('');
             const [pass, setPass] = useState('');
-            const handle = useCallback(async e => {
+
+            const handleAuth = useCallback(async e => {
                 e.preventDefault();
                 try {
                     if (isReg) await auth.createUserWithEmailAndPassword(email.trim(), pass);
                     else await auth.signInWithEmailAndPassword(email.trim(), pass);
                 } catch(err) { alert("Error: " + err.message); }
             }, [isReg, email, pass]);
+
+            const handlePasswordReset = useCallback(async (e) => {
+                e.preventDefault();
+                if (!email.trim()) {
+                    alert('Por favor, ingresa tu dirección de correo electrónico.');
+                    return;
+                }
+                try {
+                    await auth.sendPasswordResetEmail(email.trim());
+                    alert('Se ha enviado un correo electrónico a tu dirección con las instrucciones para restablecer tu contraseña.');
+                    setShowPasswordRecovery(false); // Volver a la vista de inicio de sesión
+                    setEmail(''); // Limpiar el campo de email
+                } catch (err) {
+                    alert("Error al enviar el correo de recuperación: " + err.message);
+                }
+            }, [email]);
+
             return React.createElement('div', { className:"h-screen flex flex-col items-center bg-slate-950 p-10 pt-20 text-center" },
                 React.createElement('div', { className:"text-7xl mb-6" }, "🏃‍♂️"),
                 React.createElement('h1', { className:"text-4xl font-black italic uppercase text-white" }, APP_TITLE),
                 React.createElement('p', { className:"text-[8px] text-slate-600 uppercase mb-8" }, "V ", APP_VERSION),
-                React.createElement('form', { onSubmit:handle, className:"space-y-4 w-full max-w-sm" },
-                    React.createElement('input', { type:"email", placeholder:"EMAIL", className:"w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value:email, onChange:e=>setEmail(e.target.value), required:true }),
-                    React.createElement('input', { type:"password", placeholder:"CLAVE", className:"w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value:pass, onChange:e=>setPass(e.target.value), required:true }),
-                    React.createElement('button', { type:"submit", className:"w-full bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic" }, isReg ? 'REGISTRARSE' : 'ENTRAR')
-                ),
-                React.createElement('button', { onClick:()=>setIsReg(!isReg), className:"mt-8 text-slate-500 text-[10px] uppercase font-black" }, isReg ? 'YA TENGO CUENTA' : 'CREAR CUENTA NUEVA')
+
+                // Renderiza el formulario de recuperación de contraseña si showPasswordRecovery es true
+                showPasswordRecovery ? (
+                    React.createElement('form', { onSubmit:handlePasswordReset, className:"space-y-4 w-full max-w-sm" },
+                        React.createElement('input', { type:"email", placeholder:"EMAIL", className:"w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value:email, onChange:e=>setEmail(e.target.value), required:true }),
+                        React.createElement('button', { type:"submit", className:"w-full bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic" }, "ENVIAR ENLACE DE RECUPERACIÓN"),
+                        React.createElement('button', { type:"button", onClick:()=>setShowPasswordRecovery(false), className:"mt-4 w-full text-slate-500 text-[10px] uppercase font-black" }, "VOLVER A INICIAR SESIÓN")
+                    )
+                ) : ( // De lo contrario, renderiza el formulario de inicio de sesión/registro
+                    React.createElement('form', { onSubmit:handleAuth, className:"space-y-4 w-full max-w-sm" },
+                        React.createElement('input', { type:"email", placeholder:"EMAIL", className:"w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value:email, onChange:e=>setEmail(e.target.value), required:true }),
+                        React.createElement('input', { type:"password", placeholder:"CLAVE", className:"w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value:pass, onChange:e=>setPass(e.target.value), required:true }),
+                        React.createElement('button', { type:"submit", className:"w-full bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic" }, isReg ? 'REGISTRARSE' : 'ENTRAR'),
+                        // Botones para alternar entre registro/inicio de sesión y recuperación de contraseña
+                        React.createElement('button', { type:"button", onClick:()=>setIsReg(!isReg), className:"mt-4 text-slate-500 text-[10px] uppercase font-black" }, isReg ? 'YA TENGO CUENTA' : 'CREAR CUENTA NUEVA'),
+                        React.createElement('button', { type:"button", onClick:()=>setShowPasswordRecovery(true), className:"mt-2 text-slate-500 text-[10px] uppercase font-black" }, "¿OLVIDASTE TU CONTRASEÑA?")
+                    )
+                )
             );
         }
 
