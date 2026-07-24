@@ -124,6 +124,28 @@
         }
         .phase-card:active { transform: scale(0.97); }
         .phase-icon { font-size: 2rem; line-height: 1; }
+
+        /* Mantiene las acciones de acceso visibles en teléfonos bajos. */
+        .auth-screen {
+            min-height: 0;
+            padding-top: max(2rem, env(safe-area-inset-top));
+            padding-bottom: max(1rem, env(safe-area-inset-bottom));
+        }
+        .auth-actions {
+            overscroll-behavior: contain;
+            padding-bottom: max(1rem, env(safe-area-inset-bottom));
+        }
+        @media (max-height: 700px) {
+            .auth-screen { padding-top: max(1rem, env(safe-area-inset-top)); }
+            .auth-logo { font-size: 3rem !important; margin-bottom: .25rem !important; }
+            .auth-title { font-size: 1.75rem !important; line-height: 1.9rem !important; }
+            .auth-version { margin-bottom: .5rem !important; }
+            .auth-actions input { padding: 1rem !important; }
+            .auth-actions button[type="submit"] {
+                padding-top: 1rem !important;
+                padding-bottom: 1rem !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1638,14 +1660,14 @@
                 React.createElement('button', { type:"button", onClick:()=>setIsClosed(false), className:"w-full max-w-sm bg-orange-500 py-5 rounded-full font-black uppercase text-white active:scale-95 italic" }, "VOLVER A INICIAR SESIÓN")
             );
 
-            return React.createElement('div', { className:"relative h-full flex flex-col items-center bg-slate-950 p-4 pt-8 text-center" },
+            return React.createElement('div', { className:"auth-screen relative h-full flex flex-col items-center overflow-hidden bg-slate-950 px-4 text-center" },
                 React.createElement('button', { type:"button", onClick:()=>setIsClosed(true), className:"absolute right-4 top-4 rounded-full border border-white/10 bg-slate-900/80 px-3 py-2 text-[10px] uppercase font-black text-slate-300" }, "✕ CANCELAR"),
                 React.createElement('div', { className:"shrink-0" },
-                    React.createElement('div', { className:"text-7xl mb-3" }, "🏃‍♂️"),
-                    React.createElement('h1', { className:"text-4xl font-black italic uppercase text-white" }, APP_TITLE),
-                    React.createElement('p', { className:"text-[8px] text-slate-600 uppercase mb-5" }, "V ", APP_VERSION)
+                    React.createElement('div', { className:"auth-logo text-7xl mb-3" }, "🏃‍♂️"),
+                    React.createElement('h1', { className:"auth-title text-4xl font-black italic uppercase text-white" }, APP_TITLE),
+                    React.createElement('p', { className:"auth-version text-[8px] text-slate-600 uppercase mb-5" }, "V ", APP_VERSION)
                 ),
-                React.createElement('div', { className:"flex-1 overflow-y-auto scrollbar-hide w-full max-w-sm px-4 py-1 min-h-0" },
+                React.createElement('div', { className:"auth-actions flex-1 overflow-y-auto scrollbar-hide w-full max-w-sm px-4 py-1 min-h-0" },
                     showPasswordRecovery ? (
                         React.createElement('form', { onSubmit:handlePasswordReset, className:"space-y-4" },
                             React.createElement('input', { type:"email", placeholder:"EMAIL", className:"w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value:email, onChange:e=>setEmail(e.target.value), required:true, disabled:loadingAuth }),
