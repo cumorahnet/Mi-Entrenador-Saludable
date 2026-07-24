@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#020617">
-    <title>Mi Entrenador Saludable — VERSION 2.8</title>
+    <title>Mi Entrenador Saludable — VERSION 2.10</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -1593,16 +1593,23 @@
         // ─── AuthView ─────────────────────────────────────────────────────────────────
         function AuthView({ APP_TITLE, APP_VERSION }) {
             const [isReg, setIsReg] = useState(false);
-            const [showPasswordRecovery, setShowPasswordRecovery] = useState(false); // Nuevo estado
+            const [showPasswordRecovery, setShowPasswordRecovery] = useState(false);
             const [email, setEmail] = useState('');
             const [pass, setPass] = useState('');
+            const [isClosed, setIsClosed] = useState(false);
+            const [loadingAuth, setLoadingAuth] = useState(false); // Nuevo estado de carga
 
             const handleAuth = useCallback(async e => {
                 e.preventDefault();
+                setLoadingAuth(true); // Iniciar carga
                 try {
                     if (isReg) await auth.createUserWithEmailAndPassword(email.trim(), pass);
                     else await auth.signInWithEmailAndPassword(email.trim(), pass);
-                } catch(err) { alert("Error: " + err.message); }
+                } catch(err) {
+                    alert("Error: " + err.message);
+                } finally {
+                    setLoadingAuth(false); // Finalizar carga
+                }
             }, [isReg, email, pass]);
 
             const handlePasswordReset = useCallback(async (e) => {
@@ -1611,37 +1618,47 @@
                     alert('Por favor, ingresa tu dirección de correo electrónico.');
                     return;
                 }
+                setLoadingAuth(true); // Iniciar carga
                 try {
                     await auth.sendPasswordResetEmail(email.trim());
                     alert('Se ha enviado un correo electrónico a tu dirección con las instrucciones para restablecer tu contraseña.');
-                    setShowPasswordRecovery(false); // Volver a la vista de inicio de sesión
-                    setEmail(''); // Limpiar el campo de email
+                    setShowPasswordRecovery(false);
+                    setEmail('');
                 } catch (err) {
                     alert("Error al enviar el correo de recuperación: " + err.message);
+                } finally {
+                    setLoadingAuth(false); // Finalizar carga
                 }
             }, [email]);
 
-            return React.createElement('div', { className:"h-full flex flex-col items-center bg-slate-950 p-6 pt-10 text-center" }, // Changed h-screen to h-full, adjusted padding
-                React.createElement('div', { className:"shrink-0" }, // Fixed header part
-                    React.createElement('div', { className:"text-7xl mb-4" }, "🏃‍♂️"), // Adjusted mb-6 to mb-4
+            if (isClosed) return React.createElement('div', { className:"h-full flex flex-col items-center justify-center bg-slate-950 p-6 text-center" },
+                React.createElement('div', { className:"text-6xl mb-4" }, "👋"),
+                React.createElement('h2', { className:"text-2xl font-black italic uppercase text-white mb-2" }, "VENTANA CERRADA"),
+                React.createElement('p', { className:"text-sm text-slate-400 mb-6" }, "Puedes volver a abrir el acceso cuando lo necesites."),
+                React.createElement('button', { type:"button", onClick:()=>setIsClosed(false), className:"w-full max-w-sm bg-orange-500 py-5 rounded-full font-black uppercase text-white active:scale-95 italic" }, "VOLVER A INICIAR SESIÓN")
+            );
+
+            return React.createElement('div', { className:"relative h-full flex flex-col items-center bg-slate-950 p-4 pt-8 text-center" },
+                React.createElement('button', { type:"button", onClick:()=>setIsClosed(true), className:"absolute right-4 top-4 rounded-full border border-white/10 bg-slate-900/80 px-3 py-2 text-[10px] uppercase font-black text-slate-300" }, "✕ CANCELAR"),
+                React.createElement('div', { className:"shrink-0" },
+                    React.createElement('div', { className:"text-7xl mb-3" }, "🏃‍♂️"),
                     React.createElement('h1', { className:"text-4xl font-black italic uppercase text-white" }, APP_TITLE),
-                    React.createElement('p', { className:"text-[8px] text-slate-600 uppercase mb-6" }, "V ", APP_VERSION) // Adjusted mb-8 to mb-6
+                    React.createElement('p', { className:"text-[8px] text-slate-600 uppercase mb-5" }, "V ", APP_VERSION)
                 ),
-                React.createElement('div', { className:"flex-1 overflow-y-auto scrollbar-hide w-full max-w-sm px-4 py-2" }, // Scrollable content area
+                React.createElement('div', { className:"flex-1 overflow-y-auto scrollbar-hide w-full max-w-sm px-4 py-1 min-h-0" },
                     showPasswordRecovery ? (
-                        React.createElement('form', { onSubmit:handlePasswordReset, className:"space-y-4" }, // Removed w-full max-w-sm
-                            React.createElement('input', { type:"email", placeholder:"EMAIL", className:"w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value:email, onChange:e=>setEmail(e.target.value), required:true }),
-                            React.createElement('button', { type:"submit", className:"w-full bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic" }, "ENVIAR ENLACE DE RECUPERACIÓN"),
-                            React.createElement('button', { type:"button", onClick:()=>setShowPasswordRecovery(false), className:"w-full text-orange-400 text-[10px] uppercase font-black" }, "VOLVER A INICIAR SESIÓN") // Removed mt-4
+                        React.createElement('form', { onSubmit:handlePasswordReset, className:"space-y-4" },
+                            React.createElement('input', { type:"email", placeholder:"EMAIL", className:"w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value:email, onChange:e=>setEmail(e.target.value), required:true, disabled:loadingAuth }),
+                            React.createElement('button', { type:"submit", className:"w-full bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic", disabled:loadingAuth }, loadingAuth ? 'ENVIANDO...' : "ENVIAR ENLACE DE RECUPERACIÓN"),
+                            React.createElement('button', { type:"button", onClick:()=>setShowPasswordRecovery(false), className:"w-full text-orange-400 text-[10px] uppercase font-black", disabled:loadingAuth }, "VOLVER A INICIAR SESIÓN")
                         )
-                    ) : ( // De lo contrario, renderiza el formulario de inicio de sesión/registro
-                        React.createElement('form', { onSubmit:handleAuth, className:"space-y-4" }, // Removed w-full max-w-sm
-                            React.createElement('input', { type:"email", placeholder:"EMAIL", className:"w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value:email, onChange:e=>setEmail(e.target.value), required:true }),
-                            React.createElement('input', { type:"password", placeholder:"CLAVE", className:"w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value:pass, onChange:e=>setPass(e.target.value), required:true }),
-                            React.createElement('button', { type:"submit", className:"w-full bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic" }, isReg ? 'REGISTRARSE' : 'ENTRAR'),
-                            // Botones para alternar entre registro/inicio de sesión y recuperación de contraseña
-                            React.createElement('button', { type:"button", onClick:()=>setIsReg(!isReg), className:"text-orange-400 text-[10px] uppercase font-black block w-full" }, isReg ? 'YA TENGO CUENTA' : 'CREAR CUENTA NUEVA'), // Removed mt-4
-                            React.createElement('button', { type:"button", onClick:()=>setShowPasswordRecovery(true), className:"text-yellow-400 text-[10px] uppercase font-black block w-full" }, "¿OLVIDASTE TU CONTRASEÑA?") // Removed mt-2
+                    ) : (
+                        React.createElement('form', { onSubmit:handleAuth, className:"space-y-4" },
+                            React.createElement('input', { type:"email", placeholder:"EMAIL", className:"w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value:email, onChange:e=>setEmail(e.target.value), required:true, disabled:loadingAuth }),
+                            React.createElement('input', { type:"password", placeholder:"CLAVE", className:"w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value:pass, onChange:e=>setPass(e.target.value), required:true, disabled:loadingAuth }),
+                            React.createElement('button', { type:"submit", className:"w-full bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic", disabled:loadingAuth }, isReg ? (loadingAuth ? 'REGISTRANDO...' : 'REGISTRARSE') : (loadingAuth ? 'ENTRANDO...' : 'ENTRAR')),
+                            React.createElement('button', { type:"button", onClick:()=>setIsReg(!isReg), className:"text-orange-400 text-[10px] uppercase font-black block w-full", disabled:loadingAuth }, isReg ? 'YA TENGO CUENTA' : 'CREAR CUENTA NUEVA'),
+                            React.createElement('button', { type:"button", onClick:()=>setShowPasswordRecovery(true), className:"text-yellow-400 text-[10px] uppercase font-black block w-full", disabled:loadingAuth }, "¿OLVIDASTE TU CONTRASEÑA?")
                         )
                     )
                 )

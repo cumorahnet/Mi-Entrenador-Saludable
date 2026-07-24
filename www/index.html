@@ -1642,6 +1642,7 @@
             const [isReg, setIsReg] = useState(false);
             const [email, setEmail] = useState('');
             const [pass, setPass] = useState('');
+            const [isClosed, setIsClosed] = useState(false);
             const handle = useCallback(async e => {
                 e.preventDefault();
                 try {
@@ -1649,8 +1650,17 @@
                     else await auth.signInWithEmailAndPassword(email.trim(), pass);
                 } catch(err) { alert("Error: " + err.message); }
             }, [isReg, email, pass]);
-            return React.createElement('div', { className:"h-screen flex flex-col items-center bg-slate-950 p-10 pt-20 text-center" },
-                React.createElement('div', { className:"text-7xl mb-6" }, "ðŸƒâ€â™‚ï¸"),
+
+            if (isClosed) return React.createElement('div', { className:"h-screen flex flex-col items-center justify-center bg-slate-950 p-6 text-center" },
+                React.createElement('div', { className:"text-6xl mb-4" }, "👋"),
+                React.createElement('h2', { className:"text-2xl font-black italic uppercase text-white mb-2" }, "VENTANA CERRADA"),
+                React.createElement('p', { className:"text-sm text-slate-400 mb-6" }, "Puedes volver a abrir el acceso cuando lo necesites."),
+                React.createElement('button', { type:"button", onClick:()=>setIsClosed(false), className:"w-full max-w-sm bg-orange-500 py-5 rounded-full font-black uppercase text-white active:scale-95 italic" }, "VOLVER A INICIAR SESIÓN")
+            );
+
+            return React.createElement('div', { className:"relative h-screen flex flex-col items-center bg-slate-950 p-10 pt-20 text-center" },
+                React.createElement('button', { type:"button", onClick:()=>setIsClosed(true), className:"absolute right-4 top-4 rounded-full border border-white/10 bg-slate-900/80 px-3 py-2 text-[10px] uppercase font-black text-slate-300" }, "✕ CANCELAR"),
+                React.createElement('div', { className:"text-7xl mb-6" }, "🏃‍♂️"),
                 React.createElement('h1', { className:"text-4xl font-black italic uppercase text-white" }, APP_TITLE),
                 React.createElement('p', { className:"text-[8px] text-slate-600 uppercase mb-8" }, "V ", APP_VERSION),
                 React.createElement('form', { onSubmit:handle, className:"space-y-4 w-full max-w-sm" },

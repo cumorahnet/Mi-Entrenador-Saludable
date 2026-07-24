@@ -1,6 +1,6 @@
 # Próximas tareas
 
-> Generado por CDC a partir de la sesión `session-20260722235956-c3a975`.
+> Generado por CDC a partir de la sesión `session-20260724191510-e09001`.
 
 ## Pendientes
 
@@ -8,8 +8,7 @@
 
 ## Próximos pasos
 
-- Revisar y resolver los riesgos detectados en este cierre.
-- Definir el siguiente objetivo de trabajo del proyecto.
+- revisar funcionamiento de app
 
 ## Riesgos que deben revisarse
 
