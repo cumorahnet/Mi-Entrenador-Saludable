@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#020617">
-    <title>Mi Entrenador Saludable — VERSION 2.8</title>
+    <title>Mi Entrenador Saludable — VERSION 2.9</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -1621,13 +1621,13 @@
                 }
             }, [email]);
 
-            return React.createElement('div', { className:"h-full flex flex-col items-center bg-slate-950 p-6 pt-10 text-center" }, // Changed h-screen to h-full, adjusted padding
+            return React.createElement('div', { className:"h-full flex flex-col items-center bg-slate-950 p-4 pt-8 text-center" }, // Adjusted padding
                 React.createElement('div', { className:"shrink-0" }, // Fixed header part
-                    React.createElement('div', { className:"text-7xl mb-4" }, "🏃‍♂️"), // Adjusted mb-6 to mb-4
+                    React.createElement('div', { className:"text-7xl mb-3" }, "🏃‍♂️"), // Adjusted mb
                     React.createElement('h1', { className:"text-4xl font-black italic uppercase text-white" }, APP_TITLE),
-                    React.createElement('p', { className:"text-[8px] text-slate-600 uppercase mb-6" }, "V ", APP_VERSION) // Adjusted mb-8 to mb-6
+                    React.createElement('p', { className:"text-[8px] text-slate-600 uppercase mb-5" }, "V ", APP_VERSION) // Adjusted mb
                 ),
-                React.createElement('div', { className:"flex-1 overflow-y-auto scrollbar-hide w-full max-w-sm px-4 py-2" }, // Scrollable content area
+                React.createElement('div', { className:"flex-1 overflow-y-auto scrollbar-hide w-full max-w-sm px-4 py-1 min-h-0" }, // Added min-h-0, adjusted py
                     showPasswordRecovery ? (
                         React.createElement('form', { onSubmit:handlePasswordReset, className:"space-y-4" }, // Removed w-full max-w-sm
                             React.createElement('input', { type:"email", placeholder:"EMAIL", className:"w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value:email, onChange:e=>setEmail(e.target.value), required:true }),
