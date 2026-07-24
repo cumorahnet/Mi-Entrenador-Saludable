@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#020617">
-    <title>Mi Entrenador Saludable — VERSION 2.7</title>
+    <title>Mi Entrenador Saludable — VERSION 2.8</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -1621,26 +1621,28 @@
                 }
             }, [email]);
 
-            return React.createElement('div', { className:"h-screen flex flex-col items-center bg-slate-950 p-10 pt-20 text-center" },
-                React.createElement('div', { className:"text-7xl mb-6" }, "🏃‍♂️"),
-                React.createElement('h1', { className:"text-4xl font-black italic uppercase text-white" }, APP_TITLE),
-                React.createElement('p', { className:"text-[8px] text-slate-600 uppercase mb-8" }, "V ", APP_VERSION),
-
-                // Renderiza el formulario de recuperación de contraseña si showPasswordRecovery es true
-                showPasswordRecovery ? (
-                    React.createElement('form', { onSubmit:handlePasswordReset, className:"space-y-4 w-full max-w-sm" },
-                        React.createElement('input', { type:"email", placeholder:"EMAIL", className:"w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value:email, onChange:e=>setEmail(e.target.value), required:true }),
-                        React.createElement('button', { type:"submit", className:"w-full bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic" }, "ENVIAR ENLACE DE RECUPERACIÓN"),
-                        React.createElement('button', { type:"button", onClick:()=>setShowPasswordRecovery(false), className:"mt-4 w-full text-orange-400 text-[10px] uppercase font-black" }, "VOLVER A INICIAR SESIÓN") // Actualizado el color y layout
-                    )
-                ) : ( // De lo contrario, renderiza el formulario de inicio de sesión/registro
-                    React.createElement('form', { onSubmit:handleAuth, className:"space-y-4 w-full max-w-sm" },
-                        React.createElement('input', { type:"email", placeholder:"EMAIL", className:"w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value:email, onChange:e=>setEmail(e.target.value), required:true }),
-                        React.createElement('input', { type:"password", placeholder:"CLAVE", className:"w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value:pass, onChange:e=>setPass(e.target.value), required:true }),
-                        React.createElement('button', { type:"submit", className:"w-full bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic" }, isReg ? 'REGISTRARSE' : 'ENTRAR'),
-                        // Botones para alternar entre registro/inicio de sesión y recuperación de contraseña
-                        React.createElement('button', { type:"button", onClick:()=>setIsReg(!isReg), className:"mt-4 text-orange-400 text-[10px] uppercase font-black block w-full" }, isReg ? 'YA TENGO CUENTA' : 'CREAR CUENTA NUEVA'),
-                        React.createElement('button', { type:"button", onClick:()=>setShowPasswordRecovery(true), className:"mt-2 text-yellow-400 text-[10px] uppercase font-black block w-full" }, "¿OLVIDASTE TU CONTRASEÑA?")
+            return React.createElement('div', { className:"h-full flex flex-col items-center bg-slate-950 p-6 pt-10 text-center" }, // Changed h-screen to h-full, adjusted padding
+                React.createElement('div', { className:"shrink-0" }, // Fixed header part
+                    React.createElement('div', { className:"text-7xl mb-4" }, "🏃‍♂️"), // Adjusted mb-6 to mb-4
+                    React.createElement('h1', { className:"text-4xl font-black italic uppercase text-white" }, APP_TITLE),
+                    React.createElement('p', { className:"text-[8px] text-slate-600 uppercase mb-6" }, "V ", APP_VERSION) // Adjusted mb-8 to mb-6
+                ),
+                React.createElement('div', { className:"flex-1 overflow-y-auto scrollbar-hide w-full max-w-sm px-4 py-2" }, // Scrollable content area
+                    showPasswordRecovery ? (
+                        React.createElement('form', { onSubmit:handlePasswordReset, className:"space-y-4" }, // Removed w-full max-w-sm
+                            React.createElement('input', { type:"email", placeholder:"EMAIL", className:"w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value:email, onChange:e=>setEmail(e.target.value), required:true }),
+                            React.createElement('button', { type:"submit", className:"w-full bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic" }, "ENVIAR ENLACE DE RECUPERACIÓN"),
+                            React.createElement('button', { type:"button", onClick:()=>setShowPasswordRecovery(false), className:"w-full text-orange-400 text-[10px] uppercase font-black" }, "VOLVER A INICIAR SESIÓN") // Removed mt-4
+                        )
+                    ) : ( // De lo contrario, renderiza el formulario de inicio de sesión/registro
+                        React.createElement('form', { onSubmit:handleAuth, className:"space-y-4" }, // Removed w-full max-w-sm
+                            React.createElement('input', { type:"email", placeholder:"EMAIL", className:"w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value:email, onChange:e=>setEmail(e.target.value), required:true }),
+                            React.createElement('input', { type:"password", placeholder:"CLAVE", className:"w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value:pass, onChange:e=>setPass(e.target.value), required:true }),
+                            React.createElement('button', { type:"submit", className:"w-full bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic" }, isReg ? 'REGISTRARSE' : 'ENTRAR'),
+                            // Botones para alternar entre registro/inicio de sesión y recuperación de contraseña
+                            React.createElement('button', { type:"button", onClick:()=>setIsReg(!isReg), className:"text-orange-400 text-[10px] uppercase font-black block w-full" }, isReg ? 'YA TENGO CUENTA' : 'CREAR CUENTA NUEVA'), // Removed mt-4
+                            React.createElement('button', { type:"button", onClick:()=>setShowPasswordRecovery(true), className:"text-yellow-400 text-[10px] uppercase font-black block w-full" }, "¿OLVIDASTE TU CONTRASEÑA?") // Removed mt-2
+                        )
                     )
                 )
             );
