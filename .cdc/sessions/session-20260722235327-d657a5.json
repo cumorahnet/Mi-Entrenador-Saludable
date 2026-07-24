@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "1.0",
+  "id": "session-20260722235327-d657a5",
+  "projectId": "Mi-Entrenador-Saludable",
+  "projectName": "Mi-Entrenador-Saludable",
+  "status": "closed",
+  "startedAt": "2026-07-22T23:53:27.317Z",
+  "closedAt": "2026-07-22T23:54:50.850Z",
+  "durationMs": 83533,
+  "objective": "",
+  "modifiedFiles": [],
+  "changes": [],
+  "intelligentClosure": {
+    "schemaVersion": "1.0",
+    "provider": "local-context",
+    "generatedAt": "2026-07-22T23:54:50.865Z",
+    "reviewStatus": "pending-user-review",
+    "summary": "Se cerró una sesión de trabajo del proyecto Mi-Entrenador-Saludable. Se detectaron 0 cambio(s): 0 creado(s), 0 modificado(s) y 0 eliminado(s).",
+    "achievements": [],
+    "decisions": [],
+    "risks": [
+      "No se detectaron archivos modificados. Confirma que el trabajo se haya guardado dentro del proyecto y fuera de carpetas ignoradas."
+    ],
+    "pending": [],
+    "nextSteps": [
+      "Revisar y resolver los riesgos detectados en este cierre.",
+      "Definir el siguiente objetivo de trabajo del proyecto."
+    ],
+    "memorySuggestions": [],
+    "metrics": {
+      "total": 0,
+      "created": 0,
+      "modified": 0,
+      "deleted": 0,
+      "contextualizedFiles": 0
+    },
+    "evidence": {
+      "changedFiles": [],
+      "contextualizedFiles": []
+    },
+    "artifacts": {
+      "history": ".cdc/history/session-20260722235327-d657a5.md",
+      "changelog": "CHANGELOG.md",
+      "next": "NEXT.md",
+      "decisions": null
+    }
+  }
+}

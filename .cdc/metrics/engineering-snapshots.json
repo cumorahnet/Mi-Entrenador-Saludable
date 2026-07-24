@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "Mi-Entrenador-Saludable",
+  "updatedAt": "2026-07-23T02:26:39.806Z",
+  "snapshots": [
+    {
+      "id": "metric-20260723022639-dbe51e",
+      "projectId": "Mi-Entrenador-Saludable",
+      "generatedAt": "2026-07-23T02:26:39.806Z",
+      "provider": "local-engineering",
+      "reviewStatus": "advisory-only",
+      "health": {
+        "score": 91,
+        "grade": "A",
+        "status": "healthy"
+      },
+      "signals": {
+        "technicalDebt": 0,
+        "duplications": 0,
+        "risks": 1,
+        "patterns": 4,
+        "recommendations": 1
+      },
+      "code": {
+        "analyzedFiles": 5,
+        "sourceFiles": 4,
+        "testFiles": 1
+      },
+      "context": {
+        "generatedAt": "2026-07-23T02:26:39.806Z",
+        "sourceCount": 17,
+        "gitChanges": 6,
+        "gitHead": "c1ac0c2",
+        "gitBranch": "main"
+      }
+    }
+  ]
+}

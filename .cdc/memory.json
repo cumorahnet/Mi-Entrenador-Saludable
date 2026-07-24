@@ -1,0 +1,92 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "Mi-Entrenador-Saludable",
+  "updatedAt": "2026-07-23T00:05:41.260Z",
+  "entries": [
+    {
+      "id": "mem-20260722235415-6b09be",
+      "type": "convention",
+      "title": "otra version",
+      "content": "hay una version perdida",
+      "status": "active",
+      "tags": [],
+      "source": {
+        "type": "user",
+        "reference": null
+      },
+      "supersedes": null,
+      "supersededBy": null,
+      "createdAt": "2026-07-22T23:54:15.973Z",
+      "updatedAt": "2026-07-22T23:54:15.973Z",
+      "archivedAt": null
+    },
+    {
+      "id": "mem-20260723000210-fb9a6c",
+      "type": "decision",
+      "title": "Prueba de trazabilidad",
+      "content": "prueba de trazabilidad",
+      "status": "superseded",
+      "tags": [],
+      "source": {
+        "type": "user",
+        "reference": null
+      },
+      "supersedes": null,
+      "supersededBy": "mem-20260723000222-e46c5e",
+      "createdAt": "2026-07-23T00:02:10.786Z",
+      "updatedAt": "2026-07-23T00:02:22.991Z",
+      "archivedAt": null
+    },
+    {
+      "id": "mem-20260723000222-e46c5e",
+      "type": "decision",
+      "title": "Prueba de trazabilidad",
+      "content": "prueba de trazabilidad",
+      "status": "archived",
+      "tags": [],
+      "source": {
+        "type": "user",
+        "reference": null
+      },
+      "supersedes": "mem-20260723000210-fb9a6c",
+      "supersededBy": null,
+      "createdAt": "2026-07-23T00:02:22.991Z",
+      "updatedAt": "2026-07-23T00:02:49.464Z",
+      "archivedAt": "2026-07-23T00:02:49.464Z"
+    },
+    {
+      "id": "mem-20260723000428-8a7e0c",
+      "type": "decision",
+      "title": "Prueba de trazabilidad",
+      "content": "kjhkjhj",
+      "status": "superseded",
+      "tags": [],
+      "source": {
+        "type": "user",
+        "reference": null
+      },
+      "supersedes": null,
+      "supersededBy": "mem-20260723000519-920dbc",
+      "createdAt": "2026-07-23T00:04:28.381Z",
+      "updatedAt": "2026-07-23T00:05:19.885Z",
+      "archivedAt": null
+    },
+    {
+      "id": "mem-20260723000519-920dbc",
+      "type": "decision",
+      "title": "Prueba de trazabilidad 23",
+      "content": "kjhkjhj jkljlñjdlsajfñ lkjasñdlfj flkñadsjfñlaksj ñl",
+      "status": "archived",
+      "tags": [],
+      "source": {
+        "type": "user",
+        "reference": null
+      },
+      "supersedes": "mem-20260723000428-8a7e0c",
+      "supersededBy": null,
+      "createdAt": "2026-07-23T00:05:19.885Z",
+      "updatedAt": "2026-07-23T00:05:41.260Z",
+      "archivedAt": "2026-07-23T00:05:41.260Z"
+    }
+  ]
+}
