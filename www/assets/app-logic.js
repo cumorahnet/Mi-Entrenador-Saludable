@@ -93,6 +93,44 @@
         }
     }));
 
+    const calculateWorkoutDurationSeconds = (
+        workout,
+        defaultParams,
+        warmupStepsCount,
+        trainingZonesCount
+    ) => {
+        const workoutParams = workout?.phases?.entrenamiento || {};
+        const ent = { ...defaultParams.entrenamiento, ...workoutParams };
+
+        const warmupSeconds =
+            15 +
+            warmupStepsCount * 30 +
+            Math.max(0, warmupStepsCount - 1) * 5 +
+            20;
+        const zoneSeconds =
+            ent.rounds * ent.action +
+            Math.max(0, ent.rounds - 1) * ent.change;
+        const cycleSeconds =
+            trainingZonesCount * zoneSeconds +
+            Math.max(0, trainingZonesCount - 1) * ent.zoneRest;
+        const mainTrainingSeconds =
+            ent.cycles * cycleSeconds +
+            Math.max(0, ent.cycles - 1) * ent.rest +
+            30;
+
+        return warmupSeconds + mainTrainingSeconds + 10;
+    };
+
+    const formatDurationEstimate = totalSeconds => {
+        const totalMinutes = Math.ceil(Math.max(0, totalSeconds) / 60);
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+
+        if (hours === 0) return `${minutes} min`;
+        if (minutes === 0) return `${hours} h`;
+        return `${hours} h ${minutes} min`;
+    };
+
     return {
         formatTime,
         formatPace,
@@ -100,6 +138,8 @@
         formatSpeed,
         getDistance,
         togglePhaseSelection,
-        createDefaultWorkouts
+        createDefaultWorkouts,
+        calculateWorkoutDurationSeconds,
+        formatDurationEstimate
     };
 }));

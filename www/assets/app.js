@@ -111,9 +111,14 @@ const {
     formatSpeed,
     getDistance,
     togglePhaseSelection,
-    createDefaultWorkouts
+    createDefaultWorkouts,
+    calculateWorkoutDurationSeconds,
+    formatDurationEstimate
 } = window.AppLogic;
 const DEFAULT_WORKOUTS = createDefaultWorkouts(DEFAULT_PARAMS);
+const getWorkoutDurationText = workout => formatDurationEstimate(
+    calculateWorkoutDurationSeconds(workout, DEFAULT_PARAMS, WARMUP_STEPS.length, TRAINING_ZONES.length)
+);
 
 const GPS_PHASE_KEY = 'gps-tracking';
 const POST_GPS_REST_PHASE_KEY = 'post-gps-rest';
@@ -424,7 +429,7 @@ function PhaseSelectionScreen({ onPhasesSelected, onConfigureTraining, initialSe
                         React.createElement('p', { className: "font-black uppercase italic text-sm text-white leading-tight" }, phase.label),
                         React.createElement('p', { className: "text-[10px] text-slate-500 mt-0.5" },
                             phase.key === 'training' && selectedWorkout
-                                ? `Rutina elegida: ${selectedWorkout.name}`
+                                ? `Rutina elegida: ${selectedWorkout.name} · ${getWorkoutDurationText(selectedWorkout)} aprox.`
                                 : phase.desc
                         )
                     ),
@@ -1694,6 +1699,9 @@ function WorkoutsView({ workouts, selectedPhases, selectedWorkout, onConfirm, on
                             ),
                             React.createElement('p', { className:"mt-1 text-[9px] font-bold uppercase text-slate-400" },
                                 `${w.phases?.entrenamiento?.rounds ?? 3} rondas · ${w.phases?.entrenamiento?.cycles ?? 4} ciclos`
+                            ),
+                            React.createElement('p', { className:"mt-1 text-[10px] font-black uppercase text-sky-300" },
+                                `Duración estimada: ${getWorkoutDurationText(w)}`
                             ),
                             React.createElement('span', { className:"text-[10px] text-orange-400 font-black uppercase italic" }, checkedWorkoutId === w.id ? "Seleccionada" : "Disponible")
                         )

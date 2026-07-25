@@ -8,7 +8,9 @@ const {
     formatSpeed,
     getDistance,
     togglePhaseSelection,
-    createDefaultWorkouts
+    createDefaultWorkouts,
+    calculateWorkoutDurationSeconds,
+    formatDurationEstimate
 } = appLogic;
 
 describe('formatTime', () => {
@@ -135,5 +137,65 @@ describe('createDefaultWorkouts', () => {
     it('no modifica la plantilla de parámetros', () => {
         createDefaultWorkouts(defaultParams);
         expect(defaultParams.entrenamiento.rounds).toBe(3);
+    });
+});
+
+describe('calculateWorkoutDurationSeconds', () => {
+    const defaultParams = {
+        entrenamiento: {
+            action: 30,
+            change: 5,
+            rounds: 3,
+            cycles: 4,
+            rest: 60,
+            zoneRest: 30
+        }
+    };
+
+    it('calcula la sesión completa de cada rutina integrada', () => {
+        const workouts = createDefaultWorkouts(defaultParams);
+        const durations = workouts.map(workout =>
+            calculateWorkoutDurationSeconds(workout, defaultParams, 10, 3)
+        );
+
+        expect(durations).toEqual([1200, 2040, 3720]);
+        expect(durations.map(formatDurationEstimate)).toEqual([
+            '20 min',
+            '34 min',
+            '1 h 2 min'
+        ]);
+    });
+
+    it('usa la plantilla si una rutina no redefine parámetros', () => {
+        expect(calculateWorkoutDurationSeconds(
+            { phases: {} },
+            defaultParams,
+            10,
+            3
+        )).toBe(2040);
+    });
+
+    it('evita tiempos negativos cuando no hay pasos, rondas o zonas', () => {
+        const emptyWorkout = {
+            phases: {
+                entrenamiento: {
+                    rounds: 0,
+                    cycles: 0
+                }
+            }
+        };
+
+        expect(calculateWorkoutDurationSeconds(emptyWorkout, defaultParams, 0, 0)).toBe(75);
+    });
+});
+
+describe('formatDurationEstimate', () => {
+    it('redondea hacia arriba para no subestimar la duración', () => {
+        expect(formatDurationEstimate(61)).toBe('2 min');
+        expect(formatDurationEstimate(-1)).toBe('0 min');
+    });
+
+    it('omite los minutos cuando la duración completa horas exactas', () => {
+        expect(formatDurationEstimate(3600)).toBe('1 h');
     });
 });
