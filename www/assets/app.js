@@ -81,7 +81,7 @@ const db = firebase.firestore();
 
 const APP_ID = "mientrenador-v3";
 const APP_TITLE = "Mi Entrenador Saludable";
-const APP_VERSION = "2.19";
+const APP_VERSION = "2.20";
 
 const WARMUP_STEPS = [
     { label: 'TOBILLO DERECHO', voice: 'Tobillo derecho' },
