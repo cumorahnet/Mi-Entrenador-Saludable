@@ -6,7 +6,8 @@ const {
     formatPace,
     formatDistance,
     formatSpeed,
-    getDistance
+    getDistance,
+    togglePhaseSelection
 } = appLogic;
 
 describe('formatTime', () => {
@@ -76,5 +77,20 @@ describe('getDistance', () => {
 
     it('devuelve cero si una coordenada no es válida', () => {
         expect(getDistance(Number.NaN, 0, 0, 1)).toBe(0);
+    });
+});
+
+describe('togglePhaseSelection', () => {
+    it('marca una fase que todavía no está seleccionada', () => {
+        expect(togglePhaseSelection(['walk'], 'training')).toEqual(['walk', 'training']);
+    });
+
+    it('desmarca cualquier fase seleccionada, incluido entrenamiento', () => {
+        expect(togglePhaseSelection(['walk', 'training'], 'training')).toEqual(['walk']);
+        expect(togglePhaseSelection(['walk', 'run'], 'walk')).toEqual(['run']);
+    });
+
+    it('tolera un estado inicial sin arreglo', () => {
+        expect(togglePhaseSelection(null, 'run')).toEqual(['run']);
     });
 });

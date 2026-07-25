@@ -69,5 +69,19 @@
         );
     };
 
-    return { formatTime, formatPace, formatDistance, formatSpeed, getDistance };
+    const togglePhaseSelection = (selectedPhases, phaseKey) => {
+        const phases = Array.isArray(selectedPhases) ? selectedPhases : [];
+        return phases.includes(phaseKey)
+            ? phases.filter(key => key !== phaseKey)
+            : [...phases, phaseKey];
+    };
+
+    return {
+        formatTime,
+        formatPace,
+        formatDistance,
+        formatSpeed,
+        getDistance,
+        togglePhaseSelection
+    };
 }));

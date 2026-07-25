@@ -109,7 +109,8 @@ const {
     formatPace,
     formatDistance,
     formatSpeed,
-    getDistance
+    getDistance,
+    togglePhaseSelection
 } = window.AppLogic;
 
 const GPS_PHASE_KEY = 'gps-tracking';
@@ -366,17 +367,13 @@ function PhaseSelectionScreen({ onPhasesSelected, onConfigureTraining, initialSe
     const [selectedPhases, setSelectedPhases] = useState(initialSelectedPhases || []);
 
     const togglePhase = (key) => {
+        const isSelected = selectedPhases.includes(key);
+        const nextPhases = togglePhaseSelection(selectedPhases, key);
+        setSelectedPhases(nextPhases);
+
         if (key === 'training') {
-            const phasesForWorkout = selectedPhases.includes(key)
-                ? selectedPhases
-                : [...selectedPhases, key];
-            setSelectedPhases(phasesForWorkout);
-            onConfigureTraining(phasesForWorkout);
-            return;
+            if (!isSelected) onConfigureTraining(nextPhases);
         }
-        setSelectedPhases(prev =>
-            prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
-        );
     };
 
     const handleStart = () => {
