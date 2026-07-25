@@ -76,12 +76,30 @@
             : [...phases, phaseKey];
     };
 
+    const createDefaultWorkouts = defaultParams => [
+        { id: '_default_beginner', name: 'PRINCIPIANTE', cycles: 2 },
+        { id: '_default_intermediate', name: 'INTERMEDIO', cycles: 4 },
+        { id: '_default_advanced', name: 'AVANZADO', cycles: 8 }
+    ].map(({ id, name, cycles }) => ({
+        id,
+        name,
+        isDefault: true,
+        phases: {
+            ...defaultParams,
+            entrenamiento: {
+                ...defaultParams.entrenamiento,
+                cycles
+            }
+        }
+    }));
+
     return {
         formatTime,
         formatPace,
         formatDistance,
         formatSpeed,
         getDistance,
-        togglePhaseSelection
+        togglePhaseSelection,
+        createDefaultWorkouts
     };
 }));

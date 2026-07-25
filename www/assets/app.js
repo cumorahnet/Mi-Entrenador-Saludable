@@ -110,8 +110,10 @@ const {
     formatDistance,
     formatSpeed,
     getDistance,
-    togglePhaseSelection
+    togglePhaseSelection,
+    createDefaultWorkouts
 } = window.AppLogic;
+const DEFAULT_WORKOUTS = createDefaultWorkouts(DEFAULT_PARAMS);
 
 const GPS_PHASE_KEY = 'gps-tracking';
 const POST_GPS_REST_PHASE_KEY = 'post-gps-rest';
@@ -1476,6 +1478,20 @@ function App() {
         setView('phases');
     }, []);
 
+    const handleDeleteWorkout = useCallback(async workout => {
+        if (!user || !workout || workout.isDefault) return;
+        if (!window.confirm(`¿Eliminar la rutina "${workout.name}"? Esta acción no se puede deshacer.`)) return;
+
+        try {
+            await db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid)
+                .collection('workouts').doc(workout.id).delete();
+            if (selectedWorkout?.id === workout.id) setSelectedWorkout(null);
+            if (editingWorkout?.id === workout.id) setEditingWorkout(null);
+        } catch (error) {
+            alert("Error al eliminar: " + error.message);
+        }
+    }, [user, selectedWorkout, editingWorkout]);
+
     const handleExitPlayer = useCallback(() => {
         setSelectedPhases(null);
         setSelectedWorkout(null);
@@ -1533,6 +1549,7 @@ function App() {
                 selectedWorkout,
                 onConfirm: handleWorkoutSelected,
                 onEdit: w => { setEditingWorkout(w); setView('create'); },
+                onDelete: handleDeleteWorkout,
                 onCreate: () => { setEditingWorkout(null); setView('create'); }
             }),
             view === 'avance'   && React.createElement(AvanceView, { history }),
@@ -1635,9 +1652,10 @@ function AuthView({ APP_TITLE, APP_VERSION }) {
 }
 
 // ─── WorkoutsView ─────────────────────────────────────────────────────────────
-function WorkoutsView({ workouts, selectedPhases, selectedWorkout, onConfirm, onEdit, onCreate }) {
+function WorkoutsView({ workouts, selectedPhases, selectedWorkout, onConfirm, onEdit, onDelete, onCreate }) {
+    const availableWorkouts = [...DEFAULT_WORKOUTS, ...workouts];
     const [checkedWorkoutId, setCheckedWorkoutId] = useState(selectedWorkout?.id || null);
-    const checkedWorkout = workouts.find(workout => workout.id === checkedWorkoutId) || null;
+    const checkedWorkout = availableWorkouts.find(workout => workout.id === checkedWorkoutId) || null;
     const phaseLabels = selectedPhases
         ? ['Calentamiento', ...selectedPhases.map(k => SELECTABLE_PHASES.find(p=>p.key===k)?.label||k)].join(' → ')
         : '';
@@ -1654,16 +1672,15 @@ function WorkoutsView({ workouts, selectedPhases, selectedWorkout, onConfirm, on
             React.createElement('p', { className:"text-[9px] text-slate-500 mt-1" }, "Elige la rutina con la que entrenarás:")
         ),
         React.createElement('div', { className:"space-y-4" },
-            workouts.length === 0
-                ? React.createElement('div', { className:"text-center p-12 opacity-30 italic font-black text-[10px]" }, "Sin rutinas. Crea una para comenzar.")
-                : workouts.map(w => React.createElement('div', {
+            availableWorkouts.map(w => React.createElement('div', {
                     key:w.id,
                     onClick:()=>setCheckedWorkoutId(w.id),
                     className:`glass-card p-6 flex justify-between items-center shadow-lg cursor-pointer ${checkedWorkoutId === w.id ? 'ring-2 ring-sky-400 bg-sky-500/10' : ''}`
                 },
                     React.createElement('div', { className:"flex items-center gap-4 flex-1" },
                         React.createElement('input', {
-                            type:"checkbox",
+                            type:"radio",
+                            name:"selected-workout",
                             checked:checkedWorkoutId === w.id,
                             onChange:()=>setCheckedWorkoutId(w.id),
                             onClick:event=>event.stopPropagation(),
@@ -1671,14 +1688,30 @@ function WorkoutsView({ workouts, selectedPhases, selectedWorkout, onConfirm, on
                             "aria-label":`Seleccionar rutina ${w.name}`
                         }),
                         React.createElement('div', null,
-                        React.createElement('h3', { className:"font-black uppercase italic text-sm" }, w.name),
-                        React.createElement('span', { className:"text-[10px] text-orange-400 font-black uppercase italic" }, checkedWorkoutId === w.id ? "Seleccionada" : "Disponible")
+                            React.createElement('div', { className:"flex flex-wrap items-center gap-2" },
+                                React.createElement('h3', { className:"font-black uppercase italic text-sm" }, w.name),
+                                w.isDefault && React.createElement('span', { className:"rounded-full bg-emerald-500/15 px-2 py-1 text-[8px] font-black uppercase text-emerald-300" }, "Integrada")
+                            ),
+                            React.createElement('p', { className:"mt-1 text-[9px] font-bold uppercase text-slate-400" },
+                                `${w.phases?.entrenamiento?.rounds ?? 3} rondas · ${w.phases?.entrenamiento?.cycles ?? 4} ciclos`
+                            ),
+                            React.createElement('span', { className:"text-[10px] text-orange-400 font-black uppercase italic" }, checkedWorkoutId === w.id ? "Seleccionada" : "Disponible")
                         )
                     ),
-                    React.createElement('button', {
-                        onClick:event=>{ event.stopPropagation(); onEdit(w); },
-                        className:"bg-slate-800/40 p-4 rounded-xl text-[10px] font-black uppercase italic"
-                    }, "Editar")
+                    w.isDefault
+                        ? React.createElement('span', { className:"rounded-xl border border-white/10 bg-slate-800/30 px-3 py-2 text-[8px] font-black uppercase text-slate-500" }, "Solo lectura")
+                        : React.createElement('div', { className:"flex flex-col gap-2" },
+                            React.createElement('button', {
+                                type:"button",
+                                onClick:event=>{ event.stopPropagation(); onEdit(w); },
+                                className:"bg-slate-800/40 px-4 py-3 rounded-xl text-[10px] font-black uppercase italic"
+                            }, "Editar"),
+                            React.createElement('button', {
+                                type:"button",
+                                onClick:event=>{ event.stopPropagation(); onDelete(w); },
+                                className:"border border-red-500/30 bg-red-500/10 px-4 py-3 rounded-xl text-[10px] font-black uppercase text-red-300"
+                            }, "Eliminar")
+                        )
                 ))
         ),
         React.createElement(AdBannerPlaceholder, null), // Añadido el campo de anuncio aquí

@@ -7,7 +7,8 @@ const {
     formatDistance,
     formatSpeed,
     getDistance,
-    togglePhaseSelection
+    togglePhaseSelection,
+    createDefaultWorkouts
 } = appLogic;
 
 describe('formatTime', () => {
@@ -92,5 +93,47 @@ describe('togglePhaseSelection', () => {
 
     it('tolera un estado inicial sin arreglo', () => {
         expect(togglePhaseSelection(null, 'run')).toEqual(['run']);
+    });
+});
+
+describe('createDefaultWorkouts', () => {
+    const defaultParams = {
+        entrenamiento: {
+            action: 30,
+            change: 5,
+            rounds: 3,
+            cycles: 4,
+            rest: 60,
+            zoneRest: 30
+        }
+    };
+
+    it('crea los tres niveles integrados como rutinas de solo lectura', () => {
+        const workouts = createDefaultWorkouts(defaultParams);
+
+        expect(workouts.map(({ name }) => name)).toEqual([
+            'PRINCIPIANTE',
+            'INTERMEDIO',
+            'AVANZADO'
+        ]);
+        expect(workouts.every(({ isDefault }) => isDefault)).toBe(true);
+        expect(new Set(workouts.map(({ id }) => id)).size).toBe(3);
+    });
+
+    it('solo cambia el número de ciclos entre niveles', () => {
+        const workouts = createDefaultWorkouts(defaultParams);
+
+        expect(workouts.map(workout => workout.phases.entrenamiento.cycles)).toEqual([2, 4, 8]);
+        for (const workout of workouts) {
+            expect({
+                ...workout.phases.entrenamiento,
+                cycles: defaultParams.entrenamiento.cycles
+            }).toEqual(defaultParams.entrenamiento);
+        }
+    });
+
+    it('no modifica la plantilla de parámetros', () => {
+        createDefaultWorkouts(defaultParams);
+        expect(defaultParams.entrenamiento.rounds).toBe(3);
     });
 });
