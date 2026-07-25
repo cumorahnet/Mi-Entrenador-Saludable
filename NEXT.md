@@ -1,15 +1,17 @@
 # Próximas tareas
 
-> Generado por CDC a partir de la sesión `session-20260724191510-e09001`.
+> Generado por CDC a partir de la sesión `session-20260724193422-664fd8`.
 
 ## Pendientes
 
-- No se registraron pendientes explícitos.
+- fondo del logo
 
 ## Próximos pasos
 
-- revisar funcionamiento de app
+- videos de ajercicio
 
 ## Riesgos que deben revisarse
 
-- No se detectaron archivos modificados. Confirma que el trabajo se haya guardado dentro del proyecto y fuera de carpetas ignoradas.
+- Se modificaron archivos de configuración o infraestructura (android/.gradle/8.11.1/checksums/checksums.lock, android/.gradle/8.11.1/checksums/sha1-checksums.bin, android/.gradle/8.11.1/executionHistory/executionHistory.bin, android/.gradle/8.11.1/executionHistory/executionHistory.lock, android/.gradle/8.11.1/fileChanges/last-build.bin). Valida compatibilidad y despliegue.
+- Se modificó código fuente sin cambios detectados en archivos de prueba. Verifica la cobertura antes de cerrar el trabajo.
+- La sesión contiene 53 cambios. Considera dividir la revisión o el commit para reducir el riesgo de integración.

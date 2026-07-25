@@ -5,3 +5,8 @@
 
 - cambiar el orden de inicio de sesion
 
+<!-- cdc-session:session-20260724193422-664fd8 -->
+## 24/07/2026, 07:44 p.m. — session-20260724193422-664fd8
+
+- cambio interfaz
+

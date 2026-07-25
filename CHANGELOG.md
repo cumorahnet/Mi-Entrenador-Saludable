@@ -1,5 +1,78 @@
 # CHANGELOG
 
+<!-- cdc-session:session-20260724193422-664fd8 -->
+## Sesión 24/07/2026, 07:44 p.m.
+
+### Resumen
+
+La sesión se enfocó en: verificad cdc. Se detectaron 53 cambio(s): 9 creado(s), 44 modificado(s) y 0 eliminado(s).
+
+### Cambios
+
+- android/.gradle/8.11.1/checksums/checksums.lock
+- android/.gradle/8.11.1/checksums/sha1-checksums.bin
+- android/.gradle/8.11.1/executionHistory/executionHistory.bin
+- android/.gradle/8.11.1/executionHistory/executionHistory.lock
+- android/.gradle/8.11.1/fileChanges/last-build.bin
+- android/.gradle/8.11.1/fileHashes/fileHashes.bin
+- android/.gradle/8.11.1/fileHashes/fileHashes.lock
+- android/.gradle/8.11.1/gc.properties
+- android/.gradle/buildOutputCleanup/buildOutputCleanup.lock
+- android/.gradle/buildOutputCleanup/outputFiles.bin
+- android/.gradle/file-system.probe
+- android/.gradle/vcs-1/gc.properties
+- android/app/build.gradle
+- android/app/capacitor.build.gradle
+- android/app/src/main/assets/capacitor.config.json
+- android/app/src/main/assets/capacitor.plugins.json
+- android/app/src/main/assets/public/assets/movement-health-logo.png
+- android/app/src/main/assets/public/cordova.js
+- android/app/src/main/assets/public/cordova_plugins.js
+- android/app/src/main/assets/public/index.html
+- android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+- android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png
+- android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
+- android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+- android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png
+- android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
+- android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+- android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png
+- android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
+- android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+- android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png
+- android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
+- android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+- android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png
+- android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
+- android/app/src/main/res/values/ic_launcher_background.xml
+- android/app/src/main/res/xml/config.xml
+- android/capacitor-cordova-android-plugins/build.gradle
+- android/capacitor-cordova-android-plugins/cordova.variables.gradle
+- android/capacitor-cordova-android-plugins/src/main/AndroidManifest.xml
+- android/capacitor.settings.gradle
+- assets/movement-health-logo.png
+- index.html
+- index.html.backup
+- outputs/Mi-Entrenador-Saludable-2.11-debug.apk
+- outputs/Mi-Entrenador-Saludable-2.12-debug.apk
+- outputs/Mi-Entrenador-Saludable-2.13-debug.apk
+- outputs/Mi-Entrenador-Saludable-2.14-debug.apk
+- outputs/Mi-Entrenador-Saludable-2.15-debug.apk
+- outputs/Mi-Entrenador-Saludable-2.16-debug.apk
+- version.json
+- www/assets/movement-health-logo.png
+- www/index.html
+
+### Riesgos
+
+- Se modificaron archivos de configuración o infraestructura (android/.gradle/8.11.1/checksums/checksums.lock, android/.gradle/8.11.1/checksums/sha1-checksums.bin, android/.gradle/8.11.1/executionHistory/executionHistory.bin, android/.gradle/8.11.1/executionHistory/executionHistory.lock, android/.gradle/8.11.1/fileChanges/last-build.bin). Valida compatibilidad y despliegue.
+- Se modificó código fuente sin cambios detectados en archivos de prueba. Verifica la cobertura antes de cerrar el trabajo.
+- La sesión contiene 53 cambios. Considera dividir la revisión o el commit para reducir el riesgo de integración.
+
+### Próximo paso
+
+- videos de ajercicio
+
 <!-- cdc-session:session-20260724191510-e09001 -->
 ## Sesión 24/07/2026, 01:19 p.m.
 
