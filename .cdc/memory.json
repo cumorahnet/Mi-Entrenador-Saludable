@@ -1,14 +1,14 @@
 {
   "schemaVersion": "1.0",
   "projectId": "Mi-Entrenador-Saludable",
-  "updatedAt": "2026-07-23T00:05:41.260Z",
+  "updatedAt": "2026-07-25T19:59:40.405Z",
   "entries": [
     {
       "id": "mem-20260722235415-6b09be",
       "type": "convention",
       "title": "otra version",
-      "content": "hay una version perdida",
-      "status": "active",
+      "content": "La versión perdida ya fue localizada.",
+      "status": "archived",
       "tags": [],
       "source": {
         "type": "user",
@@ -17,8 +17,8 @@
       "supersedes": null,
       "supersededBy": null,
       "createdAt": "2026-07-22T23:54:15.973Z",
-      "updatedAt": "2026-07-22T23:54:15.973Z",
-      "archivedAt": null
+      "updatedAt": "2026-07-25T19:59:40.405Z",
+      "archivedAt": "2026-07-25T19:59:40.405Z"
     },
     {
       "id": "mem-20260723000210-fb9a6c",

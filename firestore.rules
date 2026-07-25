@@ -1,0 +1,19 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedInUser(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // Cada cuenta solo puede acceder a sus rutinas e historial.
+    match /artifacts/mientrenador-v3/users/{userId}/{document=**} {
+      allow read, write: if isSignedInUser(userId);
+    }
+
+    // Cualquier otra ruta queda cerrada por defecto.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

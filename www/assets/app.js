@@ -104,30 +104,16 @@ const DEFAULT_PARAMS = {
     }
 };
 
-const formatTime = (s) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
-const formatPace = (totalDistanceMeters, totalTimeSeconds) => {
-    if (totalDistanceMeters <= 0 || totalTimeSeconds <= 0) return '0:00';
-    const paceSecondsPerKm = totalTimeSeconds / (totalDistanceMeters / 1000);
-    const minutes = Math.floor(paceSecondsPerKm / 60);
-    const seconds = Math.round(paceSecondsPerKm % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-};
-const formatDistance = (meters) => meters < 1000 ? `${Math.round(meters)} m` : `${(meters/1000).toFixed(2)} km`;
-const formatSpeed = (meters, seconds) => {
-    if (meters <= 0 || seconds <= 0) return '0.0 km/h';
-    return `${((meters/1000)/(seconds/3600)).toFixed(1)} km/h`;
-};
+const {
+    formatTime,
+    formatPace,
+    formatDistance,
+    formatSpeed,
+    getDistance
+} = window.AppLogic;
 
 const GPS_PHASE_KEY = 'gps-tracking';
 const POST_GPS_REST_PHASE_KEY = 'post-gps-rest';
-
-const getDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371e3;
-    const φ1 = lat1 * Math.PI/180, φ2 = lat2 * Math.PI/180;
-    const Δφ = (lat2-lat1) * Math.PI/180, Δλ = (lon2-lon1) * Math.PI/180;
-    const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-};
 
 const whistle = () => {
     try {

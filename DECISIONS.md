@@ -10,3 +10,8 @@
 
 - cambio interfaz
 
+<!-- cdc-session:session-20260725034231-e4e972 -->
+## 24/07/2026, 11:11 p.m. — session-20260725034231-e4e972
+
+- implementacion de eleccion de rutinas
+

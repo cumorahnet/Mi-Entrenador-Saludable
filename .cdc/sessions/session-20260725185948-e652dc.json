@@ -1,0 +1,487 @@
+{
+  "schemaVersion": "1.0",
+  "id": "session-20260725185948-e652dc",
+  "projectId": "Mi-Entrenador-Saludable",
+  "projectName": "Mi-Entrenador-Saludable",
+  "status": "active",
+  "startedAt": "2026-07-25T18:59:48.128Z",
+  "closedAt": null,
+  "durationMs": null,
+  "objective": "",
+  "modifiedFiles": [],
+  "changes": [],
+  "baseline": {
+    ".gitignore": {
+      "size": 96,
+      "mtimeMs": 1781657125841
+    },
+    "capacitor.config.json": {
+      "size": 550,
+      "mtimeMs": 1781657114442
+    },
+    "CHANGELOG.md": {
+      "size": 8071,
+      "mtimeMs": 1784956508021
+    },
+    "DECISIONS.md": {
+      "size": 463,
+      "mtimeMs": 1784956508024
+    },
+    "ersprofeOneDriveDesktopMisProyectosMi-Entrenador-Saludable": {
+      "size": 499,
+      "mtimeMs": 1781483812635
+    },
+    "index.html": {
+      "size": 1661,
+      "mtimeMs": 1784955864500
+    },
+    "index.html.backup": {
+      "size": 117718,
+      "mtimeMs": 1784923697318
+    },
+    "NEXT.md": {
+      "size": 997,
+      "mtimeMs": 1784956508022
+    },
+    "package-lock.json": {
+      "size": 43207,
+      "mtimeMs": 1784955886802
+    },
+    "package.json": {
+      "size": 917,
+      "mtimeMs": 1784955875526
+    },
+    "README.md": {
+      "size": 1424,
+      "mtimeMs": 1784951968519
+    },
+    "version.json": {
+      "size": 32,
+      "mtimeMs": 1784955898182
+    },
+    "www/index.html": {
+      "size": 1661,
+      "mtimeMs": 1784955864500
+    },
+    "www/assets/app.js": {
+      "size": 110150,
+      "mtimeMs": 1784955853560
+    },
+    "www/assets/movement-health-logo.png": {
+      "size": 1398750,
+      "mtimeMs": 1784937575078
+    },
+    "www/assets/styles.css": {
+      "size": 7048,
+      "mtimeMs": 1784951848304
+    },
+    "outputs/index-corregido.html": {
+      "size": 116536,
+      "mtimeMs": 1781715045920
+    },
+    "outputs/mi-entrenador-capacitor-base.zip": {
+      "size": 26715,
+      "mtimeMs": 1781715073008
+    },
+    "outputs/Mi-Entrenador-Saludable-2.11-debug.apk": {
+      "size": 4790210,
+      "mtimeMs": 1784932431230
+    },
+    "outputs/Mi-Entrenador-Saludable-2.12-debug.apk": {
+      "size": 4790477,
+      "mtimeMs": 1784934603077
+    },
+    "outputs/Mi-Entrenador-Saludable-2.13-debug.apk": {
+      "size": 4790603,
+      "mtimeMs": 1784937031260
+    },
+    "outputs/Mi-Entrenador-Saludable-2.14-debug.apk": {
+      "size": 6222352,
+      "mtimeMs": 1784937852279
+    },
+    "outputs/Mi-Entrenador-Saludable-2.15-debug.apk": {
+      "size": 6222435,
+      "mtimeMs": 1784938621092
+    },
+    "outputs/Mi-Entrenador-Saludable-2.16-debug.apk": {
+      "size": 6222722,
+      "mtimeMs": 1784942061482
+    },
+    "outputs/Mi-Entrenador-Saludable-2.16.0-debug.apk": {
+      "size": 6246729,
+      "mtimeMs": 1784952343930
+    },
+    "outputs/Mi-Entrenador-Saludable-2.17.0-debug.apk": {
+      "size": 6275955,
+      "mtimeMs": 1784954201054
+    },
+    "outputs/Mi-Entrenador-Saludable-2.18.0-debug.apk": {
+      "size": 6250699,
+      "mtimeMs": 1784954961960
+    },
+    "outputs/Mi-Entrenador-Saludable-2.19.0-debug.apk": {
+      "size": 6273831,
+      "mtimeMs": 1784955929071
+    },
+    "assets/app.js": {
+      "size": 110150,
+      "mtimeMs": 1784955853560
+    },
+    "assets/movement-health-logo.png": {
+      "size": 1398750,
+      "mtimeMs": 1784937575078
+    },
+    "assets/styles.css": {
+      "size": 7048,
+      "mtimeMs": 1784951848304
+    },
+    "android/.gitignore": {
+      "size": 1824,
+      "mtimeMs": 1780416477000
+    },
+    "android/build.gradle": {
+      "size": 636,
+      "mtimeMs": 1780416477000
+    },
+    "android/capacitor.settings.gradle": {
+      "size": 1038,
+      "mtimeMs": 1784942039266
+    },
+    "android/gradle.properties": {
+      "size": 987,
+      "mtimeMs": 1780416477000
+    },
+    "android/gradlew": {
+      "size": 8762,
+      "mtimeMs": 1780416477000
+    },
+    "android/gradlew.bat": {
+      "size": 2966,
+      "mtimeMs": 1780416477000
+    },
+    "android/local.properties": {
+      "size": 368,
+      "mtimeMs": 1781716616097
+    },
+    "android/settings.gradle": {
+      "size": 208,
+      "mtimeMs": 1780416477000
+    },
+    "android/variables.gradle": {
+      "size": 497,
+      "mtimeMs": 1780416477000
+    },
+    "android/gradle/wrapper/gradle-wrapper.jar": {
+      "size": 43583,
+      "mtimeMs": 1780416477000
+    },
+    "android/gradle/wrapper/gradle-wrapper.properties": {
+      "size": 253,
+      "mtimeMs": 1780416477000
+    },
+    "android/capacitor-cordova-android-plugins/build.gradle": {
+      "size": 1661,
+      "mtimeMs": 1784942039268
+    },
+    "android/capacitor-cordova-android-plugins/cordova.variables.gradle": {
+      "size": 312,
+      "mtimeMs": 1784942039269
+    },
+    "android/capacitor-cordova-android-plugins/src/main/AndroidManifest.xml": {
+      "size": 210,
+      "mtimeMs": 1784955915426
+    },
+    "android/capacitor-cordova-android-plugins/src/main/res/.gitkeep": {
+      "size": 1,
+      "mtimeMs": 1780416477000
+    },
+    "android/capacitor-cordova-android-plugins/src/main/java/.gitkeep": {
+      "size": 0,
+      "mtimeMs": 1780416477000
+    },
+    "android/app/.gitignore": {
+      "size": 26,
+      "mtimeMs": 1780416477000
+    },
+    "android/app/build.gradle": {
+      "size": 2153,
+      "mtimeMs": 1784942033604
+    },
+    "android/app/capacitor.build.gradle": {
+      "size": 684,
+      "mtimeMs": 1784942039267
+    },
+    "android/app/proguard-rules.pro": {
+      "size": 751,
+      "mtimeMs": 1780416477000
+    },
+    "android/app/src/test/java/com/getcapacitor/myapp/ExampleUnitTest.java": {
+      "size": 402,
+      "mtimeMs": 1780416477000
+    },
+    "android/app/src/main/AndroidManifest.xml": {
+      "size": 1689,
+      "mtimeMs": 1781725059377
+    },
+    "android/app/src/main/res/xml/config.xml": {
+      "size": 185,
+      "mtimeMs": 1784955915425
+    },
+    "android/app/src/main/res/xml/file_paths.xml": {
+      "size": 213,
+      "mtimeMs": 1780416477000
+    },
+    "android/app/src/main/res/values/ic_launcher_background.xml": {
+      "size": 121,
+      "mtimeMs": 1784937770684
+    },
+    "android/app/src/main/res/values/strings.xml": {
+      "size": 344,
+      "mtimeMs": 1781715277526
+    },
+    "android/app/src/main/res/values/styles.xml": {
+      "size": 823,
+      "mtimeMs": 1780416477000
+    },
+    "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png": {
+      "size": 11495,
+      "mtimeMs": 1784937789084
+    },
+    "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png": {
+      "size": 36046,
+      "mtimeMs": 1784937789103
+    },
+    "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png": {
+      "size": 13849,
+      "mtimeMs": 1784937789091
+    },
+    "android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png": {
+      "size": 6913,
+      "mtimeMs": 1784937789063
+    },
+    "android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png": {
+      "size": 21139,
+      "mtimeMs": 1784937789079
+    },
+    "android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png": {
+      "size": 8557,
+      "mtimeMs": 1784937789071
+    },
+    "android/app/src/main/res/mipmap-xhdpi/ic_launcher.png": {
+      "size": 3491,
+      "mtimeMs": 1784937789048
+    },
+    "android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png": {
+      "size": 10128,
+      "mtimeMs": 1784937789059
+    },
+    "android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png": {
+      "size": 4402,
+      "mtimeMs": 1784937789054
+    },
+    "android/app/src/main/res/mipmap-mdpi/ic_launcher.png": {
+      "size": 1162,
+      "mtimeMs": 1784937789011
+    },
+    "android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png": {
+      "size": 3005,
+      "mtimeMs": 1784937789028
+    },
+    "android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png": {
+      "size": 1528,
+      "mtimeMs": 1784937789023
+    },
+    "android/app/src/main/res/mipmap-hdpi/ic_launcher.png": {
+      "size": 2190,
+      "mtimeMs": 1784937789030
+    },
+    "android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png": {
+      "size": 5996,
+      "mtimeMs": 1784937789045
+    },
+    "android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png": {
+      "size": 2761,
+      "mtimeMs": 1784937789038
+    },
+    "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml": {
+      "size": 265,
+      "mtimeMs": 1780416477000
+    },
+    "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml": {
+      "size": 265,
+      "mtimeMs": 1780416477000
+    },
+    "android/app/src/main/res/layout/activity_main.xml": {
+      "size": 535,
+      "mtimeMs": 1780416477000
+    },
+    "android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml": {
+      "size": 1880,
+      "mtimeMs": 1780416477000
+    },
+    "android/app/src/main/res/drawable-port-xxxhdpi/splash.png": {
+      "size": 17489,
+      "mtimeMs": 1780416477000
+    },
+    "android/app/src/main/res/drawable-port-xxhdpi/splash.png": {
+      "size": 13346,
+      "mtimeMs": 1780416477000
+    },
+    "android/app/src/main/res/drawable-port-xhdpi/splash.png": {
+      "size": 9875,
+      "mtimeMs": 1780416477000
+    },
+    "android/app/src/main/res/drawable-port-mdpi/splash.png": {
+      "size": 4096,
+      "mtimeMs": 1780416477000
+    },
+    "android/app/src/main/res/drawable-port-hdpi/splash.png": {
+      "size": 7934,
+      "mtimeMs": 1780416477000
+    },
+    "android/app/src/main/res/drawable-land-xxxhdpi/splash.png": {
+      "size": 17683,
+      "mtimeMs": 1780416477000
+    },
+    "android/app/src/main/res/drawable-land-xxhdpi/splash.png": {
+      "size": 13984,
+      "mtimeMs": 1780416477000
+    },
+    "android/app/src/main/res/drawable-land-xhdpi/splash.png": {
+      "size": 9251,
+      "mtimeMs": 1780416477000
+    },
+    "android/app/src/main/res/drawable-land-mdpi/splash.png": {
+      "size": 4040,
+      "mtimeMs": 1780416477000
+    },
+    "android/app/src/main/res/drawable-land-hdpi/splash.png": {
+      "size": 7705,
+      "mtimeMs": 1780416477000
+    },
+    "android/app/src/main/res/drawable/ic_launcher_background.xml": {
+      "size": 5606,
+      "mtimeMs": 1780416477000
+    },
+    "android/app/src/main/res/drawable/splash.png": {
+      "size": 4040,
+      "mtimeMs": 1780416477000
+    },
+    "android/app/src/main/java/com/mientrenadorsaludable/app/MainActivity.java": {
+      "size": 134,
+      "mtimeMs": 1781725059374
+    },
+    "android/app/src/main/java/com/mientrenadorsaludable/app/NativeSpeechPlugin.java.disabled.off": {
+      "size": 4111,
+      "mtimeMs": 1781722488619
+    },
+    "android/app/src/main/java/com/mientrenadorsaludable/app/TrackingForegroundService.java.off": {
+      "size": 7741,
+      "mtimeMs": 1781722488621
+    },
+    "android/app/src/main/java/com/mientrenadorsaludable/app/TrackingPlugin.java.off": {
+      "size": 1450,
+      "mtimeMs": 1781722488624
+    },
+    "android/app/src/main/assets/capacitor.config.json": {
+      "size": 505,
+      "mtimeMs": 1784955915421
+    },
+    "android/app/src/main/assets/capacitor.plugins.json": {
+      "size": 666,
+      "mtimeMs": 1784942039220
+    },
+    "android/app/src/main/assets/public/cordova.js": {
+      "size": 0,
+      "mtimeMs": 1784955915423
+    },
+    "android/app/src/main/assets/public/cordova_plugins.js": {
+      "size": 0,
+      "mtimeMs": 1784955915424
+    },
+    "android/app/src/main/assets/public/index.html": {
+      "size": 1661,
+      "mtimeMs": 1784955864500
+    },
+    "android/app/src/main/assets/public/assets/app.js": {
+      "size": 110150,
+      "mtimeMs": 1784955853560
+    },
+    "android/app/src/main/assets/public/assets/movement-health-logo.png": {
+      "size": 1398750,
+      "mtimeMs": 1784937575078
+    },
+    "android/app/src/main/assets/public/assets/styles.css": {
+      "size": 7048,
+      "mtimeMs": 1784951848304
+    },
+    "android/app/src/androidTest/java/com/getcapacitor/myapp/ExampleInstrumentedTest.java": {
+      "size": 774,
+      "mtimeMs": 1780416477000
+    },
+    "android/.gradle/config.properties": {
+      "size": 91,
+      "mtimeMs": 1781716616908
+    },
+    "android/.gradle/file-system.probe": {
+      "size": 8,
+      "mtimeMs": 1784952339808
+    },
+    "android/.gradle/vcs-1/gc.properties": {
+      "size": 0,
+      "mtimeMs": 1784931625088
+    },
+    "android/.gradle/buildOutputCleanup/buildOutputCleanup.lock": {
+      "size": 17,
+      "mtimeMs": 1784955929395
+    },
+    "android/.gradle/buildOutputCleanup/cache.properties": {
+      "size": 54,
+      "mtimeMs": 1781716659027
+    },
+    "android/.gradle/buildOutputCleanup/outputFiles.bin": {
+      "size": 163949,
+      "mtimeMs": 1784955929359
+    },
+    "android/.gradle/8.11.1/gc.properties": {
+      "size": 0,
+      "mtimeMs": 1784931625103
+    },
+    "android/.gradle/8.11.1/fileHashes/fileHashes.bin": {
+      "size": 243419,
+      "mtimeMs": 1784955929150
+    },
+    "android/.gradle/8.11.1/fileHashes/fileHashes.lock": {
+      "size": 17,
+      "mtimeMs": 1784955929415
+    },
+    "android/.gradle/8.11.1/fileHashes/resourceHashesCache.bin": {
+      "size": 24209,
+      "mtimeMs": 1781725283592
+    },
+    "android/.gradle/8.11.1/fileChanges/last-build.bin": {
+      "size": 1,
+      "mtimeMs": 1784955929391
+    },
+    "android/.gradle/8.11.1/executionHistory/executionHistory.bin": {
+      "size": 2474828,
+      "mtimeMs": 1784955929151
+    },
+    "android/.gradle/8.11.1/executionHistory/executionHistory.lock": {
+      "size": 17,
+      "mtimeMs": 1784955929396
+    },
+    "android/.gradle/8.11.1/checksums/checksums.lock": {
+      "size": 17,
+      "mtimeMs": 1784955929416
+    },
+    "android/.gradle/8.11.1/checksums/md5-checksums.bin": {
+      "size": 41347,
+      "mtimeMs": 1781725253748
+    },
+    "android/.gradle/8.11.1/checksums/sha1-checksums.bin": {
+      "size": 135827,
+      "mtimeMs": 1784931621993
+    }
+  }
+}

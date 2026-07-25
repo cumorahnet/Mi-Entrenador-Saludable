@@ -4,10 +4,11 @@ Proyecto base para convertir la app web actual en app Android con Capacitor.
 
 ## Estructura
 
-- `index.html`: documento base y carga de dependencias.
-- `assets/styles.css`: tema visual, contraste y diseño adaptable.
-- `assets/app.js`: componentes, navegación, rutinas y seguimiento GPS.
-- `www/`: copia lista para Capacitor/Android.
+- `www/index.html`: documento base y carga de dependencias.
+- `www/assets/styles.css`: tema visual, contraste y diseño adaptable.
+- `www/assets/app.js`: componentes, navegación, rutinas y seguimiento GPS.
+- `www/assets/app-logic.js`: cálculos puros reutilizables y probados.
+- `tests/`: pruebas automatizadas de la lógica de la aplicación.
 - `android/`: proyecto nativo generado por Capacitor.
 
 ## Requisitos
@@ -29,11 +30,24 @@ Android Studio abrirá el proyecto nativo en la carpeta `android/`.
 
 ## Después de cambios en la app
 
-Edita `index.html` y `assets/`, copia los cambios a `www/` y sincroniza:
+Edita directamente `www/index.html` o `www/assets/` y sincroniza:
 
 ```powershell
 npm.cmd run android:sync
 ```
+
+## Pruebas automatizadas
+
+Antes de registrar un cambio de código, ejecuta:
+
+```powershell
+npm.cmd run check
+```
+
+Este comando ejecuta las pruebas y exige 100 % de cobertura por archivo para la
+lógica incluida en `www/assets/app-logic.js`. Los cambios que agreguen nueva
+lógica pura deben acompañarse de sus pruebas. GitHub Actions ejecuta la misma
+verificación en cada `push` y solicitud de cambios.
 
 ## Para funciones nativas reales
 

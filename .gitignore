@@ -3,5 +3,6 @@ android/.gradle/
 android/app/build/
 android/build/
 dist/
+coverage/
 .DS_Store
 npm-debug.log*
