@@ -62,6 +62,9 @@ En la configuración del repositorio, **Settings → Pages → Build and
 deployment → Source** debe estar seleccionado como **GitHub Actions**. No es
 necesario copiar `index.html` ni `assets/` a la raíz del repositorio.
 
+El `index.html` de la raíz es únicamente una redirección de compatibilidad hacia
+`www/`; no contiene una segunda copia de la aplicación.
+
 ## Para funciones nativas reales
 
 La versión actual usa `@capacitor/geolocation` en Android y la API web como alternativa en navegador. Para rastreo real con la app en segundo plano, los siguientes pasos son:
