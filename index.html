@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#020617">
-    <title>Mi Entrenador Saludable — VERSION 2.11</title>
+    <title>Mi Entrenador Saludable — VERSION 2.16</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -45,10 +45,76 @@
             overscroll-behavior-y: none;
         }
         .glass-card {
-            background: rgba(255,255,255,0.03); backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.05); border-radius: 1.5rem;
+            background: rgba(15, 23, 42, 0.88);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(148, 163, 184, 0.14);
+            border-radius: 1rem;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+        }
+        .italic { font-style: normal !important; }
+        .font-black { font-weight: 700 !important; }
+        .bg-slate-950 { background-color: #08111f !important; }
+        .bg-slate-900 { background-color: #0f1b2d !important; }
+        .bg-orange-500 { background-color: #2563eb !important; }
+        .text-orange-500, .text-orange-400 { color: #60a5fa !important; }
+        .border-orange-500 { border-color: #3b82f6 !important; }
+        .shadow-orange-500\/30 { --tw-shadow-color: rgba(37, 99, 235, .25) !important; }
+        input {
+            font-size: 16px;
+            letter-spacing: .01em;
+        }
+        button {
+            letter-spacing: .025em;
+        }
+        button:focus-visible,
+        input:focus-visible {
+            outline: 2px solid #60a5fa !important;
+            outline-offset: 2px;
+        }
+        .brand-mark {
+            width: 4.25rem;
+            height: 4.25rem;
+            margin: 0 auto 1rem;
+            display: grid;
+            place-items: center;
+            border-radius: 1.1rem;
+            background: linear-gradient(145deg, #2563eb, #1d4ed8);
+            border: 1px solid rgba(147, 197, 253, .35);
+            box-shadow: 0 18px 38px rgba(37, 99, 235, .22);
+            color: white;
+            font-size: 1rem;
+            font-weight: 800;
+            letter-spacing: .12em;
+        }
+        .brand-logo {
+            width: 5.5rem;
+            height: 5.5rem;
+            margin: 0 auto 1rem;
+            display: block;
+            object-fit: contain;
+            filter: drop-shadow(0 16px 22px rgba(37, 99, 235, .20));
+        }
+        .screen-kicker {
+            color: #60a5fa;
+            letter-spacing: .14em;
+        }
+        .professional-nav {
+            padding-bottom: max(1rem, env(safe-area-inset-bottom));
+            box-shadow: 0 -8px 24px rgba(0, 0, 0, .14);
+        }
+        .nav-indicator {
+            width: 1.5rem;
+            height: 3px;
+            margin-bottom: .45rem;
+            border-radius: 999px;
+            background: currentColor;
         }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .overflow-y-auto {
+            -webkit-overflow-scrolling: touch;
+            touch-action: pan-y;
+            overscroll-behavior-y: contain;
+        }
         .timer-huge {
             font-size: 60vw; line-height: 0.75; font-weight: 900;
             letter-spacing: -0.06em; pointer-events: none;
@@ -119,11 +185,24 @@
             transition: all 0.2s ease;
         }
         .phase-card.selected {
-            border-color: rgba(249, 115, 22, 0.6);
-            background: rgba(249, 115, 22, 0.08);
+            border-color: rgba(96, 165, 250, 0.72);
+            background: rgba(37, 99, 235, 0.12);
         }
         .phase-card:active { transform: scale(0.97); }
-        .phase-icon { font-size: 2rem; line-height: 1; }
+        .phase-icon {
+            width: 2.5rem;
+            height: 2.5rem;
+            display: grid;
+            place-items: center;
+            border-radius: .75rem;
+            background: rgba(96, 165, 250, .10);
+            border: 1px solid rgba(96, 165, 250, .18);
+            color: #93c5fd;
+            font-size: .72rem;
+            line-height: 1;
+            font-weight: 800;
+            letter-spacing: .08em;
+        }
 
         /* Mantiene las acciones de acceso visibles en teléfonos bajos. */
         .auth-screen {
@@ -151,7 +230,12 @@
         }
         @media (max-height: 700px) {
             .auth-screen { padding-top: max(1rem, env(safe-area-inset-top)); }
-            .auth-logo { font-size: 3rem !important; margin-bottom: .25rem !important; }
+            .auth-logo {
+                width: 3.25rem !important;
+                height: 3.25rem !important;
+                font-size: .78rem !important;
+                margin-bottom: .5rem !important;
+            }
             .auth-title { font-size: 1.75rem !important; line-height: 1.9rem !important; }
             .auth-version { margin-bottom: .5rem !important; }
             .auth-actions input { padding: 1rem !important; }
@@ -176,9 +260,24 @@
         };
 
         let pullStartY = 0;
+        let pullScrollContainer = null;
+
+        function findScrollableParent(element) {
+            let node = element instanceof Element ? element : null;
+            while (node && node !== document.body) {
+                const style = window.getComputedStyle(node);
+                const canScroll = /(auto|scroll)/.test(style.overflowY)
+                    && node.scrollHeight > node.clientHeight;
+                if (canScroll) return node;
+                node = node.parentElement;
+            }
+            return null;
+        }
+
         window.addEventListener('touchstart', (event) => {
             if (event.touches && event.touches.length === 1) {
                 pullStartY = event.touches[0].clientY;
+                pullScrollContainer = findScrollableParent(event.target);
             }
         }, { passive: true });
         window.addEventListener('touchmove', (event) => {
@@ -186,7 +285,11 @@
 
             const currentY = event.touches[0].clientY;
             const pullingDown = currentY > pullStartY;
-            const atTop = window.scrollY <= 0 && document.documentElement.scrollTop <= 0 && document.body.scrollTop <= 0;
+            const atTop = pullScrollContainer
+                ? pullScrollContainer.scrollTop <= 0
+                : window.scrollY <= 0
+                    && document.documentElement.scrollTop <= 0
+                    && document.body.scrollTop <= 0;
 
             if (atTop && pullingDown) {
                 event.preventDefault();
@@ -234,7 +337,7 @@
 
         const APP_ID = "mientrenador-v3";
         const APP_TITLE = "Mi Entrenador Saludable";
-        const APP_VERSION = "2.11";
+        const APP_VERSION = "2.16";
 
         const WARMUP_STEPS = [
             { label: 'TOBILLO DERECHO', voice: 'Tobillo derecho' },
@@ -462,10 +565,10 @@
         };
 
         const SELECTABLE_PHASES = [
-            { key: 'training', label: 'Entrenamiento Principal', icon: '🏋️', desc: 'Piernas, brazos y tronco en ciclos' },
-            { key: 'walk',     label: 'Caminata',               icon: '🚶', desc: 'Seguimiento GPS de tu caminata' },
-            { key: 'run',      label: 'Carrera',                icon: '🏃', desc: 'Seguimiento GPS de tu carrera' },
-            { key: 'stretch',  label: 'Estiramientos',          icon: '🧘', desc: 'Rutina completa de estiramientos' },
+            { key: 'training', label: 'Entrenamiento principal', icon: '01', desc: 'Fuerza por zonas, rondas y ciclos' },
+            { key: 'walk',     label: 'Caminata',                icon: '02', desc: 'Actividad guiada con seguimiento GPS' },
+            { key: 'run',      label: 'Carrera',                 icon: '03', desc: 'Sesión de carrera con métricas GPS' },
+            { key: 'stretch',  label: 'Movilidad y estiramiento',icon: '04', desc: 'Recuperación y trabajo de movilidad' },
         ];
 
         const ALL_SEGMENT_GENERATORS = {
@@ -517,13 +620,13 @@
 
         // ─── Componente para placeholder de anuncios ──────────────────────────────────
         const AdBannerPlaceholder = () => React.createElement('div', {
-            className: "glass-card p-4 text-center text-xs text-slate-500 italic",
-            style: { minHeight: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center' }
-        }, "Espacio para anuncios o mensajes futuros");
+            className: "p-4 text-center text-[10px] font-semibold uppercase tracking-widest text-slate-500",
+            style: { minHeight: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+        }, "Constancia · Técnica · Progreso");
         // ──────────────────────────────────────────────────────────────────────────────
 
         // ─── PhaseSelectionScreen ─────────────────────────────────────────────────────
-        function PhaseSelectionScreen({ onPhasesSelected, user, workouts, onCreateWorkout }) {
+        function PhaseSelectionScreen({ onPhasesSelected, onClose, user, workouts, onCreateWorkout }) {
             const [selectedPhases, setSelectedPhases] = useState([]);
 
             const togglePhase = (key) => {
@@ -541,10 +644,20 @@
             };
 
             return React.createElement('div', { className: "h-screen flex flex-col bg-slate-950 overflow-hidden" },
-                React.createElement('div', { className: "p-6 pt-12 text-center shrink-0" },
-                    React.createElement('p', { className: "text-[10px] font-black uppercase text-orange-500 tracking-widest mb-1" }, "Mi Entrenador Saludable"),
-                    React.createElement('h1', { className: "text-3xl font-black italic uppercase text-white leading-tight" }, "¿Qué haremos hoy?"),
-                    React.createElement('p', { className: "text-[11px] text-slate-500 mt-2 font-medium" }, "El calentamiento siempre se incluye automáticamente")
+                React.createElement('div', {
+                    className: "p-5 text-center shrink-0",
+                    style: { paddingTop: "max(3.5rem, calc(env(safe-area-inset-top) + 1rem))" }
+                },
+                    React.createElement('div', { className: "w-full flex items-center justify-between mb-5" },
+                        React.createElement('button', {
+                            type: "button",
+                            onClick: onClose,
+                            className: "min-h-11 rounded-xl border border-white/10 bg-slate-900 px-4 py-2 text-[11px] font-black text-slate-200 active:scale-95"
+                        }, "Cerrar aplicación"),
+                        React.createElement('p', { className: "screen-kicker text-[10px] font-black uppercase tracking-widest" }, "Plan de entrenamiento")
+                    ),
+                    React.createElement('h1', { className: "text-3xl font-black text-white leading-tight" }, "¿Qué haremos hoy?"),
+                    React.createElement('p', { className: "text-[11px] text-slate-400 mt-2 font-medium" }, "Selecciona una o más actividades para tu sesión")
                 ),
                 React.createElement('div', { className: "flex-1 overflow-y-auto scrollbar-hide px-5 py-2 space-y-3" },
                     SELECTABLE_PHASES.map(phase =>
@@ -574,10 +687,10 @@
                                 React.createElement('path', { d:"M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" })
                             )
                         ),
-                        React.createElement('span', { className: "phase-icon" }, "🔥"),
+                        React.createElement('span', { className: "phase-icon" }, "BASE"),
                         React.createElement('div', { className: "flex-1 text-left" },
-                            React.createElement('p', { className: "font-black uppercase italic text-sm text-white leading-tight" }, "Calentamiento"),
-                            React.createElement('p', { className: "text-[10px] text-slate-500 mt-0.5" }, "Siempre incluido al inicio")
+                            React.createElement('p', { className: "font-black uppercase text-sm text-white leading-tight" }, "Preparación"),
+                            React.createElement('p', { className: "text-[10px] text-slate-500 mt-0.5" }, "Movilidad y activación incluidas")
                         ),
                         React.createElement('span', { className: "text-[9px] font-black uppercase text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded-full" }, "AUTO")
                     )
@@ -1535,6 +1648,7 @@
         function App() {
             const [user, setUser] = useState(null);
             const [view, setView] = useState('phases');
+            const [isAppResting, setIsAppResting] = useState(false);
             const [workouts, setWorkouts] = useState([]);
             const [history, setHistory] = useState([]);
             const [loading, setLoading] = useState(true);
@@ -1585,21 +1699,49 @@
                 setView('phases');
             }, []);
 
+            const handleCloseApp = useCallback(async () => {
+                try {
+                    const appPlugin = window.Capacitor?.Plugins?.App;
+                    if (appPlugin?.minimizeApp) {
+                        await appPlugin.minimizeApp();
+                        return;
+                    }
+                } catch (error) {
+                    console.warn('No se pudo minimizar la aplicación:', error);
+                }
+                setIsAppResting(true);
+            }, []);
+
             if (loading) return React.createElement('div', { className:"h-full w-full flex items-center justify-center bg-slate-950" },
                 React.createElement('div', { className:"animate-spin w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full" })
             );
             if (!user) return React.createElement(AuthView, { APP_TITLE, APP_VERSION });
+            if (isAppResting) return React.createElement('div', { className:"h-full flex flex-col items-center justify-center bg-slate-950 p-6 text-center" },
+                React.createElement('img', { src:"assets/movement-health-logo.png", alt:"Mi Entrenador Saludable", className:"brand-logo" }),
+                React.createElement('h2', { className:"text-2xl font-black text-white mb-2" }, "Aplicación en espera"),
+                React.createElement('p', { className:"text-sm text-slate-400 mb-6" }, "Tu cuenta continúa iniciada en este dispositivo."),
+                React.createElement('button', {
+                    type:"button",
+                    onClick:()=>setIsAppResting(false),
+                    className:"w-full max-w-sm bg-orange-500 py-4 rounded-xl font-black uppercase text-white active:scale-95"
+                }, "Volver a la aplicación")
+            );
 
             return React.createElement('div', { className:"h-full w-full flex flex-col bg-slate-950 text-white overflow-hidden" },
-                (view === 'workouts' || view === 'avance' || view === 'create') && React.createElement('header', { className:"p-5 flex justify-between items-center bg-slate-900 border-b border-white/5 shrink-0" },
+                (view === 'workouts' || view === 'avance' || view === 'create') && React.createElement('header', { className:"p-5 flex justify-between items-center bg-slate-900 border-b border-white/10 shrink-0" },
                     React.createElement('div', { onClick:()=>setView('phases'), className:"cursor-pointer" },
-                        React.createElement('h1', { className:"text-lg font-black italic uppercase text-orange-500" }, APP_TITLE),
-                        React.createElement('p', { className:"text-[8px] text-slate-500 font-bold uppercase" }, user.email, " | V", APP_VERSION)
+                        React.createElement('h1', { className:"text-base font-black text-white" }, APP_TITLE),
+                        React.createElement('p', { className:"text-[9px] text-slate-500 font-semibold mt-1" }, user.email, " · V", APP_VERSION)
                     ),
-                    React.createElement('button', { onClick:()=>auth.signOut(), className:"p-2 bg-red-500/10 rounded-xl text-red-500 font-bold text-[10px] px-4 uppercase italic" }, "Salir")
+                    React.createElement('button', { onClick:()=>auth.signOut(), className:"px-4 py-2 border border-white/10 bg-white/5 rounded-lg text-slate-300 font-bold text-[10px] uppercase" }, "Cerrar sesión")
                 ),
                 React.createElement('main', { className:"flex-1 relative flex flex-col min-h-0" },
-                    view === 'phases'   && React.createElement(PhaseSelectionScreen, { onPhasesSelected:handlePhasesSelected, user, workouts }),
+                    view === 'phases'   && React.createElement(PhaseSelectionScreen, {
+                        onPhasesSelected: handlePhasesSelected,
+                        onClose: handleCloseApp,
+                        user,
+                        workouts
+                    }),
                     view === 'workouts' && React.createElement(WorkoutsView, {
                         workouts, user,
                         selectedPhases,
@@ -1619,9 +1761,9 @@
                         }
                     })
                 ),
-                (view === 'phases' || view === 'workouts' || view === 'avance') && React.createElement('nav', { className:"bg-slate-900 border-t border-white/5 p-4 flex justify-around items-center shrink-0" },
-                    React.createElement('button', { onClick:()=>setView('phases'),   className:`flex flex-col items-center text-[9px] font-black ${(view==='phases'||view==='workouts')?'text-orange-500':'text-slate-500'}` }, React.createElement('span',{className:"text-xl mb-1"},"🏠"), "INICIO"),
-                    React.createElement('button', { onClick:()=>setView('avance'),   className:`flex flex-col items-center text-[9px] font-black ${view==='avance'?'text-orange-500':'text-slate-500'}` }, React.createElement('span',{className:"text-xl mb-1"},"📊"), "AVANCE")
+                (view === 'phases' || view === 'workouts' || view === 'avance') && React.createElement('nav', { className:"professional-nav bg-slate-900 border-t border-white/10 px-4 pt-3 flex justify-around items-center shrink-0" },
+                    React.createElement('button', { onClick:()=>setView('phases'), className:`min-w-24 py-1 flex flex-col items-center text-[10px] font-black uppercase ${(view==='phases'||view==='workouts')?'text-orange-500':'text-slate-500'}` }, React.createElement('span',{className:"nav-indicator"}), "Inicio"),
+                    React.createElement('button', { onClick:()=>setView('avance'), className:`min-w-24 py-1 flex flex-col items-center text-[10px] font-black uppercase ${view==='avance'?'text-orange-500':'text-slate-500'}` }, React.createElement('span',{className:"nav-indicator"}), "Progreso")
                 )
             );
         }
@@ -1668,18 +1810,18 @@
             }, [email]);
 
             if (isClosed) return React.createElement('div', { className:"h-full flex flex-col items-center justify-center bg-slate-950 p-6 text-center" },
-                React.createElement('div', { className:"text-6xl mb-4" }, "👋"),
-                React.createElement('h2', { className:"text-2xl font-black italic uppercase text-white mb-2" }, "VENTANA CERRADA"),
-                React.createElement('p', { className:"text-sm text-slate-400 mb-6" }, "Puedes volver a abrir el acceso cuando lo necesites."),
-                React.createElement('button', { type:"button", onClick:()=>setIsClosed(false), className:"w-full max-w-sm bg-orange-500 py-5 rounded-full font-black uppercase text-white active:scale-95 italic" }, "VOLVER A INICIAR SESIÓN")
+                React.createElement('img', { src:"assets/movement-health-logo.png", alt:"Mi Entrenador Saludable", className:"brand-logo" }),
+                React.createElement('h2', { className:"text-2xl font-black text-white mb-2" }, "Sesión cerrada"),
+                React.createElement('p', { className:"text-sm text-slate-400 mb-6" }, "Tu cuenta permanece protegida."),
+                React.createElement('button', { type:"button", onClick:()=>setIsClosed(false), className:"w-full max-w-sm bg-orange-500 py-4 rounded-xl font-black uppercase text-white active:scale-95" }, "Volver al acceso")
             );
 
             return React.createElement('div', { className:"auth-screen relative h-full flex flex-col items-center overflow-hidden bg-slate-950 px-4 text-center" },
                 React.createElement('button', { type:"button", onClick:()=>setIsClosed(true), className:"auth-cancel absolute right-4 rounded-full border border-white/10 bg-slate-900/95 px-3 py-2 text-[10px] uppercase font-black text-slate-300" }, "✕ CANCELAR"),
                 React.createElement('div', { className:"shrink-0" },
-                    React.createElement('div', { className:"auth-logo text-7xl mb-3" }, "🏃‍♂️"),
-                    React.createElement('h1', { className:"auth-title text-4xl font-black italic uppercase text-white" }, APP_TITLE),
-                    React.createElement('p', { className:"auth-version text-[8px] text-slate-600 uppercase mb-5" }, "V ", APP_VERSION)
+                    React.createElement('img', { src:"assets/movement-health-logo.png", alt:"Mi Entrenador Saludable", className:"auth-logo brand-logo" }),
+                    React.createElement('h1', { className:"auth-title text-3xl font-black text-white" }, APP_TITLE),
+                    React.createElement('p', { className:"auth-version text-[9px] text-slate-500 uppercase tracking-widest mt-2 mb-5" }, "Entrenamiento personal · V", APP_VERSION)
                 ),
                 React.createElement('div', { className:"auth-actions flex-1 overflow-y-auto scrollbar-hide w-full max-w-sm px-4 py-1 min-h-0" },
                     showPasswordRecovery ? (
@@ -1694,7 +1836,7 @@
                             React.createElement('input', { type:"password", placeholder:"CLAVE", className:"w-full p-4 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value:pass, onChange:e=>setPass(e.target.value), required:true, disabled:loadingAuth }),
                             React.createElement('button', { type:"submit", className:"w-full bg-orange-500 py-4 rounded-full font-black uppercase text-white active:scale-95 italic", disabled:loadingAuth }, isReg ? (loadingAuth ? 'REGISTRANDO...' : 'REGISTRARSE') : (loadingAuth ? 'ENTRANDO...' : 'ENTRAR')),
                             React.createElement('button', { type:"button", onClick:()=>setIsReg(!isReg), className:"text-orange-400 text-[10px] uppercase font-black block w-full", disabled:loadingAuth }, isReg ? 'YA TENGO CUENTA' : 'CREAR CUENTA NUEVA'),
-                            React.createElement('button', { type:"button", onClick:()=>setShowPasswordRecovery(true), className:"auth-recovery text-yellow-400 text-[10px] uppercase font-black block w-full", disabled:loadingAuth }, "¿OLVIDASTE TU CONTRASEÑA?")
+                            React.createElement('button', { type:"button", onClick:()=>setShowPasswordRecovery(true), className:"auth-recovery text-slate-300 text-[10px] uppercase font-black block w-full", disabled:loadingAuth }, "¿Olvidaste tu contraseña?")
                         )
                     )
                 )
