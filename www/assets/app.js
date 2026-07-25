@@ -81,7 +81,7 @@ const db = firebase.firestore();
 
 const APP_ID = "mientrenador-v3";
 const APP_TITLE = "Mi Entrenador Saludable";
-const APP_VERSION = "2.18";
+const APP_VERSION = "2.19";
 
 const WARMUP_STEPS = [
     { label: 'TOBILLO DERECHO', voice: 'Tobillo derecho' },
@@ -881,18 +881,8 @@ function PlayerView({ workout, selectedPhases, onExit, onComplete }) {
     const endWorkout = useCallback(() => {
         if (intervalIdRef.current) { clearInterval(intervalIdRef.current); intervalIdRef.current = null; }
         setUiStatus('finished');
-        speak('Entrenamiento finalizado. ¡Buen trabajo!', true, () => {
-            if (hasGpsDataRef.current && finalGpsSummary) {
-                setShowGpsResults(true);
-            } else {
-                if (!savedRef.current && workout) {
-                    onComplete(workout.name, elapsedRef.current, null);
-                    savedRef.current = true;
-                }
-                onExit();
-            }
-        });
-    }, [workout, onComplete, onExit, finalGpsSummary]);
+        speak('Entrenamiento finalizado. Revisa el resumen de tus actividades.', true);
+    }, []);
 
     const advanceToStep = useCallback((nextIdx) => {
         const s = stepsRef.current;
@@ -937,25 +927,18 @@ function PlayerView({ workout, selectedPhases, onExit, onComplete }) {
             setCurrentLocation(null);
 
             const nextStepIndex = idxRef.current + 1;
-            if (isSkip || nextStepIndex >= stepsRef.current.length || stepsRef.current[nextStepIndex].phase === POST_GPS_REST_PHASE_KEY) {
-                setUiStatus('finished');
-                if (hasUsableGpsData) {
-                    setShowGpsResults(true);
-                } else {
-                    if (!savedRef.current && workout) {
-                        onComplete(workout.name, elapsedRef.current, null);
-                        savedRef.current = true;
-                    }
-                    onExit();
-                }
+            if (nextStepIndex >= stepsRef.current.length) {
+                endWorkout();
             } else {
                 setUiStatus('running');
-                advanceToStep(idxRef.current + 1);
+                if (advanceToStep(nextStepIndex) && stepsRef.current[nextStepIndex]?.phase !== GPS_PHASE_KEY) {
+                    handleSpeech(stepsRef.current[nextStepIndex], nextStepIndex, stepsRef.current[nextStepIndex].seconds);
+                }
             }
         };
         speak('Seguimiento finalizado.', true, finishStopFlow);
         setTimeout(finishStopFlow, 1200);
-    }, [advanceToStep, announceGpsStats, gpsCoordinates, workout, onComplete, onExit, elapsedRef, finalGpsSummary]);
+    }, [advanceToStep, announceGpsStats, gpsCoordinates, endWorkout, handleSpeech]);
 
     useEffect(() => { stopGpsTrackingRef.current = stopGpsTracking; }, [stopGpsTracking]);
 
@@ -1154,14 +1137,16 @@ function PlayerView({ workout, selectedPhases, onExit, onComplete }) {
         return () => { clearInterval(interval); intervalIdRef.current = null; };
     }, [uiStatus, endWorkout, setElap, setTime, startGpsTracking, advanceToStep, handleSpeech]);
 
-    const handleGpsSummaryClosed = useCallback(() => {
-        setShowGpsResults(false);
+    const handleFinishActivity = useCallback(() => {
         if (!savedRef.current && workout) {
-            onComplete(workout.name, elapsedRef.current, { coordinates: gpsCoordinates, summary: finalGpsSummary });
+            const gpsData = hasGpsDataRef.current && finalGpsSummary
+                ? { coordinates: gpsCoordinates, summary: finalGpsSummary }
+                : null;
+            onComplete(workout.name, elapsedRef.current, gpsData);
             savedRef.current = true;
         }
         onExit();
-    }, [workout, onComplete, onExit, gpsCoordinates, finalGpsSummary, elapsedRef]);
+    }, [workout, onComplete, onExit, gpsCoordinates, finalGpsSummary]);
 
     if (!workout) return React.createElement('div', { className:"h-screen flex items-center justify-center bg-slate-950 text-white/50 text-sm italic" }, "Error: Rutina no seleccionada.");
 
@@ -1169,14 +1154,6 @@ function PlayerView({ workout, selectedPhases, onExit, onComplete }) {
         React.createElement('p', { className:"mb-8" }, "No se pudieron generar los pasos de la rutina."),
         React.createElement('button', { onClick:onExit, className:"bg-white/10 text-white py-4 px-8 rounded-full font-black uppercase italic text-xs" }, "Volver")
     );
-
-    if (showGpsResults) return React.createElement(GpsActivityDisplay, {
-        finalGpsSummary,
-        gpsCoordinates,
-        onSave: () => {},
-        onShare: () => {},
-        onClose: handleGpsSummaryClosed
-    });
 
     const curr = steps[uiIdx] || { label:'Cargando...', color:'bg-slate-950' };
     const showOverlay = uiStatus === 'ready' || uiStatus === 'paused';
@@ -1218,10 +1195,60 @@ function PlayerView({ workout, selectedPhases, onExit, onComplete }) {
     );
     // ─────────────────────────────────────────────────────────────────────────
 
-    if (uiStatus === 'finished') return React.createElement('div', { className:"h-screen flex flex-col items-center justify-center p-8 bg-slate-950 text-white text-center" },
-        React.createElement('h1', { className:"text-5xl font-black italic mb-4" }, "¡HECHO!"),
-        React.createElement('button', { onClick:onExit, className:"w-full max-w-sm bg-white text-black py-6 rounded-full font-black uppercase" }, "Finalizar")
-    );
+    if (uiStatus === 'finished') {
+        const activityLabels = [
+            'Preparación',
+            ...selectedPhases.map(key => SELECTABLE_PHASES.find(phase => phase.key === key)?.label || key)
+        ];
+        return React.createElement('div', { className:"h-screen flex flex-col bg-slate-950 text-white p-6 text-center overflow-hidden" },
+            React.createElement('div', { className:"shrink-0 pt-8 pb-4" },
+                React.createElement('p', { className:"screen-kicker text-[10px] font-black uppercase" }, "Resumen de actividades del día"),
+                React.createElement('h1', { className:"text-4xl font-black mt-2" }, "¡Sesión completada!")
+            ),
+            React.createElement('div', { className:"flex-1 overflow-y-auto scrollbar-hide space-y-4 min-h-0" },
+                React.createElement('div', { className:"glass-card p-5 text-left" },
+                    React.createElement('span', { className:"text-[9px] text-slate-400 uppercase block" }, "Rutina"),
+                    React.createElement('strong', { className:"text-lg text-white block mt-1" }, workout.name || "Sesión"),
+                    React.createElement('span', { className:"text-[10px] text-slate-400 block mt-2" },
+                        new Date().toLocaleDateString('es-MX', { weekday:'long', day:'numeric', month:'long', year:'numeric' })
+                    )
+                ),
+                React.createElement('div', { className:"grid grid-cols-2 gap-3" },
+                    React.createElement('div', { className:"glass-card p-5" },
+                        React.createElement('span', { className:"text-[9px] text-slate-400 uppercase block" }, "Tiempo total"),
+                        React.createElement('strong', { className:"text-2xl text-emerald-400 block mt-1" }, formatTime(uiElapsed))
+                    ),
+                    React.createElement('div', { className:"glass-card p-5" },
+                        React.createElement('span', { className:"text-[9px] text-slate-400 uppercase block" }, "Fases realizadas"),
+                        React.createElement('strong', { className:"text-2xl text-sky-400 block mt-1" }, activityLabels.length)
+                    )
+                ),
+                React.createElement('div', { className:"glass-card p-5 text-left" },
+                    React.createElement('span', { className:"text-[9px] text-slate-400 uppercase block mb-3" }, "Actividades"),
+                    React.createElement('div', { className:"flex flex-wrap gap-2" },
+                        activityLabels.map(label => React.createElement('span', {
+                            key:label,
+                            className:"rounded-full border border-sky-400/25 bg-sky-500/10 px-3 py-2 text-[10px] font-bold text-sky-100"
+                        }, label))
+                    )
+                ),
+                finalGpsSummary && React.createElement('div', { className:"glass-card p-5" },
+                    React.createElement('span', { className:"text-[9px] text-slate-400 uppercase block mb-3" }, "Seguimiento GPS"),
+                    React.createElement('div', { className:"grid grid-cols-2 gap-4" },
+                        React.createElement('div', null, React.createElement('span', { className:"text-[9px] text-slate-500 block uppercase" }, "Distancia"), React.createElement('strong', { className:"text-lg text-sky-400" }, finalGpsSummary.distanceText)),
+                        React.createElement('div', null, React.createElement('span', { className:"text-[9px] text-slate-500 block uppercase" }, "Tiempo GPS"), React.createElement('strong', { className:"text-lg text-emerald-400" }, finalGpsSummary.timeText)),
+                        React.createElement('div', null, React.createElement('span', { className:"text-[9px] text-slate-500 block uppercase" }, "Ritmo"), React.createElement('strong', { className:"text-lg text-purple-400" }, finalGpsSummary.pace, " /km")),
+                        React.createElement('div', null, React.createElement('span', { className:"text-[9px] text-slate-500 block uppercase" }, "Velocidad"), React.createElement('strong', { className:"text-lg text-yellow-400" }, finalGpsSummary.speed))
+                    )
+                )
+            ),
+            React.createElement('button', {
+                type:"button",
+                onClick:handleFinishActivity,
+                className:"w-full shrink-0 mt-5 bg-orange-500 py-5 rounded-full font-black uppercase text-white active:scale-95"
+            }, "Terminar actividad")
+        );
+    }
 
     return React.createElement('div', { className:`h-screen flex flex-col transition-colors duration-700 ${curr.color||'bg-slate-950'} text-white` },
         React.createElement('div', { className:"bg-black/10 p-4 pt-10 flex justify-between items-center shrink-0 z-10" },
