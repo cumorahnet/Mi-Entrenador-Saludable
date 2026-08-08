@@ -99,9 +99,9 @@
           "type": "intelligent-closure",
           "reference": "session-20260724191510-e09001"
         },
-        "reviewStatus": "pending",
-        "reviewedAt": null,
-        "memoryEntryId": null
+        "reviewStatus": "approved",
+        "reviewedAt": "2026-07-25T23:12:38.151Z",
+        "memoryEntryId": "mem-20260725231238-bec115"
       }
     ],
     "metrics": {

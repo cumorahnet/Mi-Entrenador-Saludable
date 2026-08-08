@@ -453,9 +453,9 @@
           "type": "intelligent-closure",
           "reference": "session-20260724193422-664fd8"
         },
-        "reviewStatus": "pending",
-        "reviewedAt": null,
-        "memoryEntryId": null
+        "reviewStatus": "approved",
+        "reviewedAt": "2026-07-25T23:12:39.879Z",
+        "memoryEntryId": "mem-20260725231239-683298"
       },
       {
         "id": "memory-suggestion-20260724193422-664fd8-2",
@@ -470,9 +470,9 @@
           "type": "intelligent-closure",
           "reference": "session-20260724193422-664fd8"
         },
-        "reviewStatus": "pending",
-        "reviewedAt": null,
-        "memoryEntryId": null
+        "reviewStatus": "approved",
+        "reviewedAt": "2026-07-25T23:12:42.760Z",
+        "memoryEntryId": "mem-20260725231242-1f44eb"
       }
     ],
     "metrics": {

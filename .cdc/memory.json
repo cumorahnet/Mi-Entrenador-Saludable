@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0",
   "projectId": "Mi-Entrenador-Saludable",
-  "updatedAt": "2026-07-25T19:59:40.405Z",
+  "updatedAt": "2026-07-25T23:12:46.202Z",
   "entries": [
     {
       "id": "mem-20260722235415-6b09be",
@@ -87,6 +87,106 @@
       "createdAt": "2026-07-23T00:05:19.885Z",
       "updatedAt": "2026-07-23T00:05:41.260Z",
       "archivedAt": "2026-07-23T00:05:41.260Z"
+    },
+    {
+      "id": "mem-20260725231238-bec115",
+      "type": "decision",
+      "title": "Decisión registrada: cambiar el orden de inicio de sesion",
+      "content": "cambiar el orden de inicio de sesion",
+      "status": "active",
+      "tags": [
+        "sesión",
+        "decisión"
+      ],
+      "source": {
+        "type": "intelligent-closure",
+        "reference": "session-20260724191510-e09001:memory-suggestion-20260724191510-e09001-1"
+      },
+      "supersedes": null,
+      "supersededBy": null,
+      "createdAt": "2026-07-25T23:12:38.151Z",
+      "updatedAt": "2026-07-25T23:12:38.151Z",
+      "archivedAt": null
+    },
+    {
+      "id": "mem-20260725231239-683298",
+      "type": "decision",
+      "title": "Decisión registrada: cambio interfaz",
+      "content": "cambio interfaz",
+      "status": "active",
+      "tags": [
+        "sesión",
+        "decisión"
+      ],
+      "source": {
+        "type": "intelligent-closure",
+        "reference": "session-20260724193422-664fd8:memory-suggestion-20260724193422-664fd8-1"
+      },
+      "supersedes": null,
+      "supersededBy": null,
+      "createdAt": "2026-07-25T23:12:39.879Z",
+      "updatedAt": "2026-07-25T23:12:39.879Z",
+      "archivedAt": null
+    },
+    {
+      "id": "mem-20260725231242-1f44eb",
+      "type": "goal",
+      "title": "Objetivo pendiente: fondo del logo",
+      "content": "fondo del logo",
+      "status": "active",
+      "tags": [
+        "sesión",
+        "pendiente"
+      ],
+      "source": {
+        "type": "intelligent-closure",
+        "reference": "session-20260724193422-664fd8:memory-suggestion-20260724193422-664fd8-2"
+      },
+      "supersedes": null,
+      "supersededBy": null,
+      "createdAt": "2026-07-25T23:12:42.760Z",
+      "updatedAt": "2026-07-25T23:12:42.760Z",
+      "archivedAt": null
+    },
+    {
+      "id": "mem-20260725231244-a4937b",
+      "type": "decision",
+      "title": "Decisión registrada: implementacion de eleccion de rutinas",
+      "content": "implementacion de eleccion de rutinas",
+      "status": "active",
+      "tags": [
+        "sesión",
+        "decisión"
+      ],
+      "source": {
+        "type": "intelligent-closure",
+        "reference": "session-20260725034231-e4e972:memory-suggestion-20260725034231-e4e972-1"
+      },
+      "supersedes": null,
+      "supersededBy": null,
+      "createdAt": "2026-07-25T23:12:44.050Z",
+      "updatedAt": "2026-07-25T23:12:44.050Z",
+      "archivedAt": null
+    },
+    {
+      "id": "mem-20260725231246-2fdefb",
+      "type": "goal",
+      "title": "Objetivo pendiente: logo con fondo mas claro",
+      "content": "logo con fondo mas claro",
+      "status": "active",
+      "tags": [
+        "sesión",
+        "pendiente"
+      ],
+      "source": {
+        "type": "intelligent-closure",
+        "reference": "session-20260725034231-e4e972:memory-suggestion-20260725034231-e4e972-2"
+      },
+      "supersedes": null,
+      "supersededBy": null,
+      "createdAt": "2026-07-25T23:12:46.202Z",
+      "updatedAt": "2026-07-25T23:12:46.202Z",
+      "archivedAt": null
     }
   ]
 }
