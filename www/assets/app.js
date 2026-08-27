@@ -857,10 +857,11 @@ function PlayerView({ workout, selectedPhases, onExit, onComplete }) {
         if (remaining === step.seconds && step.voiceInitial && !spokenInit.current[initKey] && statusRef.current === 'running') {
             speak(step.voiceInitial, true); if (step.whistleOnStart) navigator.vibrate?.(150); spokenInit.current[initKey] = true;
         }
-        if (step.voiceMidpoint && remaining === step.voiceMidpoint.time) {
+        const isCountdown = step.voiceCountdown && remaining > 0 && remaining <= 3;
+        if (step.voiceMidpoint && remaining === step.voiceMidpoint.time && !isCountdown) {
             const k = `${stepIdx}_mid_${remaining}`; if (lastSpokenKey.current !== k) { speak(step.voiceMidpoint.text, true); lastSpokenKey.current = k; }
         }
-        if (step.voiceCountdown && remaining > 0 && remaining <= 3) {
+        if (isCountdown) {
             const k = `${stepIdx}_cd_${remaining}`; if (lastSpokenKey.current !== k) { speak(String(remaining), true); lastSpokenKey.current = k; }
         }
         if (step.whistleOnStart && remaining === step.seconds && statusRef.current === 'running' && step.phase !== GPS_PHASE_KEY && !spokenInit.current[initKey+'_whistle']) {
