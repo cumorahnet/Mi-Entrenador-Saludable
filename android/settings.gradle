@@ -1,3 +1,11 @@
+// En este equipo, Android solo se compila desde la copia oficial.
+def officialAndroid = new File('C:/Cumorahnet/Projects/Proyectos/Mi-Entrenador-Saludable/android')
+if (System.getProperty('os.name').toLowerCase().contains('windows') &&
+        !settingsDir.canonicalPath.equalsIgnoreCase(officialAndroid.canonicalPath)) {
+    throw new GradleException('Carpeta Android incorrecta. Abra ' + officialAndroid)
+}
+rootProject.name = 'Mi-Entrenador-Saludable-OFICIAL'
+
 include ':app'
 include ':capacitor-cordova-android-plugins'
 project(':capacitor-cordova-android-plugins').projectDir = new File('./capacitor-cordova-android-plugins/')

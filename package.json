@@ -1,6 +1,6 @@
 {
   "name": "mi-entrenador-saludable",
-  "version": "2.20.0",
+  "version": "2.35.0",
   "description": "App Android hibrida para entrenamiento saludable con GPS.",
   "main": "www/index.html",
   "scripts": {
@@ -10,9 +10,11 @@
     "check": "npm run test:coverage",
     "start": "npx cap serve",
     "android:add": "npx cap add android",
-    "android:sync": "npx cap sync android",
-    "android:open": "npx cap open android",
-    "android:copy": "npx cap copy android"
+    "android:verify": "node scripts/android-safe.cjs verify",
+    "android:release": "node scripts/android-safe.cjs release",
+    "android:sync": "node scripts/android-safe.cjs sync",
+    "android:open": "node scripts/android-safe.cjs open",
+    "android:copy": "node scripts/android-safe.cjs copy"
   },
   "keywords": [
     "capacitor",

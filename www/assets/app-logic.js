@@ -76,14 +76,25 @@
             : [...phases, phaseKey];
     };
 
+    const getPhaseSelectionChange = (selectedPhases, phaseKey) => {
+        const phases = Array.isArray(selectedPhases) ? selectedPhases : [];
+        const wasSelected = phases.includes(phaseKey);
+        return {
+            selectedPhases: togglePhaseSelection(phases, phaseKey),
+            shouldChooseWorkout: phaseKey === 'training' && !wasSelected,
+            shouldClearWorkout: phaseKey === 'training' && wasSelected
+        };
+    };
+
     const createDefaultWorkouts = defaultParams => [
-        { id: '_default_beginner', name: 'PRINCIPIANTE', cycles: 2 },
-        { id: '_default_intermediate', name: 'INTERMEDIO', cycles: 4 },
-        { id: '_default_advanced', name: 'AVANZADO', cycles: 8 }
-    ].map(({ id, name, cycles }) => ({
+        { id: '_default_beginner', name: 'PRINCIPIANTE', cycles: 2, exerciseDifficulty: 'Fácil' },
+        { id: '_default_intermediate', name: 'INTERMEDIO', cycles: 4, exerciseDifficulty: 'Intermedio' },
+        { id: '_default_advanced', name: 'AVANZADO', cycles: 8, exerciseDifficulty: 'Difícil' }
+    ].map(({ id, name, cycles, exerciseDifficulty }) => ({
         id,
         name,
         isDefault: true,
+        exerciseDifficulty,
         phases: {
             ...defaultParams,
             entrenamiento: {
@@ -131,6 +142,187 @@
         return `${hours} h ${minutes} min`;
     };
 
+    const getCountdownAnnouncement = (remainingSeconds, enabled, includeChangeCue = false) => (
+        enabled && remainingSeconds === 3
+            ? `Tres. Dos. Uno.${includeChangeCue ? ' Cambio.' : ''}`
+            : null
+    );
+
+    const getRestNextActivity = (steps, stepIndex) => {
+        const restPhases = ['inicio', 'cambio-warmup', 'post-warmup', 'cambio-ent',
+            'zone-rest', 'ciclo-rest', 'post-training', 'post-gps-rest',
+            'pre-stretches', 'cambio-est'];
+        if (!restPhases.includes(steps[stepIndex]?.phase)) return null;
+        const nextIndex = steps.findIndex((step, index) => index > stepIndex && !restPhases.includes(step.phase));
+        if (nextIndex < 0) return null;
+        const next = steps[nextIndex];
+        return { stepIndex:nextIndex, text:next.label };
+    };
+
+    const getGpsStartAnnouncement = activityTypeLabel => {
+        const activity = String(activityTypeLabel || '').trim().toLowerCase();
+        return `${activity ? `Iniciar ${activity}. ` : ''}Tres. Dos. Uno.`;
+    };
+
+    const normalizeCatalogValue = value => String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .toUpperCase();
+
+    const getWorkoutExerciseDifficulty = workout => {
+        if (workout?.exerciseDifficulty) return workout.exerciseDifficulty;
+        const workoutName = normalizeCatalogValue(workout?.name);
+        if (workoutName.includes('PRINCIPIANTE')) return 'Fácil';
+        if (workoutName.includes('AVANZADO')) return 'Difícil';
+        return 'Intermedio';
+    };
+
+    const createRandomExerciseSequence = (catalog, difficulty, groups, random = Math.random) => {
+        const entries = Array.isArray(catalog) ? catalog : [];
+        const requestedGroups = Array.isArray(groups) ? groups : [];
+        const difficultyKey = normalizeCatalogValue(difficulty);
+        const stateByGroup = new Map();
+
+        const shuffledCopy = items => {
+            const shuffled = [...items];
+            for (let index = shuffled.length - 1; index > 0; index--) {
+                const randomValue = Number(random());
+                const safeRandom = Number.isFinite(randomValue)
+                    ? Math.min(Math.max(randomValue, 0), 0.999999999)
+                    : 0;
+                const swapIndex = Math.floor(safeRandom * (index + 1));
+                [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+            }
+            return shuffled;
+        };
+
+        return requestedGroups.map(group => {
+            const groupKey = normalizeCatalogValue(group);
+            let state = stateByGroup.get(groupKey);
+            if (!state) {
+                state = {
+                    options: entries.filter(entry =>
+                        normalizeCatalogValue(entry.group) === groupKey &&
+                        normalizeCatalogValue(entry.difficulty) === difficultyKey
+                    ),
+                    queue: [],
+                    lastName: null
+                };
+                stateByGroup.set(groupKey, state);
+            }
+
+            if (state.options.length === 0) return null;
+            if (state.queue.length === 0) {
+                state.queue = shuffledCopy(state.options);
+                if (
+                    state.queue.length > 1 &&
+                    state.lastName &&
+                    state.queue[0].name === state.lastName
+                ) {
+                    [state.queue[0], state.queue[1]] = [state.queue[1], state.queue[0]];
+                }
+            }
+
+            const selected = state.queue.shift();
+            state.lastName = selected.name;
+            return selected;
+        });
+    };
+
+    const repeatExerciseSequenceForCycles = (firstCycleSequence, cycles) => {
+        const sequence = Array.isArray(firstCycleSequence) ? firstCycleSequence : [];
+        const cycleCount = Number.isFinite(cycles) ? Math.max(0, Math.floor(cycles)) : 0;
+        return Array.from({ length: cycleCount }, () => sequence).flat();
+    };
+
+    const inferSessionSection = (step, selectedPhases) => {
+        if (step?.sessionSection) return step.sessionSection;
+        if (['inicio', 'calentamiento', 'cambio-warmup', 'post-warmup'].includes(step?.phase)) {
+            return 'preparation';
+        }
+        if (['entrenamiento', 'cambio-ent', 'zone-rest', 'ciclo-rest', 'post-training'].includes(step?.phase)) {
+            return 'training';
+        }
+        if (['pre-stretches', 'estiramientos', 'cambio-est'].includes(step?.phase)) {
+            return 'stretch';
+        }
+        if (['gps-tracking', 'post-gps-rest'].includes(step?.phase)) {
+            if (step?.activityType === 'walk' || step?.activityType === 'run') return step.activityType;
+            const cardioPhases = (Array.isArray(selectedPhases) ? selectedPhases : [])
+                .filter(key => key === 'walk' || key === 'run');
+            return cardioPhases[0] || 'walk';
+        }
+        return null;
+    };
+
+    const getNextSessionSectionIndex = (steps, index, selectedPhases) => {
+        const section = inferSessionSection(steps[index], selectedPhases);
+        let next = index + 1;
+        while (next < steps.length && inferSessionSection(steps[next], selectedPhases) === section) next++;
+        return next;
+    };
+
+    // Keep the accepted anchor until small walking increments exceed the noise floor.
+    const evaluateGpsPosition = (anchor, point, now) => {
+        if (![point.latitude, point.longitude, point.accuracy, point.timestamp].every(isFiniteNumber) ||
+            Math.abs(point.latitude) > 90 || Math.abs(point.longitude) > 180 ||
+            point.accuracy < 0 || point.accuracy > 50 ||
+            now - point.timestamp > 15000 || point.timestamp > now + 1000 ||
+            (anchor && point.timestamp <= anchor.timestamp)) return { valid:false, distance:0, anchor };
+        if (!anchor || point.timestamp - anchor.timestamp > 30000) {
+            return { valid:true, distance:0, anchor:point };
+        }
+        const distance = getDistance(anchor.latitude, anchor.longitude, point.latitude, point.longitude);
+        const seconds = (point.timestamp - anchor.timestamp) / 1000;
+        if (distance / seconds > 12) return { valid:false, distance:0, anchor };
+        const threshold = Math.max(2, Math.min(10, (point.accuracy + anchor.accuracy) * .15));
+        return distance >= threshold
+            ? { valid:true, distance, anchor:point }
+            : { valid:true, distance:0, anchor };
+    };
+
+    const getGpsFeedback = ({ now, lastFixTime, distance, previousDistance, time, previousTime }) => {
+        if (!lastFixTime || now - lastFixTime > 15000) {
+            return { key:'signal', text:'La señal GPS no es suficiente. No puedo confirmar tu avance; busca un lugar con cielo despejado.' };
+        }
+        const progress = Math.max(0, distance - previousDistance);
+        if (progress < 5) return { key:'no-progress', text:'El GPS no registra avance suficiente. Si estás caminando, revisa la señal y el permiso de ubicación precisa.' };
+        return { key:'progress', text:`Has avanzado ${formatDistance(progress)} desde el último informe. Distancia total: ${formatDistance(distance)}. Velocidad del tramo: ${formatSpeed(progress, time - previousTime)}.` };
+    };
+
+    const calculateSessionBreakdown = ({
+        steps,
+        currentStepIndex,
+        currentStepRemaining,
+        gpsActivityTimes,
+        selectedPhases
+    } = {}) => {
+        const totals = { preparation:0, training:0, walk:0, run:0, stretch:0 };
+        const sessionSteps = Array.isArray(steps) ? steps : [];
+        const lastReachedIndex = Number.isFinite(currentStepIndex)
+            ? Math.min(Math.max(0, Math.floor(currentStepIndex)), Math.max(0, sessionSteps.length - 1))
+            : -1;
+
+        sessionSteps.forEach((step, index) => {
+            if (index > lastReachedIndex) return;
+            const section = inferSessionSection(step, selectedPhases);
+            if (!section || !(section in totals)) return;
+            const stepSeconds = Number.isFinite(step?.seconds) ? Math.max(0, step.seconds) : 0;
+            const seconds = Number.isFinite(step.performedSeconds) ? step.performedSeconds : index < lastReachedIndex
+                ? stepSeconds
+                : Math.min(stepSeconds, Math.max(0, stepSeconds - (Number(currentStepRemaining) || 0)));
+            totals[section] += seconds;
+        });
+
+        for (const activityType of ['walk', 'run']) {
+            const gpsSeconds = Number(gpsActivityTimes?.[activityType]);
+            if (Number.isFinite(gpsSeconds) && gpsSeconds > 0) totals[activityType] += gpsSeconds;
+        }
+
+        return totals;
+    };
+
     return {
         formatTime,
         formatPace,
@@ -138,8 +330,19 @@
         formatSpeed,
         getDistance,
         togglePhaseSelection,
+        getPhaseSelectionChange,
         createDefaultWorkouts,
         calculateWorkoutDurationSeconds,
-        formatDurationEstimate
+        formatDurationEstimate,
+        getCountdownAnnouncement,
+        getRestNextActivity,
+        getGpsStartAnnouncement,
+        getWorkoutExerciseDifficulty,
+        createRandomExerciseSequence,
+        repeatExerciseSequenceForCycles,
+        calculateSessionBreakdown,
+        getNextSessionSectionIndex,
+        evaluateGpsPosition,
+        getGpsFeedback
     };
 }));
