@@ -132,6 +132,7 @@ const {
     formatPace,
     formatDistance,
     formatSpeed,
+    getGpsSummarySpeech,
     getDistance,
     togglePhaseSelection,
     getPhaseSelectionChange,
@@ -1058,7 +1059,7 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
     // REMOVED useEffect for gpsMapHeight
 
     const announceGpsStats = useCallback((distance, timeSec) => {
-        speak(`Distancia: ${formatDistance(distance)}. Velocidad: ${formatSpeed(distance, timeSec)}. Ritmo: ${formatPace(distance, timeSec)}.`, false);
+        speak(getGpsSummarySpeech(distance, timeSec), false);
     }, []);
 
     const handleSpeech = useCallback((step, stepIdx, remaining) => {

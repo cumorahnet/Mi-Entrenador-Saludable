@@ -176,8 +176,8 @@ public class NativeGpsService extends Service {
                 } else {
                     key = "progress";
                     text = String.format(new Locale("es", "MX"),
-                        "Has avanzado %.0f metros. Distancia total: %.0f metros. Velocidad del tramo: %.1f kilómetros por hora.",
-                        progress, distance, progress * 3600 / interval);
+                        "Distancia acumulada: %.0f metros. Velocidad del tramo: %.1f kilómetros por hora.",
+                        distance, progress * 3600 / interval);
                 }
                 if (speechReady && (key.equals("progress") || !key.equals(lastFeedback)))
                     speech.speak(text, TextToSpeech.QUEUE_FLUSH, null, "gps-feedback");

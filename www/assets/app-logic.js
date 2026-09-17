@@ -51,6 +51,13 @@
         return `${((meters / 1000) / (seconds / 3600)).toFixed(1)} km/h`;
     };
 
+    const spokenDistance = meters => formatDistance(meters).replace(' km', ' kilómetros').replace(' m', ' metros').replace('.', ',');
+    const spokenSpeed = (meters, seconds) => formatSpeed(meters, seconds).replace('km/h', 'kilómetros por hora').replace('.', ',');
+    const getGpsSummarySpeech = (distance, time) => {
+        const [minutes, seconds] = formatPace(distance, time).split(':').map(Number);
+        return `Distancia acumulada: ${spokenDistance(distance)}. Velocidad promedio: ${spokenSpeed(distance, time)}. Ritmo promedio: ${minutes} minutos y ${seconds} segundos por kilómetro.`;
+    };
+
     const getDistance = (lat1, lon1, lat2, lon2) => {
         if (![lat1, lon1, lat2, lon2].every(isFiniteNumber)) return 0;
 
@@ -288,7 +295,7 @@
         }
         const progress = Math.max(0, distance - previousDistance);
         if (progress < 5) return { key:'no-progress', text:'El GPS no registra avance suficiente. Si estás caminando, revisa la señal y el permiso de ubicación precisa.' };
-        return { key:'progress', text:`Has avanzado ${formatDistance(progress)} desde el último informe. Distancia total: ${formatDistance(distance)}. Velocidad del tramo: ${formatSpeed(progress, time - previousTime)}.` };
+        return { key:'progress', text:`Distancia acumulada: ${spokenDistance(distance)}. Velocidad del tramo: ${spokenSpeed(progress, time - previousTime)}.` };
     };
 
     const calculateSessionBreakdown = ({
@@ -328,6 +335,7 @@
         formatPace,
         formatDistance,
         formatSpeed,
+        getGpsSummarySpeech,
         getDistance,
         togglePhaseSelection,
         getPhaseSelectionChange,

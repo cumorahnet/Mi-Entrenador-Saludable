@@ -35,6 +35,21 @@ it('distingue avance, falta de avance registrado y falta de señal', () => {
     expect(logic.getGpsFeedback({ ...state, lastFixTime:1000 }).key).toBe('signal');
 });
 
+it('anuncia la distancia acumulada después de varios informes', () => {
+    const feedback = logic.getGpsFeedback({ now:180000, lastFixTime:179000,
+        distance:1250, previousDistance:1100, time:180, previousTime:120 });
+    expect(feedback.text).toContain('Distancia acumulada: 1,25 kilómetros.');
+    expect(feedback.text).not.toContain('150 metros');
+    expect(feedback.text).toContain('9,0 kilómetros por hora');
+});
+
+it('expresa la velocidad y el ritmo finales con unidades habladas', () => {
+    expect(logic.getGpsSummarySpeech(1000, 750)).toBe(
+        'Distancia acumulada: 1,00 kilómetros. Velocidad promedio: 4,8 kilómetros por hora. Ritmo promedio: 12 minutos y 30 segundos por kilómetro.');
+    expect(logic.getGpsSummarySpeech(500, 300)).toContain('500 metros');
+    expect(logic.getGpsSummarySpeech(0, 0)).toContain('0 minutos y 0 segundos por kilómetro');
+});
+
 it.each(['running', 'paused', 'gps-running'])('finaliza la etapa en %s y conserva las siguientes', status => {
     const gps = status === 'gps-running';
     const section = gps ? 'walk' : 'training';
