@@ -322,7 +322,7 @@
             totals[section] += seconds;
         });
 
-        for (const activityType of ['walk', 'run']) {
+        for (const activityType of ['walk', 'run', 'training']) {
             const gpsSeconds = Number(gpsActivityTimes?.[activityType]);
             if (Number.isFinite(gpsSeconds) && gpsSeconds > 0) totals[activityType] += gpsSeconds;
         }

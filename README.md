@@ -67,10 +67,27 @@ El `index.html` de la raíz es únicamente una redirección de compatibilidad ha
 
 ## Para funciones nativas reales
 
-La versión actual usa `@capacitor/geolocation` en Android y la API web como alternativa en navegador. Para rastreo real con la app en segundo plano, los siguientes pasos son:
+La versión actual usa `@capacitor/geolocation` y Text-to-Speech nativo en Android, con las API web como alternativa en navegador. Para rastreo real con la app en segundo plano, los siguientes pasos son:
 
-- Reemplazar `speechSynthesis` por Text-to-Speech nativo.
 - Incorporar un plugin especializado de ubicación en segundo plano.
 - Agregar notificación persistente durante caminata/carrera.
 - Configurar permisos Android de ubicación en primer y segundo plano.
 - Preparar iconos, splash screen, firma y versión para Play Store.
+
+## Actualizaciones Android verificadas
+
+La carpeta oficial en este equipo es `C:\Cumorahnet\Projects\Proyectos\Mi-Entrenador-Saludable\android`.
+La copia `OneDrive\Desktop\MisProyectos\Mi-Entrenador-Saludable-v2` es antigua.
+
+```powershell
+npm.cmd run android:verify
+npm.cmd run android:release
+npm.cmd run android:open
+```
+
+`android:release` sincroniza los recursos web, recompila un APK debug y comprueba
+su version y fecha. Guarda el APK en `outputs/MI-ENTRENADOR-SALUDABLE-ULTIMA-<version>.apk`
+y un JSON adjunto con ruta de origen, version, fecha y SHA-256. Si falla, no usar
+un APK de una ejecucion anterior. Antes de pulsar Run, comprobar la ruta completa
+del proyecto abierto. Confirmar la version instalada en el dispositivo antes de
+dar la actualizacion por terminada.

@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 
 const source = readFileSync('www/assets/app.js', 'utf8');
-const generate = runInNewContext(source.slice(source.indexOf('const generateWorkoutSteps ='), source.indexOf('// ─── Componente para placeholder')) + '; generateWorkoutSteps', { GPS_PHASE_KEY:'gps-tracking' });
+const generate = runInNewContext(source.slice(source.indexOf('const generateWorkoutSteps ='), source.indexOf('// ─── Componente para placeholder')) + '; generateWorkoutSteps', { GPS_PHASE_KEY:'gps-tracking', getWorkoutExerciseDifficulty:()=> 'Fácil', SELECTABLE_PHASES:[],
+    ALL_SEGMENT_GENERATORS:Object.fromEntries(['warmup','walk','run','stretch'].map(key=>[key, { generator:()=>[{ label:key, seconds:10, phase:key }] }])) });
 
 it('genera una actividad cronometrada con su nombre y sin ejercicios ajenos', () => {
     const steps = generate({ name:'Nadar', customActivity:{ mode:'time', seconds:120, cycles:3, rest:20 } }, {}, ['training']);
@@ -65,4 +66,61 @@ it('descarta sin escribir en el historial', () => {
     expect(callback).not.toHaveBeenCalled();
     expect(context.savedRef.current).toBe(true);
     expect(context.onExit).toHaveBeenCalledTimes(1);
+});
+
+it('añade preparación una sola vez y respeta el orden elegido con una actividad personalizada', () => {
+    const steps = generate({ name:'Pesas', customActivity:{ mode:'cycles', seconds:45, cycles:2, rest:20, preparation:30 } }, {}, ['run','training','stretch']);
+    expect(steps.map(s=>s.sessionSection)).toEqual(['preparation','run','training','training','training','stretch']);
+    expect(steps[0].seconds).toBe(30);
+});
+
+it('respeta el orden también en rutinas estándar y mantiene la preparación primero', () => {
+    const steps = generate({ name:'Rutina' }, {}, ['stretch','run','walk']);
+    expect(steps.slice(0,-1).map(s=>s.sessionSection)).toEqual(['preparation','stretch','run','walk']);
+});
+
+it('separa el tiempo de preparación del seguimiento GPS personalizado', async () => {
+    const { default:logic } = await import('../www/assets/app-logic.js');
+    const steps = generate({ name:'Senderismo', customActivity:{ mode:'gps', preparation:20 } }, {}, ['training']);
+    expect(steps[1].activityType).toBe('training');
+    expect(logic.calculateSessionBreakdown({ steps, currentStepIndex:1, currentStepRemaining:0,
+        gpsActivityTimes:{ training:120 }, selectedPhases:['training'] })).toMatchObject({ preparation:20, training:124 });
+});
+
+function customForm(workoutToEdit, overrides = {}) {
+    const write = vi.fn().mockResolvedValue();
+    const doc = vi.fn(id=>({ id:id || 'new-workout', set:write }));
+    const collection = { doc };
+    const chain = { collection:()=>chain, doc:()=>chain };
+    let calls = 0;
+    chain.collection = key=>key === 'workouts' ? collection : chain;
+    const onSaved = vi.fn();
+    const context = { React:{ createElement:(type, props, ...children)=>({ type, props, children }) },
+        useState:value=>[calls++ === 1 ? { ...value, ...overrides } : value, vi.fn()],
+        useRef:value=>({ current:value }), db:chain, APP_ID:'test', InputField:()=>null };
+    const start = source.indexOf('function CustomActivityView(');
+    const end = source.indexOf('function InputField(', start);
+    const render = runInNewContext(source.slice(start,end)+'; CustomActivityView', context);
+    const form = render({ user:{ uid:'user' }, workoutToEdit, onSaved, onCancel:vi.fn() });
+    return { submit:()=>form.props.onSubmit({ preventDefault(){} }), write, doc, onSaved };
+}
+
+it('guarda preparación y actualiza la misma rutina al editarla', async () => {
+    const form = customForm({ id:'saved-workout', name:'Pesas', customActivity:{ mode:'cycles', seconds:45, cycles:2, rest:10 } }, { preparation:'25' });
+    await form.submit();
+    expect(form.doc).toHaveBeenCalledWith('saved-workout');
+    expect(form.write).toHaveBeenCalledWith(expect.objectContaining({ name:'Pesas', customActivity:expect.objectContaining({ preparation:25 }) }));
+    expect(form.onSaved).toHaveBeenCalledWith(expect.objectContaining({ id:'saved-workout' }));
+});
+
+it('las actividades antiguas se pueden guardar con preparación cero', async () => {
+    const form = customForm({ name:'Nadar', customActivity:{ mode:'time', seconds:60, cycles:1, rest:0 } });
+    await form.submit();
+    expect(form.onSaved).toHaveBeenCalledWith(expect.objectContaining({ id:'new-workout', customActivity:expect.objectContaining({ preparation:0 }) }));
+});
+
+it.each(['', -1, 3601, 1.5])('rechaza preparación inválida %s sin guardar', async preparation => {
+    const form = customForm({ name:'Nadar' }, { preparation });
+    await form.submit();
+    expect(form.write).not.toHaveBeenCalled();
 });

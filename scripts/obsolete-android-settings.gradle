@@ -1,0 +1,2 @@
+﻿// COPIA ANTIGUA: bloqueo intencional para evitar instalar APK obsoleto.
+throw new GradleException('PROYECTO ANTIGUO BLOQUEADO. Abra C:/Cumorahnet/Projects/Proyectos/Mi-Entrenador-Saludable/android en Android Studio.')
