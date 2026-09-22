@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
+import appLogic from '../www/assets/app-logic.js';
 
 const source = readFileSync('www/assets/app.js', 'utf8');
 const generate = runInNewContext(source.slice(source.indexOf('const generateWorkoutSteps ='), source.indexOf('// ─── Componente para placeholder')) + '; generateWorkoutSteps', { GPS_PHASE_KEY:'gps-tracking', getWorkoutExerciseDifficulty:()=> 'Fácil', SELECTABLE_PHASES:[],
@@ -88,7 +89,7 @@ it('separa el tiempo de preparación del seguimiento GPS personalizado', async (
         gpsActivityTimes:{ training:120 }, selectedPhases:['training'] })).toMatchObject({ preparation:10, training:144 });
 });
 
-function customForm(workoutToEdit, overrides = {}) {
+function customForm(workoutToEdit, overrides = {}, workouts = []) {
     const write = vi.fn().mockResolvedValue();
     const doc = vi.fn(id=>({ id:id || 'new-workout', set:write }));
     const collection = { doc };
@@ -96,13 +97,13 @@ function customForm(workoutToEdit, overrides = {}) {
     let calls = 0;
     chain.collection = key=>key === 'workouts' ? collection : chain;
     const onSaved = vi.fn();
-    const context = { React:{ createElement:(type, props, ...children)=>({ type, props, children }) },
+    const context = { ...appLogic, React:{ createElement:(type, props, ...children)=>({ type, props, children }) },
         useState:value=>[calls++ === 1 ? { ...value, ...overrides } : value, vi.fn()],
         useRef:value=>({ current:value }), db:chain, APP_ID:'test', InputField:()=>null };
     const start = source.indexOf('function CustomActivityView(');
     const end = source.indexOf('function InputField(', start);
     const render = runInNewContext(source.slice(start,end)+'; CustomActivityView', context);
-    const form = render({ user:{ uid:'user' }, workoutToEdit, onSaved, onCancel:vi.fn() });
+    const form = render({ user:{ uid:'user' }, workouts, workoutToEdit, onSaved, onCancel:vi.fn() });
     return { submit:()=>form.props.onSubmit({ preventDefault(){} }), write, doc, onSaved };
 }
 
@@ -117,7 +118,7 @@ it('guarda preparación y actualiza la misma rutina al editarla', async () => {
 it('las actividades antiguas se pueden guardar con preparación cero', async () => {
     const form = customForm({ name:'Nadar', customActivity:{ mode:'time', seconds:60, cycles:1, rest:0 } });
     await form.submit();
-    expect(form.onSaved).toHaveBeenCalledWith(expect.objectContaining({ id:'new-workout', customActivity:expect.objectContaining({ preparation:0 }) }));
+    expect(form.onSaved).toHaveBeenCalledWith(expect.objectContaining({ id:expect.stringMatching(/^custom-/), customActivity:expect.objectContaining({ preparation:0 }) }));
 });
 
 it.each(['', -1, 3601, 1.5])('rechaza preparación inválida %s sin guardar', async preparation => {
@@ -143,7 +144,7 @@ it('combina varias actividades guardadas con las predefinidas y calienta una sol
 it('muestra las actividades recuperadas de Firebase en la misma selección y prioridad', () => {
     const saved = { id:'swim', name:'Nadar', customActivity:{ mode:'time', seconds:90 } };
     const onPhasesSelected = vi.fn();
-    const context = { React:{ createElement:(type, props, ...children)=>({ type, props, children }) },
+    const context = { ...appLogic, React:{ createElement:(type, props, ...children)=>({ type, props, children }) },
         useState:value=>[value, vi.fn()], SELECTABLE_PHASES:[{ key:'walk', label:'Caminata' }],
         APP_VERSION:'test', getWorkoutDurationText:()=> '90 s', AdBannerPlaceholder:()=>null };
     const start = source.indexOf('function PhaseSelectionScreen(');
@@ -158,4 +159,51 @@ it('muestra las actividades recuperadas de Firebase en la misma selección y pri
     expect(onPhasesSelected).toHaveBeenCalledWith(['custom:swim','walk']);
     expect(JSON.stringify(tree)).toContain('Calentamiento obligatorio');
     expect(JSON.stringify(tree)).toContain('Nadar');
+});
+
+it('unifica copias idénticas, conserva variantes y reutiliza el documento guardado', async () => {
+    const saved = { id:'original', name:'Nadar', customActivity:{ mode:'time', seconds:60, preparation:0 } };
+    const copy = { ...saved, id:'copy', name:'  NADAR  ', customActivity:{ ...saved.customActivity, cycles:5, rest:20 } };
+    const variant = { ...saved, id:'longer', customActivity:{ ...saved.customActivity, seconds:120 } };
+    expect(appLogic.uniqueCustomActivities([saved, copy, variant]).map(w=>w.id)).toEqual(['original','longer']);
+    expect(appLogic.uniqueCustomActivities([saved, copy], ['custom:copy']).map(w=>w.id)).toEqual(['copy']);
+    const form = customForm({ name:'Nadar' }, { mode:'time', seconds:60 }, [saved,copy]);
+    await form.submit();
+    expect(form.doc).toHaveBeenCalledWith('original');
+    expect(form.onSaved).toHaveBeenCalledWith(expect.objectContaining({ id:'original' }));
+});
+
+it('crear la misma actividad dos veces usa el mismo identificador de Firebase', async () => {
+    const first = customForm({ name:'Nadar' });
+    const second = customForm({ name:' NADAR ' });
+    await first.submit(); await second.submit();
+    expect(first.doc.mock.calls[0][0]).toBe(second.doc.mock.calls[0][0]);
+});
+
+it('reordena tarjetas únicas y comienza con el orden elegido de todas las actividades', () => {
+    const saved = { id:'swim', name:'Nadar', customActivity:{ mode:'time', seconds:90 } };
+    let state;
+    const context = { ...appLogic, React:{ createElement:(type, props, ...children)=>({ type, props, children }) },
+        useState:value=>{ state ??= value; return [state, update=>{ state = typeof update === 'function' ? update(state) : update; }]; },
+        SELECTABLE_PHASES:[{ key:'walk', label:'Caminata' }, { key:'run', label:'Carrera' }, { key:'training', label:'Entrenamiento principal' }],
+        APP_VERSION:'test', getWorkoutDurationText:()=> '90 s', AdBannerPlaceholder:()=>null };
+    const start = source.indexOf('function PhaseSelectionScreen(');
+    const render = runInNewContext(source.slice(start,source.indexOf('// ─── MapDisplay', start))+'; PhaseSelectionScreen', context);
+    const onPhasesSelected = vi.fn();
+    const props = { workouts:[saved,{ ...saved, id:'duplicate' }], initialSelectedPhases:['walk','custom:swim','run','training'], onPhasesSelected };
+    const nodes = tree => {
+        const result = [];
+        function visit(n) { if (Array.isArray(n)) return n.forEach(visit); if (!n || typeof n !== 'object') return; result.push(n); visit(n.children); }
+        visit(tree); return result;
+    };
+    let elements = nodes(render(props));
+    expect(elements.filter(n=>n.props?.className?.includes('phase-card'))).toHaveLength(4);
+    expect(elements.filter(n=>n.type === 'select')).toHaveLength(4);
+    elements.find(n=>n.props?.['aria-label'] === 'Orden de Nadar').props.onChange({ target:{ value:'0' } });
+    elements = nodes(render(props));
+    expect(elements.filter(n=>n.props?.className?.includes('phase-card')).map(n=>n.props.key)).toEqual(['custom:swim','walk','run','training']);
+    elements.find(n=>n.props?.['aria-label'] === 'Orden de Entrenamiento principal').props.onChange({ target:{ value:'1' } });
+    elements = nodes(render(props));
+    elements.find(n=>n.type === 'button' && n.children.includes('COMENZAR')).props.onClick();
+    expect(onPhasesSelected).toHaveBeenCalledWith(['custom:swim','training','walk','run']);
 });

@@ -49,16 +49,16 @@ describe('integración Android', () => {
         }
     });
 
-    it('mantiene coherente la versión 2.37 en web, npm y Android', () => {
+    it('mantiene coherente la versión 2.38 en web, npm y Android', () => {
         const packageJson = JSON.parse(readText('package.json'));
         const androidBuild = readText('android', 'app', 'build.gradle');
         const app = readText('www', 'assets', 'app.js');
         const web = readText('www', 'index.html');
 
-        expect(packageJson.version).toBe('2.37.0');
-        expect(androidBuild).toContain('versionCode 237');
-        expect(androidBuild).toContain('versionName "2.37"');
-        expect(app).toContain('const APP_VERSION = "2.37"');
-        expect(web).toContain('Versión 2.37');
+        expect(packageJson.version).toBe('2.38.0');
+        expect(androidBuild).toContain('versionCode 238');
+        expect(androidBuild).toContain('versionName "2.38"');
+        expect(app).toContain('const APP_VERSION = "2.38"');
+        expect(web).toContain('Versión 2.38');
     });
 });

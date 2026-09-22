@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 2.38 — 2026-09-22
+
+- Una tarjeta por actividad personalizada con nombre y configuración equivalentes.
+- Guardado reutilizable sin crear copias al repetir la misma actividad.
+- Orden visible dentro de cada tarjeta seleccionada; la lista refleja la prioridad elegida.
+- Altura ajustada al espacio disponible en Android y calentamiento fijo al inicio.
+
 ## 2.37 — 2026-09-22
 
 - Actividades personalizadas guardadas en Firebase y seleccionables desde Inicio.

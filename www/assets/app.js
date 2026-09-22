@@ -81,7 +81,7 @@ const db = firebase.firestore();
 
 const APP_ID = "mientrenador-v3";
 const APP_TITLE = "Mi Entrenador Saludable";
-const APP_VERSION = "2.37";
+const APP_VERSION = "2.38";
 const ACTIVE_SESSION_STORAGE_KEY = `${APP_ID}:active-session:v1`;
 const GPS_ANNOUNCEMENT_INTERVAL_MS = 60 * 1000;
 
@@ -136,6 +136,8 @@ const {
     getDistance,
     togglePhaseSelection,
     getPhaseSelectionChange,
+    customActivityIdentity,
+    uniqueCustomActivities,
     createDefaultWorkouts,
     calculateWorkoutDurationSeconds,
     formatDurationEstimate,
@@ -514,9 +516,11 @@ const AdBannerPlaceholder = () => React.createElement('div', {
 
 // ─── PhaseSelectionScreen ─────────────────────────────────────────────────────
 function PhaseSelectionScreen({ onPhasesSelected, onConfigureTraining, onClearTrainingSelection, onCustomActivity, onEditActivity, initialSelectedPhases, selectedWorkout, workouts = [], onClose }) {
-    const [selectedPhases, setSelectedPhases] = useState(initialSelectedPhases || []);
+    const customActivities = uniqueCustomActivities(workouts, initialSelectedPhases || []);
+    const availableKeys = new Set([...SELECTABLE_PHASES.map(p=>p.key), ...customActivities.map(w=>'custom:' + w.id)]);
+    const [selectedPhases, setSelectedPhases] = useState([...new Set(initialSelectedPhases || [])].filter(key=>availableKeys.has(key)));
 
-    const availablePhases = [...SELECTABLE_PHASES, ...workouts.filter(w => w.customActivity).map(w => ({ key:'custom:' + w.id, label:w.name, icon:'★', desc:getWorkoutDurationText(w) }))];
+    const availablePhases = [...SELECTABLE_PHASES, ...customActivities.map(w => ({ key:'custom:' + w.id, label:w.name, icon:'★', desc:getWorkoutDurationText(w) }))];
     const togglePhase = (key) => {
         const change = getPhaseSelectionChange(selectedPhases, key);
         setSelectedPhases(change.selectedPhases);
@@ -532,7 +536,19 @@ function PhaseSelectionScreen({ onPhasesSelected, onConfigureTraining, onClearTr
         onPhasesSelected(selectedPhases);
     };
 
-    return React.createElement('div', { className: "h-screen flex flex-col bg-slate-950 overflow-hidden" },
+    const orderedPhases = [
+        ...selectedPhases.map(key => availablePhases.find(phase => phase.key === key)).filter(Boolean),
+        ...availablePhases.filter(phase => !selectedPhases.includes(phase.key))
+    ];
+    const movePhase = (key, position) => {
+        setSelectedPhases(current => {
+            const reordered = current.filter(item => item !== key);
+            reordered.splice(position, 0, key);
+            return reordered;
+        });
+    };
+
+    return React.createElement('div', { className: "h-full min-h-0 flex flex-col bg-slate-950 overflow-hidden" },
         React.createElement('div', {
             className: "p-5 text-center shrink-0",
             style: { paddingTop: "max(3.5rem, calc(env(safe-area-inset-top) + 1rem))" }
@@ -549,15 +565,16 @@ function PhaseSelectionScreen({ onPhasesSelected, onConfigureTraining, onClearTr
                 )
             ),
             React.createElement('h1', { className: "text-3xl font-black text-white leading-tight" }, "¿Qué haremos hoy?"),
-            React.createElement('p', { className: "text-[11px] text-slate-400 mt-2 font-medium" }, "Selecciona una o más actividades para tu sesión")
+            React.createElement('p', { className: "text-[11px] text-slate-400 mt-2 font-medium" }, "Selecciona tus actividades y cambia su posición con el control Orden de cada tarjeta. El calentamiento siempre va primero.")
         ),
-        React.createElement('div', { className: "flex-1 overflow-y-auto scrollbar-hide px-5 py-2 space-y-3" },
+        React.createElement('div', { className: "flex-1 min-h-0 overflow-y-auto scrollbar-hide px-5 py-2 space-y-3" },
+            React.createElement('div', { className:'glass-card p-4 text-yellow-300 font-bold' }, 'Calentamiento obligatorio · Siempre primero'),
             React.createElement('button', { onClick:()=>onCustomActivity(selectedPhases), className:'w-full glass-card p-5 text-left font-bold text-sky-300' }, '+ Actividad personalizada · Nadar, montañismo, pesas…'),
-            availablePhases.map(phase =>
+            orderedPhases.map(phase =>
                 React.createElement('div', {
                     key: phase.key,
                     onClick: () => togglePhase(phase.key),
-                    className: `phase-card glass-card p-5 flex items-center gap-4 cursor-pointer ${selectedPhases.includes(phase.key) ? 'selected' : ''}`
+                    className: `phase-card glass-card p-4 flex flex-wrap items-center gap-3 cursor-pointer ${selectedPhases.includes(phase.key) ? 'selected' : ''}`
                 },
                     React.createElement('div', {
                         className: `w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${selectedPhases.includes(phase.key) ? 'bg-orange-500 border-orange-500' : 'border-slate-600'}`
@@ -576,32 +593,20 @@ function PhaseSelectionScreen({ onPhasesSelected, onConfigureTraining, onClearTr
                         )
                     ),
                     phase.key.startsWith('custom:') && React.createElement('button', { type:'button', className:'p-3 text-sky-300', onClick:event=>{ event.stopPropagation(); onEditActivity(workouts.find(w => 'custom:' + w.id === phase.key), selectedPhases); } }, 'Editar'),
-                    selectedPhases.includes(phase.key) && React.createElement('div', { className: "w-2 h-2 rounded-full bg-orange-500 shrink-0" })
+                    selectedPhases.includes(phase.key) && React.createElement('label', {
+                        className:'w-full flex items-center justify-between gap-3 border-t border-white/10 pt-3 text-sm font-bold text-orange-300',
+                        onClick:event=>event.stopPropagation()
+                    }, 'Orden después del calentamiento',
+                        React.createElement('select', {
+                            'aria-label':'Orden de ' + phase.label,
+                            value:selectedPhases.indexOf(phase.key),
+                            className:'min-h-11 bg-slate-800 rounded-xl px-4 text-white',
+                            onChange:event=>movePhase(phase.key, Number(event.target.value))
+                        }, selectedPhases.map((_, position)=>React.createElement('option', { key:position, value:position }, (position + 1) + 'º')))
+                    )
                 )
             ),
-            selectedPhases.length > 0 && React.createElement('div', { className:'glass-card p-5 space-y-3' },
-                React.createElement('h2', { className:'font-bold' }, 'Orden de las actividades'),
-                React.createElement('p', { className:'text-xs text-slate-400' }, 'El calentamiento es obligatorio y va primero. Ordena las demás actividades.'),
-                selectedPhases.map((key, index) => React.createElement('label', { key, className:'flex items-center justify-between gap-3' },
-                    React.createElement('span', null, key === 'training' && selectedWorkout ? selectedWorkout.name : availablePhases.find(p=>p.key===key)?.label || key),
-                    React.createElement('select', { value:index, className:'bg-slate-800 rounded-xl p-3',
-                        onChange:event=>{ const reordered = [...selectedPhases]; reordered.splice(index, 1); reordered.splice(Number(event.target.value), 0, key); setSelectedPhases(reordered); }
-                    }, selectedPhases.map((_, position)=>React.createElement('option', { key:position, value:position }, (position + 1) + 'º')))
-                ))
-            ),
-            React.createElement('div', { className: "glass-card p-5 flex items-center gap-4 opacity-40 mt-1" },
-                React.createElement('div', { className: "w-6 h-6 rounded-full bg-yellow-500 flex items-center justify-center shrink-0" },
-                    React.createElement('svg', { width:"12", height:"12", viewBox:"0 0 24 24", fill:"white" },
-                        React.createElement('path', { d:"M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" })
-                    )
-                ),
-                React.createElement('span', { className: "phase-icon" }, "BASE"),
-                React.createElement('div', { className: "flex-1 text-left" },
-                    React.createElement('p', { className: "font-black uppercase text-sm text-white leading-tight" }, "Calentamiento obligatorio"),
-                    React.createElement('p', { className: "text-[10px] text-slate-500 mt-0.5" }, 'Movilidad y activación incluidas en todas las sesiones')
-                ),
-                React.createElement('span', { className: "text-[9px] font-black uppercase text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded-full" }, "AUTO")
-            )
+            React.createElement('p', { className:'text-xs text-slate-400 py-2' }, 'Las actividades seleccionadas se realizan en el orden mostrado.')
         ),
         React.createElement('div', { className: "p-5 pb-10 shrink-0 space-y-3" },
             React.createElement(AdBannerPlaceholder, null), // Añadido el campo de anuncio aquí
@@ -1953,16 +1958,19 @@ function App() {
         if (!window.confirm(`¿Eliminar la rutina "${workout.name}"? Esta acción no se puede deshacer.`)) return;
 
         try {
-            await db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid)
-                .collection('workouts').doc(workout.id).delete();
-            setSelectedPhases(current => current?.filter(key => key !== 'custom:' + workout.id) || null);
+            const collection = db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid).collection('workouts');
+            const copies = workout.customActivity ? workouts.filter(w=>w.customActivity && customActivityIdentity(w) === customActivityIdentity(workout)) : [workout];
+            const batch = db.batch();
+            for (const copy of copies) batch.delete(collection.doc(copy.id));
+            await batch.commit();
+            setSelectedPhases(current => current?.filter(key => !copies.some(w=>key === 'custom:' + w.id)) || null);
             if (selectedWorkout?.id === workout.id) setSelectedWorkout(null);
             if (editingWorkout?.id === workout.id) setEditingWorkout(null);
             if (workout.customActivity) setView('phases');
         } catch (error) {
             alert("Error al eliminar: " + error.message);
         }
-    }, [user, selectedWorkout, editingWorkout]);
+    }, [user, selectedWorkout, editingWorkout, workouts]);
 
     const handleExitPlayer = useCallback(() => {
         endVoiceSession();
@@ -2031,7 +2039,7 @@ function App() {
                 onDelete: handleDeleteWorkout,
                 onCreate: () => { setEditingWorkout(null); setView('create'); }
             }),
-            view === 'custom' && React.createElement(CustomActivityView, { user, workoutToEdit:editingWorkout,
+            view === 'custom' && React.createElement(CustomActivityView, { user, workouts, workoutToEdit:editingWorkout,
                 onDelete:handleDeleteWorkout,
                 onCancel:()=>setView('phases'), onSaved:workout=>{ setEditingWorkout(null); handleWorkoutSelected(workout); } }),
             view === 'avance'   && React.createElement(AvanceView, { history }),
@@ -2269,7 +2277,7 @@ function CreateView({ user, workoutToEdit, onCancel, onSaved, onBackToPhases }) 
 }
 
 
-function CustomActivityView({ user, workoutToEdit, onCancel, onSaved, onDelete }) {
+function CustomActivityView({ user, workouts = [], workoutToEdit, onCancel, onSaved, onDelete }) {
     const [name, setName] = useState(workoutToEdit?.name || '');
     const [config, setConfig] = useState({ mode:'time', seconds:60, cycles:3, rest:30, preparation:0, ...workoutToEdit?.customActivity });
     const [saving, setSaving] = useState(false);
@@ -2289,9 +2297,16 @@ function CustomActivityView({ user, workoutToEdit, onCancel, onSaved, onDelete }
         busy.current = true; setSaving(true); setError('');
         try {
             const collection = db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid).collection('workouts');
-            if (!documentRef.current) documentRef.current = workoutToEdit?.id ? collection.doc(workoutToEdit.id) : collection.doc();
             const data = { name:name.trim(), customActivity:{ ...config, seconds:Number(config.seconds), cycles:Number(config.cycles), rest:Number(config.rest), preparation:Number(config.preparation) }, updatedAt:new Date().toISOString() };
-            await documentRef.current.set(data);
+            const identity = customActivityIdentity(data);
+            const existing = workouts.find(w=>w.customActivity && customActivityIdentity(w) === identity);
+            if (!documentRef.current) documentRef.current = collection.doc(workoutToEdit?.id || existing?.id || 'custom-' + encodeURIComponent(identity));
+            const copies = workoutToEdit?.customActivity ? workouts.filter(w=>w.customActivity && customActivityIdentity(w) === customActivityIdentity(workoutToEdit)) : [];
+            if (copies.length > 1) {
+                const batch = db.batch();
+                for (const copy of copies) batch.set(collection.doc(copy.id), data);
+                await batch.commit();
+            } else await documentRef.current.set(data);
             onSaved({ id:documentRef.current.id, ...data });
         } catch (e) { setError('No se pudo guardar la actividad. Revisa tu conexión e inténtalo otra vez.'); }
         finally { busy.current = false; setSaving(false); }

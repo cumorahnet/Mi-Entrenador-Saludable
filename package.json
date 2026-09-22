@@ -1,6 +1,6 @@
 {
   "name": "mi-entrenador-saludable",
-  "version": "2.37.0",
+  "version": "2.38.0",
   "description": "App Android hibrida para entrenamiento saludable con GPS.",
   "main": "www/index.html",
   "scripts": {

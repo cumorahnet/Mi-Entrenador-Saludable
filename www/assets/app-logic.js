@@ -76,6 +76,26 @@
         );
     };
 
+    const customActivityIdentity = workout => {
+        const c = workout.customActivity;
+        return JSON.stringify([
+            workout.name.trim().normalize('NFKC').toLocaleLowerCase('es').replace(/\s+/g, ' '),
+            c.mode, Number(c.preparation || 0),
+            c.mode === 'gps' ? 0 : Number(c.seconds),
+            c.mode === 'cycles' ? Number(c.cycles) : 1,
+            c.mode === 'cycles' ? Number(c.rest || 0) : 0
+        ]);
+    };
+    const uniqueCustomActivities = (workouts, selected = []) => {
+        const groups = new Map();
+        for (const workout of workouts.filter(w => w.customActivity)) {
+            const identity = customActivityIdentity(workout);
+            const previous = groups.get(identity);
+            if (!previous || (!selected.includes('custom:' + previous.id) && selected.includes('custom:' + workout.id))) groups.set(identity, workout);
+        }
+        return [...groups.values()];
+    };
+
     const togglePhaseSelection = (selectedPhases, phaseKey) => {
         const phases = Array.isArray(selectedPhases) ? selectedPhases : [];
         return phases.includes(phaseKey)
@@ -332,6 +352,8 @@
     };
 
     return {
+        customActivityIdentity,
+        uniqueCustomActivities,
         formatTime,
         formatPace,
         formatDistance,

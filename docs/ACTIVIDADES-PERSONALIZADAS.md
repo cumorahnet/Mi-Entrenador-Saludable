@@ -38,4 +38,6 @@ La actividad personalizada permite indicar preparación adicional de 0 a 3600 se
 
 **Guardar entrenamiento** espera la confirmación de Firestore y vuelve al menú sin iniciar la sesión. La configuración se conserva en la cuenta, disponible otros días y dispositivos con la misma cuenta. Desde Inicio puedes seleccionar las actividades guardadas o editarlas. Puedes combinarlas con entrenamiento principal, caminata, carrera y estiramientos.
 
-En **Orden de las actividades**, selecciona la posición de cada actividad, incluidas todas las personalizadas seleccionadas. El calentamiento se realiza una vez al inicio y el resto sigue el orden mostrado al pulsar **Comenzar**. El orden se elige para cada sesión.
+Cada tarjeta seleccionada tiene un control **Orden después del calentamiento**. Selecciona su posición y la tarjeta se moverá al lugar elegido, tanto para actividades personalizadas como predefinidas. El calentamiento se realiza una vez al inicio y el resto sigue el orden mostrado al pulsar **Comenzar**.
+
+Las copias con el mismo nombre y configuración se muestran como una sola actividad, sin borrar registros automáticamente. Guardar de nuevo la misma actividad reutiliza su documento. Editar o eliminar desde la tarjeta aplica también a sus copias equivalentes; las variantes con distinta configuración se conservan.
