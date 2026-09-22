@@ -7,8 +7,9 @@ En Inicio, pulsa **Actividad personalizada**, escribe el nombre y elige:
 - **Seguimiento GPS:** ruta, distancia y tiempo hasta finalizar manualmente.
 
 La configuración se guarda entre las rutinas del usuario para reutilizarla,
-editarla o eliminarla. Las actividades personalizadas no añaden ejercicios
-predefinidos ni calentamiento automáticamente.
+editarla y reutilizarla desde Inicio. Las actividades personalizadas aparecen
+junto a las predefinidas y permiten seleccionar varias en una sesión.
+Todas las sesiones comienzan con un único calentamiento obligatorio.
 
 Al terminar cualquier sesión, **Guardar actividad** espera la confirmación de
 Firestore antes de salir. Si falla, conserva el resumen para reintentar. Se usa
@@ -33,8 +34,8 @@ AGENTS.md. El APK 2.35 tiene versionCode 235 y es una compilación debug.
 
 ## Preparación y orden de la sesión
 
-La actividad personalizada permite indicar preparación de 0 a 3600 segundos; 0 la omite. Las actividades anteriores conservan preparación cero hasta que se editen.
+La actividad personalizada permite indicar preparación adicional de 0 a 3600 segundos; 0 omite solamente esa preparación adicional. Esta se realiza antes de la actividad correspondiente y nunca sustituye el calentamiento obligatorio.
 
-**Guardar entrenamiento** guarda la configuración y vuelve al menú sin iniciar la sesión. Desde **Entrenamiento principal** puedes seleccionar la rutina guardada o editarla. Puedes combinarla con caminata, carrera y estiramientos.
+**Guardar entrenamiento** espera la confirmación de Firestore y vuelve al menú sin iniciar la sesión. La configuración se conserva en la cuenta, disponible otros días y dispositivos con la misma cuenta. Desde Inicio puedes seleccionar las actividades guardadas o editarlas. Puedes combinarlas con entrenamiento principal, caminata, carrera y estiramientos.
 
-En **Orden de las actividades**, selecciona la posición de cada actividad. La preparación se realiza una vez al inicio y el resto sigue el orden mostrado al pulsar **Comenzar**. El orden se elige para cada sesión.
+En **Orden de las actividades**, selecciona la posición de cada actividad, incluidas todas las personalizadas seleccionadas. El calentamiento se realiza una vez al inicio y el resto sigue el orden mostrado al pulsar **Comenzar**. El orden se elige para cada sesión.

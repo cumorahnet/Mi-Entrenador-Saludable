@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 2.37 — 2026-09-22
+
+- Actividades personalizadas guardadas en Firebase y seleccionables desde Inicio.
+- Combinación de varias actividades personalizadas y predefinidas con prioridad común.
+- Calentamiento obligatorio al inicio de todas las sesiones.
+- Desglose de tiempos y GPS independiente para cada actividad personalizada.
+- Versión Android 2.37 (237).
+
 ## 2.36 — 2026-09-21
 
 - Preparación configurable para actividades personalizadas.

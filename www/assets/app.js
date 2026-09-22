@@ -81,7 +81,7 @@ const db = firebase.firestore();
 
 const APP_ID = "mientrenador-v3";
 const APP_TITLE = "Mi Entrenador Saludable";
-const APP_VERSION = "2.36";
+const APP_VERSION = "2.37";
 const ACTIVE_SESSION_STORAGE_KEY = `${APP_ID}:active-session:v1`;
 const GPS_ANNOUNCEMENT_INTERVAL_MS = 60 * 1000;
 
@@ -440,36 +440,35 @@ const generateWorkoutSteps = (workout, defaultParams, selectedPhasesKeys) => {
     if (!workout)
         return [{ label:'ERROR DE RUTINA', seconds:5, color:'bg-red-500', phase:'error', voiceInitial:'Error: Rutina no encontrada.', whistleOnStart:false, voiceCountdown:false }];
 
-    const generateCustomSteps = () => {
-        const config = workout.customActivity;
+    const generateCustomSteps = (activity = workout, section = 'training') => {
+        const config = activity.customActivity;
         const count = config.mode === 'cycles' ? config.cycles : 1;
         const customSteps = [];
+        if (config.preparation > 0) customSteps.push({ label:'Preparación · ' + activity.name, seconds:Number(config.preparation), phase:'custom-preparation', sessionSection:section, color:'bg-yellow-700', voiceInitial:'Prepárate para ' + activity.name, voiceCountdown:true });
         for (let cycle = 1; cycle <= count; cycle++) {
-            customSteps.push({ label:workout.name + (count > 1 ? ' · Ciclo ' + cycle + '/' + count : ''),
+            customSteps.push({ label:activity.name + (count > 1 ? ' · Ciclo ' + cycle + '/' + count : ''),
                 seconds:config.mode === 'gps' ? 4 : config.seconds,
-                ...(config.mode === 'gps' ? { activityType:'training' } : {}),
+                ...(config.mode === 'gps' ? { activityType:section } : {}),
                 color:'bg-emerald-700', phase:config.mode === 'gps' ? GPS_PHASE_KEY : 'entrenamiento',
-                sessionSection:'training', voiceInitial:workout.name + (count > 1 ? '. Ciclo ' + cycle : ''),
+                sessionSection:section, voiceInitial:activity.name + (count > 1 ? '. Ciclo ' + cycle : ''),
                 whistleOnStart:true, voiceCountdown:config.mode !== 'gps' });
             if (cycle < count && config.rest > 0) customSteps.push({ label:'Descanso', seconds:config.rest,
-                color:'bg-slate-800', phase:'custom-rest', sessionSection:'training', voiceInitial:'Descanso', voiceCountdown:true });
+                color:'bg-slate-800', phase:'custom-rest', sessionSection:section, voiceInitial:'Descanso', voiceCountdown:true });
         }
         return customSteps;
     };
     const ent = { ...defaultParams.entrenamiento, ...(workout.phases?.entrenamiento || {}) };
 
-    const phasesToRun = [...(workout.customActivity ? [] : ['warmup']), ...selectedPhasesKeys]
+    const phasesToRun = ['warmup', ...selectedPhasesKeys]
         .filter((k, i, arr) => arr.indexOf(k) === i);
 
     let steps = [];
-    if (workout.customActivity?.preparation > 0) steps.push({
-        label:'Preparación', seconds:Number(workout.customActivity.preparation), color:'bg-yellow-700',
-        phase:'custom-preparation', sessionSection:'preparation', voiceInitial:'Prepárate para comenzar.', voiceCountdown:true
-    });
     const exerciseDifficulty = getWorkoutExerciseDifficulty(workout);
 
     for (let i = 0; i < phasesToRun.length; i++) {
         const key = phasesToRun[i];
+        const custom = workout.sessionActivities?.find(activity => 'custom:' + activity.id === key);
+        if (custom) { steps = steps.concat(generateCustomSteps(custom, key)); continue; }
         if (key === 'training' && workout.customActivity) {
             steps = steps.concat(generateCustomSteps());
             continue;
@@ -480,7 +479,7 @@ const generateWorkoutSteps = (workout, defaultParams, selectedPhasesKeys) => {
         const nextKey = phasesToRun[i + 1];
         let introForNext = null;
         if (nextKey) {
-            const nextLabel = SELECTABLE_PHASES.find(p => p.key === nextKey)?.label || key;
+            const nextLabel = workout.sessionActivities?.find(a => 'custom:' + a.id === nextKey)?.name || SELECTABLE_PHASES.find(p => p.key === nextKey)?.label || nextKey;
             introForNext = `A continuación, ${nextLabel.toLowerCase()}.`;
         } else {
             introForNext = 'Rutina finalizada.';
@@ -514,9 +513,10 @@ const AdBannerPlaceholder = () => React.createElement('div', {
 // ──────────────────────────────────────────────────────────────────────────────
 
 // ─── PhaseSelectionScreen ─────────────────────────────────────────────────────
-function PhaseSelectionScreen({ onPhasesSelected, onConfigureTraining, onClearTrainingSelection, onCustomActivity, initialSelectedPhases, selectedWorkout, onClose }) {
+function PhaseSelectionScreen({ onPhasesSelected, onConfigureTraining, onClearTrainingSelection, onCustomActivity, onEditActivity, initialSelectedPhases, selectedWorkout, workouts = [], onClose }) {
     const [selectedPhases, setSelectedPhases] = useState(initialSelectedPhases || []);
 
+    const availablePhases = [...SELECTABLE_PHASES, ...workouts.filter(w => w.customActivity).map(w => ({ key:'custom:' + w.id, label:w.name, icon:'★', desc:getWorkoutDurationText(w) }))];
     const togglePhase = (key) => {
         const change = getPhaseSelectionChange(selectedPhases, key);
         setSelectedPhases(change.selectedPhases);
@@ -552,8 +552,8 @@ function PhaseSelectionScreen({ onPhasesSelected, onConfigureTraining, onClearTr
             React.createElement('p', { className: "text-[11px] text-slate-400 mt-2 font-medium" }, "Selecciona una o más actividades para tu sesión")
         ),
         React.createElement('div', { className: "flex-1 overflow-y-auto scrollbar-hide px-5 py-2 space-y-3" },
-            React.createElement('button', { onClick:onCustomActivity, className:'w-full glass-card p-5 text-left font-bold text-sky-300' }, '+ Actividad personalizada · Nadar, montañismo, pesas…'),
-            SELECTABLE_PHASES.map(phase =>
+            React.createElement('button', { onClick:()=>onCustomActivity(selectedPhases), className:'w-full glass-card p-5 text-left font-bold text-sky-300' }, '+ Actividad personalizada · Nadar, montañismo, pesas…'),
+            availablePhases.map(phase =>
                 React.createElement('div', {
                     key: phase.key,
                     onClick: () => togglePhase(phase.key),
@@ -575,14 +575,15 @@ function PhaseSelectionScreen({ onPhasesSelected, onConfigureTraining, onClearTr
                                 : phase.desc
                         )
                     ),
+                    phase.key.startsWith('custom:') && React.createElement('button', { type:'button', className:'p-3 text-sky-300', onClick:event=>{ event.stopPropagation(); onEditActivity(workouts.find(w => 'custom:' + w.id === phase.key), selectedPhases); } }, 'Editar'),
                     selectedPhases.includes(phase.key) && React.createElement('div', { className: "w-2 h-2 rounded-full bg-orange-500 shrink-0" })
                 )
             ),
             selectedPhases.length > 0 && React.createElement('div', { className:'glass-card p-5 space-y-3' },
                 React.createElement('h2', { className:'font-bold' }, 'Orden de las actividades'),
-                React.createElement('p', { className:'text-xs text-slate-400' }, 'La preparación va primero. Elige qué actividad sigue después.'),
+                React.createElement('p', { className:'text-xs text-slate-400' }, 'El calentamiento es obligatorio y va primero. Ordena las demás actividades.'),
                 selectedPhases.map((key, index) => React.createElement('label', { key, className:'flex items-center justify-between gap-3' },
-                    React.createElement('span', null, key === 'training' && selectedWorkout ? selectedWorkout.name : SELECTABLE_PHASES.find(p=>p.key===key)?.label || key),
+                    React.createElement('span', null, key === 'training' && selectedWorkout ? selectedWorkout.name : availablePhases.find(p=>p.key===key)?.label || key),
                     React.createElement('select', { value:index, className:'bg-slate-800 rounded-xl p-3',
                         onChange:event=>{ const reordered = [...selectedPhases]; reordered.splice(index, 1); reordered.splice(Number(event.target.value), 0, key); setSelectedPhases(reordered); }
                     }, selectedPhases.map((_, position)=>React.createElement('option', { key:position, value:position }, (position + 1) + 'º')))
@@ -596,8 +597,8 @@ function PhaseSelectionScreen({ onPhasesSelected, onConfigureTraining, onClearTr
                 ),
                 React.createElement('span', { className: "phase-icon" }, "BASE"),
                 React.createElement('div', { className: "flex-1 text-left" },
-                    React.createElement('p', { className: "font-black uppercase text-sm text-white leading-tight" }, "Preparación"),
-                    React.createElement('p', { className: "text-[10px] text-slate-500 mt-0.5" }, selectedWorkout?.customActivity ? `Preparación: ${selectedWorkout.customActivity.preparation || 0} segundos` : 'Movilidad y activación incluidas')
+                    React.createElement('p', { className: "font-black uppercase text-sm text-white leading-tight" }, "Calentamiento obligatorio"),
+                    React.createElement('p', { className: "text-[10px] text-slate-500 mt-0.5" }, 'Movilidad y activación incluidas en todas las sesiones')
                 ),
                 React.createElement('span', { className: "text-[9px] font-black uppercase text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded-full" }, "AUTO")
             )
@@ -1143,10 +1144,10 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
         const finalDistance = gpsTotalDistance.current, finalTime = gpsTotalTime.current;
         const finalCoordinates = gpsCoordinatesRef.current;
         const currentActivityType = stepsRef.current[idxRef.current]?.activityType;
-        if ((['walk', 'run', 'training'].includes(currentActivityType)) && finalTime > 0) {
+        if ((['walk', 'run', 'training'].includes(currentActivityType) || currentActivityType?.startsWith('custom:')) && finalTime > 0) {
             gpsActivityTimesRef.current = {
                 ...gpsActivityTimesRef.current,
-                [currentActivityType]:gpsActivityTimesRef.current[currentActivityType] + finalTime
+                [currentActivityType]:(gpsActivityTimesRef.current[currentActivityType] || 0) + finalTime
             };
         }
         setLiveGpsMetrics({ distance:finalDistance, time:finalTime });
@@ -1462,6 +1463,7 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
             gpsTotalTime.current = Number(restoredSession.gps?.totalTime) || 0;
             setLiveGpsMetrics({ distance:gpsTotalDistance.current, time:gpsTotalTime.current });
             gpsActivityTimesRef.current = {
+                ...restoredSession.gps?.activityTimes,
                 walk:Number(restoredSession.gps?.activityTimes?.walk) || 0,
                 run:Number(restoredSession.gps?.activityTimes?.run) || 0,
                 training:Number(restoredSession.gps?.activityTimes?.training) || 0
@@ -1598,8 +1600,8 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
 
     if (uiStatus === 'finished') {
         const activityLabels = [
-            ...(workout.customActivity && !workout.customActivity.preparation ? [] : ['Preparación']),
-            ...selectedPhases.map(key => SELECTABLE_PHASES.find(phase => phase.key === key)?.label || key)
+            'Calentamiento',
+            ...selectedPhases.map(key => workout.sessionActivities?.find(a => 'custom:' + a.id === key)?.name || SELECTABLE_PHASES.find(phase => phase.key === key)?.label || key)
         ];
         const sessionBreakdown = calculateSessionBreakdown({
             steps,
@@ -1609,11 +1611,12 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
             selectedPhases
         });
         const breakdownRows = [
-            { key:'preparation', label:'Preparación', color:'text-yellow-300', visible:!workout.customActivity || workout.customActivity.preparation > 0 },
+            { key:'preparation', label:'Preparación', color:'text-yellow-300', visible:true },
             { key:'training', label:workout.customActivity ? workout.name : 'Entrenamiento principal', color:'text-emerald-400', visible:selectedPhases.includes('training') },
             { key:'walk', label:'Caminata', color:'text-sky-400', visible:selectedPhases.includes('walk') },
             { key:'run', label:'Carrera', color:'text-orange-400', visible:selectedPhases.includes('run') },
             { key:'stretch', label:'Estiramientos', color:'text-blue-300', visible:selectedPhases.includes('stretch') }
+            ,...(workout.sessionActivities || []).map(a => ({ key:'custom:' + a.id, label:a.name, color:'text-emerald-400', visible:selectedPhases.includes('custom:' + a.id) }))
         ].filter(row => row.visible).sort((a, b) => ['preparation', ...selectedPhases].indexOf(a.key) - ['preparation', ...selectedPhases].indexOf(b.key));
         return React.createElement('div', { className:"h-screen flex flex-col bg-slate-950 text-white p-6 text-center overflow-hidden" },
             React.createElement('div', { className:"shrink-0 pt-8 pb-4" },
@@ -1921,22 +1924,27 @@ function App() {
             const silent = new SpeechSynthesisUtterance(' ');
             silent.volume = 0; window.speechSynthesis.speak(silent);
         }
+        const sessionActivities = workouts.filter(w => w.customActivity && phases.includes('custom:' + w.id));
         setSelectedPhases(phases);
         if (phases.includes('training')) {
             if (selectedWorkout) {
+                setSelectedWorkout({ ...selectedWorkout, sessionActivities });
                 setView('play');
             } else {
                 setView('workouts');
             }
         } else {
-            setSelectedWorkout({ id:'_no_training', name:'Sesión', phases: DEFAULT_PARAMS });
+            setSelectedWorkout({ id:'_no_training', name:sessionActivities.length ? sessionActivities.map(a => a.name).join(' · ') : 'Sesión', phases: DEFAULT_PARAMS, sessionActivities });
             setView('play');
         }
-    }, [selectedWorkout]);
+    }, [selectedWorkout, workouts]);
 
     const handleWorkoutSelected = useCallback((workout) => {
-        setSelectedWorkout(workout);
-        if (workout.customActivity) { clearActiveSession(); setRestoredSession(null); setSelectedPhases(current => current?.includes('training') ? current : [...(current || []), 'training']); }
+        if (workout.customActivity) {
+            clearActiveSession(); setRestoredSession(null);
+            const key = 'custom:' + workout.id;
+            setSelectedPhases(current => current?.includes(key) ? current : [...(current || []), key]);
+        } else setSelectedWorkout(workout);
         setView('phases');
     }, []);
 
@@ -1947,8 +1955,10 @@ function App() {
         try {
             await db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid)
                 .collection('workouts').doc(workout.id).delete();
+            setSelectedPhases(current => current?.filter(key => key !== 'custom:' + workout.id) || null);
             if (selectedWorkout?.id === workout.id) setSelectedWorkout(null);
             if (editingWorkout?.id === workout.id) setEditingWorkout(null);
+            if (workout.customActivity) setView('phases');
         } catch (error) {
             alert("Error al eliminar: " + error.message);
         }
@@ -2005,7 +2015,9 @@ function App() {
                 onPhasesSelected: handlePhasesSelected,
                 onConfigureTraining: phases => { setSelectedPhases(phases); setView('workouts'); },
                 onClearTrainingSelection: () => setSelectedWorkout(null),
-                onCustomActivity: () => { setEditingWorkout(null); setView('custom'); },
+                onCustomActivity: phases => { setSelectedPhases(phases); setEditingWorkout(null); setView('custom'); },
+                onEditActivity: (workout, phases) => { setSelectedPhases(phases); setEditingWorkout(workout); setView('custom'); },
+                workouts,
                 initialSelectedPhases: selectedPhases,
                 selectedWorkout,
                 onClose: handleCloseApp,
@@ -2020,7 +2032,8 @@ function App() {
                 onCreate: () => { setEditingWorkout(null); setView('create'); }
             }),
             view === 'custom' && React.createElement(CustomActivityView, { user, workoutToEdit:editingWorkout,
-                onCancel:()=>setView(editingWorkout ? 'workouts' : 'phases'), onSaved:workout=>{ setEditingWorkout(null); handleWorkoutSelected(workout); } }),
+                onDelete:handleDeleteWorkout,
+                onCancel:()=>setView('phases'), onSaved:workout=>{ setEditingWorkout(null); handleWorkoutSelected(workout); } }),
             view === 'avance'   && React.createElement(AvanceView, { history }),
             view === 'create'   && React.createElement(CreateView, {
                 user,
@@ -2125,11 +2138,11 @@ function AuthView({ APP_TITLE, APP_VERSION }) {
 
 // ─── WorkoutsView ─────────────────────────────────────────────────────────────
 function WorkoutsView({ workouts, selectedPhases, selectedWorkout, onConfirm, onEdit, onDelete, onCreate }) {
-    const availableWorkouts = [...DEFAULT_WORKOUTS, ...workouts];
+    const availableWorkouts = [...DEFAULT_WORKOUTS, ...workouts.filter(w => !w.customActivity)];
     const [checkedWorkoutId, setCheckedWorkoutId] = useState(selectedWorkout?.id || null);
     const checkedWorkout = availableWorkouts.find(workout => workout.id === checkedWorkoutId) || null;
     const phaseLabels = selectedPhases
-        ? [...(checkedWorkout?.customActivity && !checkedWorkout.customActivity.preparation ? [] : ['Preparación']), ...selectedPhases.map(k => k === 'training' && checkedWorkout ? checkedWorkout.name : SELECTABLE_PHASES.find(p=>p.key===k)?.label||k)].join(' → ')
+        ? ['Calentamiento', ...selectedPhases.map(k => k === 'training' && checkedWorkout ? checkedWorkout.name : workouts.find(w=>'custom:' + w.id===k)?.name || SELECTABLE_PHASES.find(p=>p.key===k)?.label||k)].join(' → ')
         : '';
     return React.createElement('div', { className:"flex-1 overflow-y-auto scrollbar-hide p-4 pb-32" },
         React.createElement('button', {
@@ -2256,7 +2269,7 @@ function CreateView({ user, workoutToEdit, onCancel, onSaved, onBackToPhases }) 
 }
 
 
-function CustomActivityView({ user, workoutToEdit, onCancel, onSaved }) {
+function CustomActivityView({ user, workoutToEdit, onCancel, onSaved, onDelete }) {
     const [name, setName] = useState(workoutToEdit?.name || '');
     const [config, setConfig] = useState({ mode:'time', seconds:60, cycles:3, rest:30, preparation:0, ...workoutToEdit?.customActivity });
     const [saving, setSaving] = useState(false);
@@ -2290,8 +2303,8 @@ function CustomActivityView({ user, workoutToEdit, onCancel, onSaved }) {
             React.createElement('option', { value:'time' }, 'Tiempo · cuenta regresiva'),
             React.createElement('option', { value:'cycles' }, 'Ciclos · tiempo de acción y descanso'),
             React.createElement('option', { value:'gps' }, 'Seguimiento GPS · ruta, distancia y tiempo'))),
-        React.createElement(InputField, { label:'Preparación (segundos, 0 para omitir)', val:config.preparation, set:v=>setConfig({ ...config, preparation:v }) }),
-        React.createElement('p', { className:'text-sm text-slate-300' }, 'Se guardará como un entrenamiento que podrás volver a seleccionar y editar. La preparación se realiza una vez al inicio de la sesión.'),
+        React.createElement(InputField, { label:'Preparación adicional (segundos, 0 para omitir)', val:config.preparation, set:v=>setConfig({ ...config, preparation:v }) }),
+        React.createElement('p', { className:'text-sm text-slate-300' }, 'Se guardará en tu cuenta para elegirla cualquier día junto a las demás actividades. El calentamiento siempre es obligatorio; esta preparación adicional se realiza antes de la actividad.'),
         config.mode !== 'gps' && React.createElement(InputField, { label:config.mode === 'cycles' ? 'Tiempo por ciclo (segundos)' : 'Duración (segundos)', val:config.seconds, set:v=>setConfig({ ...config, seconds:v }) }),
         config.mode === 'cycles' && React.createElement('div', { className:'grid grid-cols-2 gap-4' },
             React.createElement(InputField, { label:'Ciclos', val:config.cycles, set:v=>setConfig({ ...config, cycles:v }) }),
@@ -2300,6 +2313,7 @@ function CustomActivityView({ user, workoutToEdit, onCancel, onSaved }) {
         error && React.createElement('p', { role:'alert', className:'text-red-300' }, error),
         React.createElement('button', { type:'submit', disabled:saving, className:'w-full bg-orange-500 rounded-full p-4 font-bold' }, saving ? 'Guardando…' : 'Guardar entrenamiento'),
         React.createElement('button', { type:'button', disabled:saving, onClick:onCancel, className:'w-full rounded-full p-4 border border-white/20' }, 'Volver')
+        ,workoutToEdit?.id && onDelete && React.createElement('button', { type:'button', disabled:saving, onClick:()=>onDelete(workoutToEdit), className:'w-full rounded-full p-4 text-red-300' }, 'Eliminar actividad')
     );
 }
 

@@ -306,6 +306,7 @@
         selectedPhases
     } = {}) => {
         const totals = { preparation:0, training:0, walk:0, run:0, stretch:0 };
+        for (const key of selectedPhases || []) if (key.startsWith('custom:')) totals[key] = 0;
         const sessionSteps = Array.isArray(steps) ? steps : [];
         const lastReachedIndex = Number.isFinite(currentStepIndex)
             ? Math.min(Math.max(0, Math.floor(currentStepIndex)), Math.max(0, sessionSteps.length - 1))
@@ -322,7 +323,7 @@
             totals[section] += seconds;
         });
 
-        for (const activityType of ['walk', 'run', 'training']) {
+        for (const activityType of Object.keys(totals)) {
             const gpsSeconds = Number(gpsActivityTimes?.[activityType]);
             if (Number.isFinite(gpsSeconds) && gpsSeconds > 0) totals[activityType] += gpsSeconds;
         }

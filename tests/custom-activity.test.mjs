@@ -8,19 +8,20 @@ const generate = runInNewContext(source.slice(source.indexOf('const generateWork
 
 it('genera una actividad cronometrada con su nombre y sin ejercicios ajenos', () => {
     const steps = generate({ name:'Nadar', customActivity:{ mode:'time', seconds:120, cycles:3, rest:20 } }, {}, ['training']);
-    expect(steps).toHaveLength(1);
-    expect(steps[0]).toMatchObject({ label:'Nadar', seconds:120, sessionSection:'training' });
+    expect(steps).toHaveLength(2);
+    expect(steps[0].sessionSection).toBe('preparation');
+    expect(steps[1]).toMatchObject({ label:'Nadar', seconds:120, sessionSection:'training' });
 });
 
 it('alterna ciclos y descansos sin agregar descanso al final', () => {
     const steps = generate({ name:'Pesas', customActivity:{ mode:'cycles', seconds:45, cycles:3, rest:20 } }, {}, ['training']);
-    expect(steps.map(s=>s.seconds)).toEqual([45,20,45,20,45]);
+    expect(steps.map(s=>s.seconds)).toEqual([10,45,20,45,20,45]);
     expect(steps.at(-1).label).toBe('Pesas · Ciclo 3/3');
 });
 
 it('permite ciclos sin descanso y activa el seguimiento GPS existente', () => {
-    expect(generate({ name:'Pesas', customActivity:{ mode:'cycles', seconds:45, cycles:2, rest:0 } }, {}, ['training'])).toHaveLength(2);
-    expect(generate({ name:'Montañismo', customActivity:{ mode:'gps' } }, {}, ['training'])[0]).toMatchObject({ label:'Montañismo', phase:'gps-tracking', seconds:4 });
+    expect(generate({ name:'Pesas', customActivity:{ mode:'cycles', seconds:45, cycles:2, rest:0 } }, {}, ['training'])).toHaveLength(3);
+    expect(generate({ name:'Montañismo', customActivity:{ mode:'gps' } }, {}, ['training'])[1]).toMatchObject({ label:'Montañismo', phase:'gps-tracking', seconds:4 });
 });
 
 function resultHandlers(onComplete) {
@@ -70,8 +71,8 @@ it('descarta sin escribir en el historial', () => {
 
 it('añade preparación una sola vez y respeta el orden elegido con una actividad personalizada', () => {
     const steps = generate({ name:'Pesas', customActivity:{ mode:'cycles', seconds:45, cycles:2, rest:20, preparation:30 } }, {}, ['run','training','stretch']);
-    expect(steps.map(s=>s.sessionSection)).toEqual(['preparation','run','training','training','training','stretch']);
-    expect(steps[0].seconds).toBe(30);
+    expect(steps.map(s=>s.sessionSection)).toEqual(['preparation','run','training','training','training','training','stretch']);
+    expect(steps[2].seconds).toBe(30);
 });
 
 it('respeta el orden también en rutinas estándar y mantiene la preparación primero', () => {
@@ -82,9 +83,9 @@ it('respeta el orden también en rutinas estándar y mantiene la preparación pr
 it('separa el tiempo de preparación del seguimiento GPS personalizado', async () => {
     const { default:logic } = await import('../www/assets/app-logic.js');
     const steps = generate({ name:'Senderismo', customActivity:{ mode:'gps', preparation:20 } }, {}, ['training']);
-    expect(steps[1].activityType).toBe('training');
-    expect(logic.calculateSessionBreakdown({ steps, currentStepIndex:1, currentStepRemaining:0,
-        gpsActivityTimes:{ training:120 }, selectedPhases:['training'] })).toMatchObject({ preparation:20, training:124 });
+    expect(steps[2].activityType).toBe('training');
+    expect(logic.calculateSessionBreakdown({ steps, currentStepIndex:2, currentStepRemaining:0,
+        gpsActivityTimes:{ training:120 }, selectedPhases:['training'] })).toMatchObject({ preparation:10, training:144 });
 });
 
 function customForm(workoutToEdit, overrides = {}) {
@@ -123,4 +124,38 @@ it.each(['', -1, 3601, 1.5])('rechaza preparación inválida %s sin guardar', as
     const form = customForm({ name:'Nadar' }, { preparation });
     await form.submit();
     expect(form.write).not.toHaveBeenCalled();
+});
+
+it('combina varias actividades guardadas con las predefinidas y calienta una sola vez', async () => {
+    const sessionActivities = [
+        { id:'swim', name:'Nadar', customActivity:{ mode:'time', seconds:90 } },
+        { id:'hike', name:'Senderismo', customActivity:{ mode:'gps', preparation:15 } }
+    ];
+    const selectedPhases = ['custom:hike', 'walk', 'custom:swim', 'stretch', 'warmup'];
+    const steps = generate({ name:'Sesión', sessionActivities }, {}, selectedPhases);
+    expect(steps.map(s=>s.label)).toEqual(['warmup', 'Preparación · Senderismo', 'Senderismo', 'walk', 'Nadar', 'stretch', 'FINAL DE LA RUTINA']);
+    expect(steps[2].activityType).toBe('custom:hike');
+    const { default:logic } = await import('../www/assets/app-logic.js');
+    expect(logic.calculateSessionBreakdown({ steps, currentStepIndex:steps.length-1, currentStepRemaining:0,
+        selectedPhases, gpsActivityTimes:{ 'custom:hike':120, walk:60 } })).toMatchObject({ preparation:10, 'custom:hike':139, 'custom:swim':90, walk:70 });
+});
+
+it('muestra las actividades recuperadas de Firebase en la misma selección y prioridad', () => {
+    const saved = { id:'swim', name:'Nadar', customActivity:{ mode:'time', seconds:90 } };
+    const onPhasesSelected = vi.fn();
+    const context = { React:{ createElement:(type, props, ...children)=>({ type, props, children }) },
+        useState:value=>[value, vi.fn()], SELECTABLE_PHASES:[{ key:'walk', label:'Caminata' }],
+        APP_VERSION:'test', getWorkoutDurationText:()=> '90 s', AdBannerPlaceholder:()=>null };
+    const start = source.indexOf('function PhaseSelectionScreen(');
+    const end = source.indexOf('// ─── MapDisplay', start);
+    const render = runInNewContext(source.slice(start,end)+'; PhaseSelectionScreen', context);
+    const tree = render({ workouts:[saved], initialSelectedPhases:['custom:swim','walk'], onPhasesSelected });
+    const nodes = [];
+    function visit(node) { if (Array.isArray(node)) return node.forEach(visit); if (!node || typeof node !== 'object') return; nodes.push(node); visit(node.children); }
+    visit(tree);
+    expect(nodes.filter(n=>n.type === 'select').map(n=>n.props.value)).toEqual([0,1]);
+    nodes.find(n=>n.type === 'button' && n.children.includes('COMENZAR')).props.onClick();
+    expect(onPhasesSelected).toHaveBeenCalledWith(['custom:swim','walk']);
+    expect(JSON.stringify(tree)).toContain('Calentamiento obligatorio');
+    expect(JSON.stringify(tree)).toContain('Nadar');
 });
