@@ -207,7 +207,12 @@ public class NativeSpeechPlugin extends Plugin implements TextToSpeech.OnInitLis
     }
 
     private void releaseAudioFocusIfIdle() {
-        if (audioManager == null || !activeCalls.isEmpty()) return;
+        if (!activeCalls.isEmpty()) return;
+        synchronized (initializationLock) {
+            if (!initializationQueue.isEmpty()) return;
+        }
+        getContext().stopService(new Intent(getContext(), SpeechForegroundService.class));
+        if (audioManager == null) return;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && audioFocusRequest != null) {
             audioManager.abandonAudioFocusRequest(audioFocusRequest);
         } else {
@@ -267,7 +272,6 @@ public class NativeSpeechPlugin extends Plugin implements TextToSpeech.OnInitLis
 
     @PluginMethod
     public void warmup(PluginCall call) {
-        ensureForegroundVoiceSession();
         JSObject result = new JSObject();
         result.put("initialized", initialized);
         result.put("ready", ready);

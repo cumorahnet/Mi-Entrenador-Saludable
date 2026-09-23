@@ -88,6 +88,13 @@ public class NativeGpsService extends Service {
         if (state.optBoolean("active")) put("stoppedAt", System.currentTimeMillis());
         put("active", false);
         persist(context);
+        if (instance != null) {
+            instance.handler.removeCallbacksAndMessages(null);
+            if (instance.client != null) instance.client.removeLocationUpdates(instance.callback);
+            if (instance.speech != null) instance.speech.stop();
+            instance.stopForeground(true);
+            instance.stopSelf();
+        }
     }
 
     @Override public void onCreate() {

@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 2.39 — 2026-09-23
+
+- Cierre inmediato del servicio GPS y su notificación al detener el seguimiento, incluso durante el inicio.
+- La guía de voz libera su servicio cuando termina de hablar; preparar la voz no lo activa.
+- Mapa del historial con tamaño definido y trazado al terminar la inicialización.
+- Conservación de todas las etapas GPS al guardar y recuperar la sesión, sin unir tramos separados.
+
 ## 2.38 — 2026-09-22
 
 - Una tarjeta por actividad personalizada con nombre y configuración equivalentes.

@@ -134,6 +134,8 @@ input:focus-visible {
 }
 /* El div interno al que Leaflet se monta */
 .leaflet-map-wrapper .leaflet-map-inner {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
 }

@@ -28,7 +28,7 @@ it('permite ciclos sin descanso y activa el seguimiento GPS existente', () => {
 function resultHandlers(onComplete) {
     const context = { useCallback:f=>f, savingRef:{ current:false }, savedRef:{ current:false }, workout:{ name:'Nadar' },
         setSavingResult:vi.fn(), setSaveError:vi.fn(), hasGpsDataRef:{ current:false }, finalGpsSummary:null,
-        gpsCoordinates:[], elapsedRef:{ current:90 }, resultIdRef:{ current:'stable-session-id' }, onComplete, onExit:vi.fn() };
+        completedGpsRef:{ current:[] }, gpsCoordinates:[], elapsedRef:{ current:90 }, resultIdRef:{ current:'stable-session-id' }, onComplete, onExit:vi.fn() };
     const start = source.indexOf('    const handleFinishActivity = useCallback(');
     const end = source.indexOf('\n    if (!workout) return React.createElement', start);
     const handlers = runInNewContext(source.slice(start,end)+'; ({ save:handleFinishActivity, discard:handleDiscardActivity })', context);
@@ -206,4 +206,19 @@ it('reordena tarjetas únicas y comienza con el orden elegido de todas las activ
     elements = nodes(render(props));
     elements.find(n=>n.type === 'button' && n.children.includes('COMENZAR')).props.onClick();
     expect(onPhasesSelected).toHaveBeenCalledWith(['custom:swim','training','walk','run']);
+});
+
+it('distingue ciclos con distinto numero de repeticiones o descanso al agrupar actividades', () => {
+    const base = { id:'a', name:'Pesas', customActivity:{ mode:'cycles', preparation:10, seconds:30, cycles:3 } };
+    const explicitZero = { ...base, id:'b', customActivity:{ ...base.customActivity, rest:0 } };
+    const withRest = { ...base, id:'c', customActivity:{ ...base.customActivity, rest:15 } };
+    const moreCycles = { ...base, id:'d', customActivity:{ ...base.customActivity, cycles:4 } };
+    expect(appLogic.customActivityIdentity(base)).toBe(appLogic.customActivityIdentity(explicitZero));
+    expect(appLogic.uniqueCustomActivities([base, explicitZero, withRest, moreCycles]).map(w => w.id)).toEqual(['a', 'c', 'd']);
+});
+
+it('agrupa actividades GPS equivalentes aunque contengan duraciones heredadas', () => {
+    const base = { id:'gps-a', name:'Senderismo', customActivity:{ mode:'gps', seconds:30 } };
+    const legacy = { ...base, id:'gps-b', customActivity:{ mode:'gps', seconds:90 } };
+    expect(appLogic.uniqueCustomActivities([base, legacy]).map(w => w.id)).toEqual(['gps-a']);
 });

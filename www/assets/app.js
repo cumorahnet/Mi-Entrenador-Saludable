@@ -81,7 +81,7 @@ const db = firebase.firestore();
 
 const APP_ID = "mientrenador-v3";
 const APP_TITLE = "Mi Entrenador Saludable";
-const APP_VERSION = "2.38";
+const APP_VERSION = "2.39";
 const ACTIVE_SESSION_STORAGE_KEY = `${APP_ID}:active-session:v1`;
 const GPS_ANNOUNCEMENT_INTERVAL_MS = 60 * 1000;
 
@@ -685,6 +685,7 @@ function MapDisplay({ gpsCoordinates, currentLocation, isLiveTracking }) {
     const renderedCoordinateCountRef = useRef(0);
     const [mapError, setMapError] = useState('');
     const [leafletReady, setLeafletReady] = useState(!!window.L);
+    const [mapReady, setMapReady] = useState(false);
     const mapFullyInitialized = useRef(false);
 
     const defaultCenter = [19.432608, -99.133209];
@@ -759,6 +760,7 @@ function MapDisplay({ gpsCoordinates, currentLocation, isLiveTracking }) {
                 L.control.zoom({ position: 'topright' }).addTo(mapInstance.current);
 
                 mapFullyInitialized.current = true;
+                setMapReady(true);
                 mapInstance.current.invalidateSize({ animate: false }); // Initial invalidation
 
                 resizeObserverRef.current = new ResizeObserver(() => {
@@ -789,6 +791,11 @@ function MapDisplay({ gpsCoordinates, currentLocation, isLiveTracking }) {
                 mapInstance.current.remove();
                 mapInstance.current = null;
                 mapFullyInitialized.current = false;
+                setMapReady(false);
+                polylineInstance.current = null;
+                startMarkerRef.current = null;
+                endMarkerRef.current = null;
+                currentMarker.current = null;
                 renderedCoordinateCountRef.current = 0;
             }
         };
@@ -802,6 +809,12 @@ function MapDisplay({ gpsCoordinates, currentLocation, isLiveTracking }) {
         const coords = gpsCoordinates || [];
         const firstLatLng = coords.length > 0 ? [coords[0].lat, coords[0].lng] : null;
         const lastCoordinate = coords.length > 0 ? coords[coords.length - 1] : null;
+        const routeLines = [];
+        coords.forEach(point => {
+            if (!routeLines.length || point.segmentStart) routeLines.push([]);
+            routeLines.at(-1).push([point.lat, point.lng]);
+        });
+        const lineCoordinates = isLiveTracking ? coords.map(c => [c.lat, c.lng]) : routeLines;
 
         // En vivo se agregan únicamente los puntos nuevos. Reconstruir toda la ruta
         // en cada lectura GPS hacía crecer el trabajo de forma cuadrática.
@@ -812,10 +825,10 @@ function MapDisplay({ gpsCoordinates, currentLocation, isLiveTracking }) {
                         polylineInstance.current.addLatLng([coordinate.lat, coordinate.lng]);
                     });
                 } else {
-                    polylineInstance.current.setLatLngs(coords.map(c => [c.lat, c.lng]));
+                    polylineInstance.current.setLatLngs(lineCoordinates);
                 }
             } else {
-                polylineInstance.current = L.polyline(coords.map(c => [c.lat, c.lng]), { color: '#f97316', weight: 5, opacity: 1.0 }).addTo(map);
+                polylineInstance.current = L.polyline(lineCoordinates, { color: '#f97316', weight: 5, opacity: 1.0 }).addTo(map);
             }
         } else if (polylineInstance.current) {
             map.removeLayer(polylineInstance.current);
@@ -879,7 +892,7 @@ function MapDisplay({ gpsCoordinates, currentLocation, isLiveTracking }) {
             map.setView(defaultCenter, defaultZoom, { animate: false });
         }
 
-    }, [gpsCoordinates, currentLocation, isLiveTracking, leafletReady]);
+    }, [gpsCoordinates, currentLocation, isLiveTracking, leafletReady, mapReady]);
 
     // Re-invalidate size on app resume or visibility change
     useEffect(() => {
@@ -997,6 +1010,8 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
     const nextActivitySpeech = useRef(null);
     const wakeLockRef = useRef(null);
     const gpsWatcherId = useRef(null);
+    const gpsStartPromiseRef = useRef(null);
+    const completedGpsRef = useRef([]);
     const lastPosition = useRef(null);
     const gpsLastFixTime = useRef(0);
     const gpsFeedbackRef = useRef({ distance:0, time:0, key:null });
@@ -1048,6 +1063,7 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
             pausedAt: pausedAtRef.current,
             hasGpsData: hasGpsDataRef.current,
             finalGpsSummary: finalGpsSummaryRef.current,
+            completedGps: completedGpsRef.current,
             gps: {
                 active: isGpsActiveRef.current,
                 coordinates: gpsCoordinatesRef.current,
@@ -1125,6 +1141,7 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
         setStatus('finished');
         setTimeout(() => persistSession('finished'), 0);
         speak('Entrenamiento finalizado. Revisa el resumen de tus actividades.', true);
+        endVoiceSession();
     }, [persistSession, setElap, setStatus]);
 
     const advanceToStep = useCallback((nextIdx) => {
@@ -1140,6 +1157,11 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
         if (gpsStoppingRef.current) return;
         gpsStoppingRef.current = true;
         gpsStartingRef.current = false;
+        endVoiceSession();
+        // Starting the native service may still be waiting for permission or its first snapshot.
+        if (gpsStartPromiseRef.current) {
+            try { await gpsStartPromiseRef.current; } catch (error) { /* handled by start */ }
+        }
         if (gpsWatcherId.current) {
             const watcher = gpsWatcherId.current; gpsWatcherId.current = null;
             try { await clearLocationWatch(watcher); }
@@ -1148,6 +1170,7 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
         if (gpsAnnounceIntervalRef.current) { clearInterval(gpsAnnounceIntervalRef.current); gpsAnnounceIntervalRef.current = null; }
         const finalDistance = gpsTotalDistance.current, finalTime = gpsTotalTime.current;
         const finalCoordinates = gpsCoordinatesRef.current;
+        isGpsActiveRef.current = false;
         const currentActivityType = stepsRef.current[idxRef.current]?.activityType;
         if ((['walk', 'run', 'training'].includes(currentActivityType) || currentActivityType?.startsWith('custom:')) && finalTime > 0) {
             gpsActivityTimesRef.current = {
@@ -1170,6 +1193,7 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
             };
             finalGpsSummaryRef.current = summary;
             setFinalGpsSummary(summary);
+            completedGpsRef.current.push({ coordinates:finalCoordinates.slice(), summary });
         } else {
             setHasGpsData(false);
             hasGpsDataRef.current = false;
@@ -1306,7 +1330,7 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
             }
         }, 1000);
         try {
-            const watcher = await startLocationWatch(
+            const startPromise = startLocationWatch(
                 (position) => {
                 if (position.nativeState) {
                     const state = position.nativeState;
@@ -1349,9 +1373,13 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
                 (error) => { gpsStartingRef.current = false; speak(`Error de GPS: ${error.message || error}.`, true); stopGpsTrackingRef.current(); },
                 { startTime:gpsStartTime.current, distance:gpsTotalDistance.current, coordinates:gpsCoordinatesRef.current }
             );
-            if (!isGpsActiveRef.current || gpsStoppingRef.current) { if (watcher) clearLocationWatch(watcher); }
+            gpsStartPromiseRef.current = startPromise;
+            const watcher = await startPromise;
+            gpsStartPromiseRef.current = null;
+            if (!isGpsActiveRef.current) { if (watcher) await clearLocationWatch(watcher); }
             else gpsWatcherId.current = watcher;
         } catch (err) {
+            gpsStartPromiseRef.current = null;
             gpsStartingRef.current = false;
             speak(`Error de GPS: ${err.message}.`, true);
             stopGpsTrackingRef.current();
@@ -1425,6 +1453,7 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
         setCurrentLocation(null); currentLocationRef.current = null;
         setLiveGpsMetrics({ distance:0, time:0 });
         gpsActivityTimesRef.current = { walk:0, run:0, training:0 };
+        completedGpsRef.current = [];
         gpsStartingRef.current = false;
         gpsStoppingRef.current = false;
         setHasGpsData(false); hasGpsDataRef.current = false;
@@ -1475,6 +1504,8 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
             };
             hasGpsDataRef.current = !!restoredSession.hasGpsData; setHasGpsData(hasGpsDataRef.current);
             finalGpsSummaryRef.current = restoredSession.finalGpsSummary || null; setFinalGpsSummary(finalGpsSummaryRef.current);
+            completedGpsRef.current = restoredSession.completedGps || (restoredSession.hasGpsData && restoredSession.finalGpsSummary
+                ? [{ coordinates:restoredCoordinates, summary:restoredSession.finalGpsSummary }] : []);
 
             if (restoredSession.status === 'gps-running' && restoredSession.gps?.active) {
                 pendingGpsRestoreRef.current = restoredSession.gps;
@@ -1541,8 +1572,14 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
         setSavingResult(true);
         setSaveError('');
         try {
-            const gpsData = hasGpsDataRef.current && finalGpsSummary
-                ? { coordinates:gpsCoordinates, summary:finalGpsSummary } : null;
+            const segments = completedGpsRef.current;
+            const distance = segments.reduce((total, segment) => total + segment.summary.distance, 0);
+            const time = segments.reduce((total, segment) => total + segment.summary.time, 0);
+            const gpsData = segments.length ? {
+                coordinates:segments.flatMap(segment => segment.coordinates.map((point, index) => ({ ...point, segmentStart:index === 0 }))),
+                summary:{ distance, time, distanceText:formatDistance(distance), timeText:formatTime(time),
+                    pace:formatPace(distance, time), speed:formatSpeed(distance, time) }
+            } : null;
             await onComplete(workout.name, elapsedRef.current, gpsData, resultIdRef.current, workout.customActivity || null);
             savedRef.current = true;
             onExit();
