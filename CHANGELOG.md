@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 2.41 — 2026-09-28
+
+- Corregida la inicialización de Firebase Functions compat del panel de superusuario para consultar y eliminar cuentas.
+- Añadidas pruebas del panel para carga, paginación, eliminación simulada y permisos.
+- Publicada e instalada la versión Android 2.41 (241).
+
 <!-- cdc-session:session-20260924173510-bc0f95 -->
 ## Sesión 24/09/2026, 08:58 p.m.
 

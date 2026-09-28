@@ -82,7 +82,7 @@ let registrationConsentWrite = null;
 
 const APP_ID = "mientrenador-v3";
 const APP_TITLE = "Mi Entrenador Saludable";
-const APP_VERSION = "2.40";
+const APP_VERSION = "2.41";
 const ACTIVE_SESSION_STORAGE_KEY = `${APP_ID}:active-session:v1`;
 const GPS_ANNOUNCEMENT_INTERVAL_KEY = `${APP_ID}:gps-announcement-interval:v1`;
 const GPS_ANNOUNCEMENT_INTERVAL_OPTIONS = [300, 600, 900, 1200, 1800];
@@ -2397,7 +2397,7 @@ function SuperuserPanel({ user, onClose }) {
         setError('');
         append ? setLoadingMore(true) : setLoading(true);
         try {
-            const listAccounts = firebase.functions('us-central1').httpsCallable('listPlatformAccounts');
+            const listAccounts = firebase.app().functions('us-central1').httpsCallable('listPlatformAccounts');
             const result = await listAccounts({ pageToken: pageToken || null });
             setAccounts(current => append ? [...current, ...(result.data.accounts || [])] : (result.data.accounts || []));
             setNextPageToken(result.data.nextPageToken || null);
@@ -2421,7 +2421,7 @@ function SuperuserPanel({ user, onClose }) {
         if (!window.confirm(`¿Eliminar permanentemente la cuenta de ${accountName}? También se borrarán sus rutinas e historial. Esta acción no se puede deshacer.`)) return;
         setError('');
         try {
-            const deleteAccount = firebase.functions('us-central1').httpsCallable('deletePlatformAccount');
+            const deleteAccount = firebase.app().functions('us-central1').httpsCallable('deletePlatformAccount');
             await deleteAccount({ uid: account.uid });
             setAccounts(current => current.filter(item => item.uid !== account.uid));
         } catch (err) {
