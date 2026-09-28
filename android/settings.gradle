@@ -1,4 +1,6 @@
-// En este equipo, Android solo se compila desde la copia oficial.
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '0.10.0'
+}// En este equipo, Android solo se compila desde la copia oficial.
 def officialAndroid = new File('C:/Cumorahnet/Projects/Proyectos/Mi-Entrenador-Saludable/android')
 if (System.getProperty('os.name').toLowerCase().contains('windows') &&
         !settingsDir.canonicalPath.equalsIgnoreCase(officialAndroid.canonicalPath)) {

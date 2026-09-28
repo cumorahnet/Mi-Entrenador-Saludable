@@ -67,23 +67,46 @@ const IconMap = () => React.createElement('svg', { width:"24", height:"24", view
 
 
 const firebaseConfig = {
-    apiKey: "AIzaSyDg0nohFAprIYta3Z3IvFGms55PehyxGIM",
-    authDomain: "entrenadorpersonal-4e69d.firebaseapp.com",
-    projectId: "entrenadorpersonal-4e69d",
-    storageBucket: "entrenadorpersonal-4e69d.firebasestorage.app",
-    messagingSenderId: "198872357236",
-    appId: "1:198872357236:web:c3cd2a7f5caff197847421"
+    apiKey: "AIzaSyDGFYgpSsDs-bCTQqfqP5Cms79ozlam_lI",
+    authDomain: "mi-entrenador-saludable.firebaseapp.com",
+    projectId: "mi-entrenador-saludable",
+    storageBucket: "mi-entrenador-saludable.firebasestorage.app",
+    messagingSenderId: "578357454684",
+    appId: "1:578357454684:web:8eb0c3c7a06f7efaf94399"
 };
 
 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
+let registrationConsentWrite = null;
 
 const APP_ID = "mientrenador-v3";
 const APP_TITLE = "Mi Entrenador Saludable";
-const APP_VERSION = "2.39";
+const APP_VERSION = "2.40";
 const ACTIVE_SESSION_STORAGE_KEY = `${APP_ID}:active-session:v1`;
-const GPS_ANNOUNCEMENT_INTERVAL_MS = 60 * 1000;
+const GPS_ANNOUNCEMENT_INTERVAL_KEY = `${APP_ID}:gps-announcement-interval:v1`;
+const GPS_ANNOUNCEMENT_INTERVAL_OPTIONS = [300, 600, 900, 1200, 1800];
+const GPS_DISTANCE_ANNOUNCEMENT_KEY = `${APP_ID}:gps-distance-announcement:v1`;
+const GPS_DISTANCE_ANNOUNCEMENT_MIN_METERS = 100;
+const GPS_DISTANCE_ANNOUNCEMENT_MAX_METERS = 5000;
+const GPS_DISTANCE_ANNOUNCEMENT_STEP_METERS = 100;
+const readGpsDistanceAnnouncement = () => {
+    try {
+        const meters = Number(localStorage.getItem(GPS_DISTANCE_ANNOUNCEMENT_KEY));
+        return Number.isFinite(meters) && meters >= GPS_DISTANCE_ANNOUNCEMENT_MIN_METERS
+            && meters <= GPS_DISTANCE_ANNOUNCEMENT_MAX_METERS && meters % GPS_DISTANCE_ANNOUNCEMENT_STEP_METERS === 0
+            ? meters : 500;
+    } catch (error) { return 500; }
+};
+const formatGpsDistanceAnnouncement = meters => meters >= 1000
+    ? `${Number.isInteger(meters / 1000) ? (meters / 1000) : (meters / 1000).toFixed(1)} km`
+    : `${meters} m`;
+const readGpsAnnouncementInterval = () => {
+    try {
+        const seconds = Number(localStorage.getItem(GPS_ANNOUNCEMENT_INTERVAL_KEY));
+        return GPS_ANNOUNCEMENT_INTERVAL_OPTIONS.includes(seconds) ? seconds * 1000 : 300 * 1000;
+    } catch (error) { return 300 * 1000; }
+};
 
 const readActiveSession = () => {
     try {
@@ -115,7 +138,7 @@ const WARMUP_STEPS = [
     { label: 'BRAZO DERECHO', voice: 'Brazo derecho' },
     { label: 'BRAZO IZQUIERDO', voice: 'Brazo izquierdo' },
     { label: 'CUELLO ADELANTE Y ATRÁS', voice: 'Cuello adelante y atrás' },
-    { label: 'CUELLO DER. E IZQ.', voice: 'Cuello derecha e izquierda' },
+    { label: 'CUELLO DERECHA E IZQUIERDA', voice: 'Cuello derecha e izquierda' },
 ];
 
 const TRAINING_ZONES = ['PIERNAS', 'BRAZOS', 'TRONCO'];
@@ -515,10 +538,12 @@ const AdBannerPlaceholder = () => React.createElement('div', {
 // ──────────────────────────────────────────────────────────────────────────────
 
 // ─── PhaseSelectionScreen ─────────────────────────────────────────────────────
-function PhaseSelectionScreen({ onPhasesSelected, onConfigureTraining, onClearTrainingSelection, onCustomActivity, onEditActivity, initialSelectedPhases, selectedWorkout, workouts = [], onClose }) {
+function PhaseSelectionScreen({ onPhasesSelected, onConfigureTraining, onClearTrainingSelection, onCustomActivity, onEditActivity, initialSelectedPhases, selectedWorkout, workouts = [], onClose, onSuperuserAccess }) {
     const customActivities = uniqueCustomActivities(workouts, initialSelectedPhases || []);
     const availableKeys = new Set([...SELECTABLE_PHASES.map(p=>p.key), ...customActivities.map(w=>'custom:' + w.id)]);
     const [selectedPhases, setSelectedPhases] = useState([...new Set(initialSelectedPhases || [])].filter(key=>availableKeys.has(key)));
+    const [gpsAnnouncementIntervalSeconds, setGpsAnnouncementIntervalSeconds] = useState(() => readGpsAnnouncementInterval() / 1000);
+    const [gpsAnnouncementDistanceMeters, setGpsAnnouncementDistanceMeters] = useState(readGpsDistanceAnnouncement);
 
     const availablePhases = [...SELECTABLE_PHASES, ...customActivities.map(w => ({ key:'custom:' + w.id, label:w.name, icon:'★', desc:getWorkoutDurationText(w) }))];
     const togglePhase = (key) => {
@@ -561,7 +586,7 @@ function PhaseSelectionScreen({ onPhasesSelected, onConfigureTraining, onClearTr
                 }, "Cerrar aplicación"),
                 React.createElement('div', { className:"flex flex-col items-end gap-1" },
                     React.createElement('p', { className: "screen-kicker text-[10px] font-black uppercase tracking-widest" }, "Plan de entrenamiento"),
-                    React.createElement('span', { className:"app-version" }, "VERSIÓN ", APP_VERSION)
+                    React.createElement('span', { className:"app-version", onDoubleClick:onSuperuserAccess, role:"button", tabIndex:0, title:"Doble clic para acceso de superusuario", onKeyDown:event=>{ if (event.key === 'Enter' || event.key === ' ') onSuperuserAccess?.(); } }, "VERSIÓN ", APP_VERSION)
                 )
             ),
             React.createElement('h1', { className: "text-3xl font-black text-white leading-tight" }, "¿Qué haremos hoy?"),
@@ -603,6 +628,46 @@ function PhaseSelectionScreen({ onPhasesSelected, onConfigureTraining, onClearTr
                             className:'min-h-11 bg-slate-800 rounded-xl px-4 text-white',
                             onChange:event=>movePhase(phase.key, Number(event.target.value))
                         }, selectedPhases.map((_, position)=>React.createElement('option', { key:position, value:position }, (position + 1) + 'º')))
+                    ),
+                    selectedPhases.includes(phase.key) && ['walk', 'run'].includes(phase.key) && React.createElement('label', {
+                        className:'w-full flex flex-col gap-2 border-t border-white/10 pt-3 text-sm font-bold text-sky-300',
+                        onClick:event=>event.stopPropagation()
+                    },
+                        React.createElement('span', null, 'Aviso por voz de velocidad y distancia'),
+                        React.createElement('select', {
+                            'aria-label':'Intervalo de avisos por voz para ' + phase.label,
+                            value:gpsAnnouncementIntervalSeconds,
+                            className:'min-h-11 bg-slate-800 rounded-xl px-4 text-white',
+                            onChange:event=>{
+                                const seconds = Number(event.target.value);
+                                if (!GPS_ANNOUNCEMENT_INTERVAL_OPTIONS.includes(seconds)) return;
+                                setGpsAnnouncementIntervalSeconds(seconds);
+                                try { localStorage.setItem(GPS_ANNOUNCEMENT_INTERVAL_KEY, String(seconds)); } catch (error) {}
+                            }
+                        }, GPS_ANNOUNCEMENT_INTERVAL_OPTIONS.map(seconds => React.createElement('option', { key:seconds, value:seconds }, seconds < 60 ? `${seconds} segundos` : `${seconds / 60} min`)))
+                    ),
+                    selectedPhases.includes(phase.key) && ['walk', 'run'].includes(phase.key) && React.createElement('label', {
+                        className:'w-full flex flex-col gap-2 border-t border-white/10 pt-3 text-sm font-bold text-sky-300',
+                        onClick:event=>event.stopPropagation()
+                    },
+                        React.createElement('span', { className:'flex items-center justify-between gap-3' },
+                            React.createElement('span', null, 'Aviso por distancia'),
+                            React.createElement('span', { className:'text-white' }, formatGpsDistanceAnnouncement(gpsAnnouncementDistanceMeters))
+                        ),
+                        React.createElement('input', {
+                            type:'range', min:GPS_DISTANCE_ANNOUNCEMENT_MIN_METERS, max:GPS_DISTANCE_ANNOUNCEMENT_MAX_METERS,
+                            step:GPS_DISTANCE_ANNOUNCEMENT_STEP_METERS, value:gpsAnnouncementDistanceMeters,
+                            'aria-label':'Intervalo de avisos por distancia para ' + phase.label,
+                            className:'w-full accent-orange-500',
+                            onChange:event=>{
+                                const meters = Number(event.target.value);
+                                setGpsAnnouncementDistanceMeters(meters);
+                                try { localStorage.setItem(GPS_DISTANCE_ANNOUNCEMENT_KEY, String(meters)); } catch (error) {}
+                            }
+                        }),
+                        React.createElement('span', { className:'flex justify-between text-[10px] text-slate-400' },
+                            React.createElement('span', null, '100 m'), React.createElement('span', null, '5 km')
+                        )
                     )
                 )
             ),
@@ -744,6 +809,12 @@ function MapDisplay({ gpsCoordinates, currentLocation, isLiveTracking }) {
                     markerZoomAnimation: false,
                 });
 
+                // Mantener la ruta sobre las teselas aunque cambie el orden de
+                // los paneles de Leaflet o se repinten las capas del mapa.
+                const routePane = mapInstance.current.createPane('gpsRoutePane');
+                routePane.style.zIndex = '450';
+                routePane.style.pointerEvents = 'none';
+
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     maxZoom: 19,
                     attribution: '&copy; OpenStreetMap',
@@ -828,8 +899,14 @@ function MapDisplay({ gpsCoordinates, currentLocation, isLiveTracking }) {
                     polylineInstance.current.setLatLngs(lineCoordinates);
                 }
             } else {
-                polylineInstance.current = L.polyline(lineCoordinates, { color: '#f97316', weight: 5, opacity: 1.0 }).addTo(map);
+                polylineInstance.current = L.polyline(lineCoordinates, {
+                    color: '#f97316', weight: 5, opacity: 1.0,
+                    pane: 'gpsRoutePane',
+                }).addTo(map);
             }
+            // Las teselas pueden añadirse después al mapa; reafirmar el orden
+            // de dibujo de la ruta cada vez que se actualiza.
+            polylineInstance.current?.bringToFront();
         } else if (polylineInstance.current) {
             map.removeLayer(polylineInstance.current);
             polylineInstance.current = null;
@@ -1016,6 +1093,10 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
     const gpsLastFixTime = useRef(0);
     const gpsFeedbackRef = useRef({ distance:0, time:0, key:null });
     const [gpsSignalText, setGpsSignalText] = useState('Buscando señal GPS…');
+    const [gpsAnnouncementIntervalMs, setGpsAnnouncementIntervalMs] = useState(readGpsAnnouncementInterval);
+    const gpsAnnouncementIntervalRef = useRef(gpsAnnouncementIntervalMs);
+    const [gpsAnnouncementDistanceMeters, setGpsAnnouncementDistanceMeters] = useState(readGpsDistanceAnnouncement);
+    const gpsAnnouncementDistanceRef = useRef(gpsAnnouncementDistanceMeters);
     const gpsStartTime = useRef(null);
     const gpsAnnounceLastTime = useRef(0);
     const gpsTotalDistance = useRef(0);
@@ -1320,8 +1401,8 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
             setGpsSignalText(hasSignal ? 'GPS con señal reciente' : 'Señal GPS insuficiente; no se puede confirmar el avance');
             const previous = gpsFeedbackRef.current;
             const distance = gpsTotalDistance.current;
-            const milestone = distance - previous.distance >= 100 && now - gpsAnnounceLastTime.current >= 30000;
-            if (milestone || now - gpsAnnounceLastTime.current >= GPS_ANNOUNCEMENT_INTERVAL_MS) {
+            const distanceIntervalReached = distance - previous.distance >= gpsAnnouncementDistanceRef.current;
+            if (distanceIntervalReached || now - gpsAnnounceLastTime.current >= gpsAnnouncementIntervalRef.current) {
                 const feedback = getGpsFeedback({ now, lastFixTime:gpsLastFixTime.current, distance,
                     previousDistance:previous.distance, time:currentGpsTotalTime, previousTime:previous.time });
                 if (feedback.key === 'progress' || feedback.key !== previous.key) speak(feedback.text, false);
@@ -1371,7 +1452,8 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
 
                 },
                 (error) => { gpsStartingRef.current = false; speak(`Error de GPS: ${error.message || error}.`, true); stopGpsTrackingRef.current(); },
-                { startTime:gpsStartTime.current, distance:gpsTotalDistance.current, coordinates:gpsCoordinatesRef.current }
+                { startTime:gpsStartTime.current, distance:gpsTotalDistance.current, coordinates:gpsCoordinatesRef.current,
+                    announcementIntervalMs:gpsAnnouncementIntervalMs, announcementDistanceMeters:gpsAnnouncementDistanceMeters }
             );
             gpsStartPromiseRef.current = startPromise;
             const watcher = await startPromise;
@@ -1384,7 +1466,7 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
             speak(`Error de GPS: ${err.message}.`, true);
             stopGpsTrackingRef.current();
         }
-    }, [skipStep, announceGpsStats, persistSession, setElap, setStatus]);
+    }, [skipStep, announceGpsStats, persistSession, setElap, setStatus, gpsAnnouncementIntervalMs, gpsAnnouncementDistanceMeters]);
 
     const togglePlay = useCallback(() => {
         if (!workout || stepsRef.current.length === 0) return;
@@ -1632,6 +1714,47 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
             )
         ),
         React.createElement('p', { role:'status', className:"text-center text-xs text-slate-300 mb-3" }, gpsSignalText),
+        React.createElement('label', { className:"flex items-center justify-between gap-3 rounded-xl bg-white/5 px-4 py-3 mb-3 text-sm" },
+            React.createElement('span', null, 'Aviso de velocidad y distancia'),
+            React.createElement('select', {
+                value:gpsAnnouncementIntervalMs / 1000,
+                onChange:event => {
+                    const seconds = Number(event.target.value);
+                    const interval = GPS_ANNOUNCEMENT_INTERVAL_OPTIONS.includes(seconds) ? seconds : 300;
+                    const milliseconds = interval * 1000;
+                    gpsAnnouncementIntervalRef.current = milliseconds;
+                    setGpsAnnouncementIntervalMs(milliseconds);
+                    try { localStorage.setItem(GPS_ANNOUNCEMENT_INTERVAL_KEY, String(interval)); } catch (error) {}
+                    gpsAnnounceLastTime.current = Date.now();
+                    gpsFeedbackRef.current = { distance:gpsTotalDistance.current, time:gpsTotalTime.current, key:gpsFeedbackRef.current.key };
+                    if (isNativeRuntime()) getCapacitorPlugins().NativeGps?.setAnnouncementInterval?.({ intervalMs:milliseconds });
+                },
+                className:"rounded-lg bg-slate-800 px-3 py-2 text-white"
+            }, GPS_ANNOUNCEMENT_INTERVAL_OPTIONS.map(seconds => React.createElement('option', { key:seconds, value:seconds }, seconds < 60 ? `${seconds} segundos` : `${seconds / 60} min`)))
+        ),
+        React.createElement('label', { className:"flex flex-col gap-2 rounded-xl bg-white/5 px-4 py-3 mb-3 text-sm" },
+            React.createElement('span', { className:'flex items-center justify-between gap-3' },
+                React.createElement('span', null, 'Aviso por distancia'),
+                React.createElement('strong', { className:'text-orange-300' }, formatGpsDistanceAnnouncement(gpsAnnouncementDistanceMeters))
+            ),
+            React.createElement('input', {
+                type:'range', min:GPS_DISTANCE_ANNOUNCEMENT_MIN_METERS, max:GPS_DISTANCE_ANNOUNCEMENT_MAX_METERS,
+                step:GPS_DISTANCE_ANNOUNCEMENT_STEP_METERS, value:gpsAnnouncementDistanceMeters,
+                'aria-label':'Intervalo de avisos por distancia', className:'w-full accent-orange-500',
+                onChange:event=>{
+                    const meters = Math.max(GPS_DISTANCE_ANNOUNCEMENT_MIN_METERS,
+                        Math.min(GPS_DISTANCE_ANNOUNCEMENT_MAX_METERS, Number(event.target.value)));
+                    gpsAnnouncementDistanceRef.current = meters;
+                    setGpsAnnouncementDistanceMeters(meters);
+                    try { localStorage.setItem(GPS_DISTANCE_ANNOUNCEMENT_KEY, String(meters)); } catch (error) {}
+                    gpsFeedbackRef.current = { distance:gpsTotalDistance.current, time:gpsTotalTime.current, key:gpsFeedbackRef.current.key };
+                    if (isNativeRuntime()) getCapacitorPlugins().NativeGps?.setAnnouncementDistance?.({ distanceMeters:meters });
+                }
+            }),
+            React.createElement('span', { className:'flex justify-between text-[10px] text-slate-400' },
+                React.createElement('span', null, '100 m'), React.createElement('span', null, '5 km')
+            )
+        ),
         React.createElement('button', { onClick:finishPhase, className:"w-full shrink-0 bg-white/10 py-3 mb-2 rounded-full font-bold" }, "Saltar fase completa"),
         React.createElement('button', {
             onClick:finishPhase,
@@ -1791,7 +1914,7 @@ function MapPlayback({ routeCoordinates, routeSummary, onClose }) {
 }
 
 // ─── AvanceView ───────────────────────────────────────────────────────────────
-function AvanceView({ history }) {
+function AvanceView({ history, historyError, onRetry }) {
     const [periodType, setPeriodType] = useState('semana');
     const [periodOffset, setPeriodOffset] = useState(0);
     const [showHistoricalMap, setShowHistoricalMap] = useState(false);
@@ -1886,8 +2009,17 @@ function AvanceView({ history }) {
         React.createElement('div', { className:"glass-card p-4" }, React.createElement('div', { style:{height:'200px'} }, React.createElement('canvas', { ref:chartRef }))),
         React.createElement('div', { className:"mt-8" },
             React.createElement('h3', { className:"font-black uppercase text-xs text-orange-500 mb-4" }, "Historial de Actividades"),
+            historyError && React.createElement('div', { role:'alert', className:"glass-card p-4 mb-3 text-sm text-amber-200" },
+                React.createElement('p', null, historyError),
+                React.createElement('button', { onClick:onRetry, className:"mt-3 rounded-lg bg-orange-500 px-4 py-2 font-bold text-white" }, "Reintentar")
+            ),
             filteredHistory.length === 0
-                ? React.createElement('p', { className:"text-white/50 italic text-sm" }, "No hay actividades en este periodo.")
+                ? React.createElement('div', null,
+                    React.createElement('p', { className:"text-white/50 italic text-sm" }, "No hay actividades en este periodo."),
+                    history.length === 0 && !historyError && React.createElement('p', { className:"mt-2 text-xs text-amber-200/80" },
+                        "No aparecen sesiones en esta cuenta. Si tenías entrenamientos anteriores al cambio de proyecto Firebase, pueden seguir en el proyecto anterior y no se trasladan automáticamente."
+                    )
+                )
                 : filteredHistory.map(h => React.createElement('div', { key:h.id, className:"glass-card p-4 mb-2 flex justify-between items-center" },
                     React.createElement('div', { className:"flex-1" },
                         React.createElement('p', { className:"text-sm font-bold" }, h.workoutName || "Actividad GPS"),
@@ -1913,9 +2045,15 @@ function AvanceView({ history }) {
 // ─── App ──────────────────────────────────────────────────────────────────────
 function App() {
     const [user, setUser] = useState(null);
+    const [accountReady, setAccountReady] = useState(false);
+    const [superuserMode, setSuperuserMode] = useState(false);
     const [view, setView] = useState('phases');
     const [isAppResting, setIsAppResting] = useState(false);
     const [workouts, setWorkouts] = useState([]);
+    const [workoutsLoading, setWorkoutsLoading] = useState(false);
+    const [workoutsError, setWorkoutsError] = useState('');
+    const [historyError, setHistoryError] = useState('');
+    const [dataRetry, setDataRetry] = useState(0);
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedWorkout, setSelectedWorkout] = useState(null);
@@ -1925,11 +2063,29 @@ function App() {
     const restoredForUserRef = useRef(null);
 
     useEffect(() => {
-        const unsub = auth.onAuthStateChanged(u => {
-            setUser(u && !u.isAnonymous ? u : null);
-            setTimeout(() => setLoading(false), 500);
+        let authChange = 0;
+        const unsub = auth.onAuthStateChanged(async u => {
+            const change = ++authChange;
+            setLoading(true);
+            if (u && registrationConsentWrite) await registrationConsentWrite;
+            if (change !== authChange) return;
+            const nextUser = u && !u.isAnonymous ? u : null;
+            setAccountReady(false);
+            setWorkouts([]);
+            setHistory([]);
+            setWorkoutsError('');
+            setWorkoutsLoading(!!nextUser);
+            setSelectedWorkout(null);
+            setSelectedPhases(null);
+            setEditingWorkout(null);
+            setRestoredSession(null);
+            restoredForUserRef.current = null;
+            setIsAppResting(false);
+            setView('phases');
+            setUser(nextUser);
+            setLoading(false);
         });
-        return unsub;
+        return () => { authChange++; unsub(); };
     }, []);
 
     useEffect(() => {
@@ -1952,10 +2108,34 @@ function App() {
             }
         }
         const base = db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid);
-        const unsubW = base.collection('workouts').onSnapshot(s => setWorkouts(s.docs.map(d => ({id:d.id,...d.data()}))));
-        const unsubH = base.collection('history').onSnapshot(s => setHistory(s.docs.map(d => ({id:d.id,...d.data()}))));
-        return () => { unsubW(); unsubH(); };
-    }, [user]);
+        let active = true;
+        setWorkoutsLoading(true);
+        setWorkoutsError('');
+        setHistoryError('');
+        const unsubW = base.collection('workouts').onSnapshot(s => {
+            if (!active) return;
+            setWorkouts(s.docs.map(d => ({...d.data(), id:d.id})));
+            setWorkoutsLoading(false);
+            setWorkoutsError('');
+        }, error => {
+            if (!active) return;
+            console.error('No se pudieron recuperar las actividades:', error);
+            setWorkoutsLoading(false);
+            setWorkoutsError('No se pudieron recuperar tus actividades guardadas. Revisa tu conexión y vuelve a intentarlo.');
+        });
+        const unsubH = base.collection('history').onSnapshot(s => {
+            if (!active) return;
+            setHistory(s.docs.map(d => ({...d.data(), id:d.id})));
+            setHistoryError('');
+        }, error => {
+            if (!active) return;
+            console.error('No se pudo recuperar el historial:', error);
+            setHistoryError(error.code === 'permission-denied'
+                ? 'Firebase rechazó la lectura del historial. Verifica que la cuenta y las reglas de Firestore correspondan al proyecto correcto.'
+                : 'No se pudo recuperar el historial. Revisa la conexión e inténtalo de nuevo.');
+        });
+        return () => { active = false; unsubW(); unsubH(); };
+    }, [user, dataRetry]);
 
     const handlePhasesSelected = useCallback((phases) => {
         clearActiveSession();
@@ -2034,7 +2214,9 @@ function App() {
     if (loading) return React.createElement('div', { className:"h-full w-full flex items-center justify-center bg-slate-950" },
         React.createElement('div', { className:"animate-spin w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full" })
     );
-    if (!user) return React.createElement(AuthView, { APP_TITLE, APP_VERSION });
+    if (!user) return React.createElement(AuthView, { APP_TITLE, APP_VERSION, superuserMode, onSuperuserAccess:()=>setSuperuserMode(true), onExitSuperuser:()=>setSuperuserMode(false) });
+    if (!accountReady) return React.createElement(AccountSetup, { key:user.uid, user, onComplete:()=>setAccountReady(true) });
+    if (superuserMode) return React.createElement(SuperuserPanel, { user, onClose:()=>setSuperuserMode(false) });
     if (isAppResting) return React.createElement('div', { className:"h-full flex flex-col items-center justify-center bg-slate-950 p-6 text-center" },
         React.createElement('img', { src:"assets/movement-health-logo.png", alt:"Mi Entrenador Saludable", className:"brand-logo" }),
         React.createElement('h2', { className:"text-2xl font-black text-white mb-2" }, "Aplicación en espera"),
@@ -2051,11 +2233,15 @@ function App() {
             React.createElement('div', { onClick:()=>setView('phases'), className:"cursor-pointer" },
                 React.createElement('h1', { className:"text-base font-black text-white" }, APP_TITLE),
                 React.createElement('p', { className:"text-[10px] text-slate-300 font-semibold mt-1" }, user.email),
-                React.createElement('span', { className:"app-version mt-2" }, "VERSIÓN ", APP_VERSION)
+                React.createElement('span', { className:"app-version mt-2", onDoubleClick:()=>setSuperuserMode(true), role:"button", tabIndex:0, title:"Doble clic para acceso de superusuario", onKeyDown:event=>{ if (event.key === 'Enter' || event.key === ' ') setSuperuserMode(true); } }, "VERSIÓN ", APP_VERSION)
             ),
             React.createElement('button', { onClick:()=>auth.signOut(), className:"px-4 py-2 border border-white/10 bg-white/5 rounded-lg text-slate-300 font-bold text-[10px] uppercase" }, "Cerrar sesión")
         ),
         React.createElement('main', { className:"flex-1 relative flex flex-col min-h-0" },
+            view === 'phases' && workoutsLoading && React.createElement('p', { role:'status', className:'p-4 text-slate-300' }, 'Recuperando tus actividades guardadas…'),
+            view === 'phases' && workoutsError && React.createElement('div', { role:'alert', className:'p-4 text-red-300' },
+                workoutsError,
+                React.createElement('button', { type:'button', className:'ml-3 underline', onClick:()=>setDataRetry(value=>value + 1) }, 'Reintentar')),
             view === 'phases'   && React.createElement(PhaseSelectionScreen, {
                 onPhasesSelected: handlePhasesSelected,
                 onConfigureTraining: phases => { setSelectedPhases(phases); setView('workouts'); },
@@ -2066,6 +2252,7 @@ function App() {
                 initialSelectedPhases: selectedPhases,
                 selectedWorkout,
                 onClose: handleCloseApp,
+                onSuperuserAccess:()=>setSuperuserMode(true),
             }),
             view === 'workouts' && React.createElement(WorkoutsView, {
                 workouts, user,
@@ -2079,7 +2266,7 @@ function App() {
             view === 'custom' && React.createElement(CustomActivityView, { user, workouts, workoutToEdit:editingWorkout,
                 onDelete:handleDeleteWorkout,
                 onCancel:()=>setView('phases'), onSaved:workout=>{ setEditingWorkout(null); handleWorkoutSelected(workout); } }),
-            view === 'avance'   && React.createElement(AvanceView, { history }),
+            view === 'avance'   && React.createElement(AvanceView, { history, historyError, onRetry:()=>setDataRetry(value=>value+1) }),
             view === 'create'   && React.createElement(CreateView, {
                 user,
                 workoutToEdit:editingWorkout,
@@ -2107,11 +2294,198 @@ function App() {
 }
 
 // ─── AuthView ─────────────────────────────────────────────────────────────────
-function AuthView({ APP_TITLE, APP_VERSION }) {
+function AccountSetup({ user, onComplete }) {
+    const [checking, setChecking] = useState(true);
+    const [error, setError] = useState('');
+    const [consent, setConsent] = useState(false);
+    const [accepted, setAccepted] = useState(false);
+    const [name, setName] = useState(user.displayName || '');
+    const [saving, setSaving] = useState(false);
+    const [retry, setRetry] = useState(0);
+    const ref = db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid).collection('legal').doc('terms-v1');
+    useEffect(() => {
+        let active = true;
+        setChecking(true);
+        setError('');
+        ref.get({ source:'server' }).then(snapshot => {
+            if (!active) return;
+            const data = snapshot.exists ? snapshot.data() : {};
+            const valid = data.accepted === true && data.privacyNoticeAccepted === true
+                && data.termsVersion === '1.0' && data.privacyNoticeVersion === '1.0';
+            setConsent(valid);
+            setChecking(false);
+            if (valid && user.displayName) onComplete();
+        }).catch(() => {
+            if (!active) return;
+            setChecking(false);
+            setError('No se pudo verificar tu registro. Revisa tu conexión y vuelve a intentarlo.');
+        });
+        return () => { active = false; };
+    }, [user.uid, retry]);
+    const submit = async event => {
+        event.preventDefault();
+        const fullName = name.trim().replace(/\s+/g, ' ');
+        if (saving || checking || fullName.length < 3 || (!consent && !accepted)) return;
+        setSaving(true);
+        setError('');
+        try {
+            if (fullName !== user.displayName) await user.updateProfile({ displayName:fullName });
+            if (!consent) await ref.set({ accepted:true, termsVersion:'1.0', privacyNoticeVersion:'1.0', privacyNoticeAccepted:true,
+                acceptedAt:firebase.firestore.FieldValue.serverTimestamp(), termsDocument:'terminos.html', privacyNoticeDocument:'privacidad.html' });
+            onComplete();
+        } catch (_) {
+            setError('No se pudo completar el registro. Tus datos se conservan; vuelve a intentarlo.');
+        } finally { setSaving(false); }
+    };
+    return React.createElement('div', { className:'h-full overflow-y-auto bg-slate-950 p-6 text-white flex flex-col items-center justify-center' },
+        React.createElement('form', { onSubmit:submit, className:'w-full max-w-sm space-y-4' },
+            React.createElement('h1', { className:'text-xl font-black' }, 'Completa tu registro'),
+            checking ? React.createElement('p', { role:'status' }, 'Verificando tu registro…') : React.createElement(React.Fragment, null,
+                React.createElement('input', { type:'text', value:name, onChange:e=>setName(e.target.value), required:true, minLength:3, maxLength:100, disabled:saving, autoComplete:'name', placeholder:'NOMBRE COMPLETO', className:'w-full rounded-2xl bg-slate-900 p-4' }),
+                !consent && React.createElement('label', { className:'block text-sm' },
+                    React.createElement('input', { type:'checkbox', checked:accepted, onChange:e=>setAccepted(e.target.checked), required:true, disabled:saving }),
+                    ' Leí y acepto los ', React.createElement('a', { href:'terminos.html', target:'_blank', rel:'noopener noreferrer', className:'underline text-orange-400' }, 'Términos y Condiciones'),
+                    ' y el ', React.createElement('a', { href:'privacidad.html', target:'_blank', rel:'noopener noreferrer', className:'underline text-orange-400' }, 'Aviso de Privacidad')),
+                React.createElement('button', { type:'submit', disabled:saving || (!consent && !accepted) || name.trim().length < 3, className:'w-full rounded-2xl bg-orange-500 p-4 font-bold disabled:opacity-50' }, saving ? 'GUARDANDO…' : 'GUARDAR Y CONTINUAR')),
+            error && React.createElement('div', { role:'alert' }, error, React.createElement('button', { type:'button', disabled:saving, onClick:()=>setRetry(value=>value + 1), className:'ml-3 underline' }, 'Reintentar verificación')),
+            React.createElement('button', { type:'button', disabled:saving, onClick:()=>auth.signOut(), className:'w-full text-sm underline' }, 'Cerrar sesión')));
+}
+
+function FullNamePrompt({ user, onComplete }) {
+    const [name, setName] = useState('');
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
+    const submit = async event => {
+        event.preventDefault();
+        const fullName = name.trim().replace(/\s+/g, ' ');
+        if (fullName.length < 3) {
+            setError('Escribe tu nombre completo.');
+            return;
+        }
+        setSaving(true);
+        setError('');
+        try {
+            await user.updateProfile({ displayName: fullName });
+            onComplete(fullName);
+        } catch (saveError) {
+            setError('No se pudo guardar el nombre. Revisa tu conexión e inténtalo de nuevo.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return React.createElement('div', { className:"h-full flex items-center justify-center bg-slate-950 p-6 text-white" },
+        React.createElement('form', { onSubmit:submit, className:"w-full max-w-sm space-y-4 rounded-3xl border border-white/10 bg-slate-900 p-6 text-center" },
+            React.createElement('h1', { className:"text-xl font-black" }, "Completa tu perfil"),
+            React.createElement('p', { className:"text-sm text-slate-400" }, "Escribe tu nombre completo para identificar correctamente tu cuenta."),
+            React.createElement('input', { type:"text", value:name, onChange:event=>setName(event.target.value), autoComplete:"name", maxLength:100, required:true, disabled:saving, placeholder:"NOMBRE COMPLETO", className:"w-full rounded-2xl border border-white/10 bg-slate-950 p-4 text-center text-white outline-none focus:border-orange-400" }),
+            error && React.createElement('p', { role:"alert", className:"text-sm text-red-300" }, error),
+            React.createElement('button', { type:"submit", disabled:saving, className:"w-full rounded-2xl bg-orange-500 py-4 font-black uppercase text-white disabled:opacity-50" }, saving ? "GUARDANDO…" : "GUARDAR Y CONTINUAR")
+        )
+    );
+}
+
+function SuperuserPanel({ user, onClose }) {
+    const [accounts, setAccounts] = useState([]);
+    const [nextPageToken, setNextPageToken] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [error, setError] = useState('');
+    const [search, setSearch] = useState('');
+
+    const loadAccounts = useCallback(async (pageToken, append = false) => {
+        setError('');
+        append ? setLoadingMore(true) : setLoading(true);
+        try {
+            const listAccounts = firebase.functions('us-central1').httpsCallable('listPlatformAccounts');
+            const result = await listAccounts({ pageToken: pageToken || null });
+            setAccounts(current => append ? [...current, ...(result.data.accounts || [])] : (result.data.accounts || []));
+            setNextPageToken(result.data.nextPageToken || null);
+        } catch (err) {
+            const message = err.code === 'functions/permission-denied'
+                ? 'Esta cuenta no tiene asignado el rol de superusuario en Firebase.'
+                : err.code === 'functions/not-found' || err.code === 'functions/unavailable'
+                    ? 'El servicio de superusuario aún no está desplegado o no está disponible.'
+                    : (err.message || 'No se pudo cargar la lista de cuentas.');
+            setError(message);
+        } finally {
+            setLoading(false);
+            setLoadingMore(false);
+        }
+    }, []);
+
+    useEffect(() => { loadAccounts(null, false); }, [loadAccounts]);
+
+    const handleDelete = useCallback(async account => {
+        const accountName = account.fullName || account.email || account.uid;
+        if (!window.confirm(`¿Eliminar permanentemente la cuenta de ${accountName}? También se borrarán sus rutinas e historial. Esta acción no se puede deshacer.`)) return;
+        setError('');
+        try {
+            const deleteAccount = firebase.functions('us-central1').httpsCallable('deletePlatformAccount');
+            await deleteAccount({ uid: account.uid });
+            setAccounts(current => current.filter(item => item.uid !== account.uid));
+        } catch (err) {
+            setError(err.message || 'No se pudo eliminar la cuenta.');
+        }
+    }, []);
+
+    const normalizedSearch = search.trim().toLocaleLowerCase();
+    const visibleAccounts = accounts.filter(account =>
+        !normalizedSearch || `${account.fullName} ${account.email}`.toLocaleLowerCase().includes(normalizedSearch)
+    );
+
+    return React.createElement('div', { className:"h-full min-h-0 flex flex-col bg-slate-950 text-white" },
+        React.createElement('header', { className:"flex items-center justify-between border-b border-white/10 bg-slate-900 px-4 py-4" },
+            React.createElement('div', null,
+                React.createElement('h1', { className:"text-lg font-black uppercase text-orange-400" }, "Superusuario"),
+                React.createElement('p', { className:"text-xs text-slate-400" }, user.email || user.uid)
+            ),
+            React.createElement('button', { type:"button", onClick:onClose, className:"rounded-xl border border-white/10 px-4 py-2 text-xs font-bold text-slate-200" }, "Volver")
+        ),
+        React.createElement('div', { className:"flex-1 overflow-y-auto p-4" },
+            React.createElement('div', { className:"mx-auto w-full max-w-3xl" },
+                React.createElement('div', { className:"mb-4 flex flex-wrap items-center justify-between gap-3" },
+                    React.createElement('div', null,
+                        React.createElement('h2', { className:"text-base font-black" }, "Cuentas"),
+                        React.createElement('p', { className:"text-xs text-slate-400" }, "Free incluye comerciales; Plus muestra el estado de comerciales registrado para cada cuenta.")
+                    ),
+                    React.createElement('button', { type:"button", onClick:()=>loadAccounts(null, false), disabled:loading || loadingMore, className:"rounded-xl bg-white/10 px-4 py-2 text-xs font-bold disabled:opacity-50" }, "Actualizar")
+                ),
+                React.createElement('input', { type:"search", value:search, onChange:event=>setSearch(event.target.value), placeholder:"Buscar por nombre o correo", className:"mb-4 w-full rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-sm text-white outline-none focus:border-orange-400" }),
+                error && React.createElement('div', { role:"alert", className:"mb-4 rounded-xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-200" }, error),
+                loading ? React.createElement('p', { className:"py-10 text-center text-sm text-slate-400" }, "Cargando cuentas…")
+                    : visibleAccounts.length === 0 ? React.createElement('p', { className:"py-10 text-center text-sm text-slate-400" }, accounts.length ? "No hay coincidencias." : "No hay cuentas para mostrar.")
+                    : React.createElement('div', { className:"space-y-3" }, visibleAccounts.map(account =>
+                        React.createElement('article', { key:account.uid, className:"rounded-2xl border border-white/10 bg-slate-900 p-4" },
+                            React.createElement('div', { className:"flex flex-wrap items-start justify-between gap-3" },
+                                React.createElement('div', { className:"min-w-0 flex-1" },
+                                    React.createElement('h3', { className:"break-words font-bold text-white" }, account.fullName || "Nombre no registrado"),
+                                    React.createElement('p', { className:"break-all text-xs text-slate-400" }, account.email || "Sin correo"),
+                                    React.createElement('p', { className:"mt-1 text-[10px] text-slate-500" }, "Alta: ", account.createdAt ? new Date(account.createdAt).toLocaleDateString() : "Sin fecha")
+                                ),
+                                React.createElement('button', { type:"button", onClick:()=>handleDelete(account), disabled:account.uid === user.uid, className:"rounded-xl border border-red-400/30 px-3 py-2 text-[10px] font-black uppercase text-red-300 disabled:opacity-40", title:account.uid === user.uid ? "No puedes eliminar tu propia cuenta" : "Eliminar cuenta" }, "Eliminar")
+                            ),
+                            React.createElement('div', { className:"mt-3 flex flex-wrap gap-2" },
+                                React.createElement('span', { className:`rounded-full px-3 py-1 text-[10px] font-black uppercase ${account.plan === 'plus' ? 'bg-orange-500/15 text-orange-300' : 'bg-slate-700 text-slate-200'}` }, account.plan === 'plus' ? "Plus" : "Free"),
+                                React.createElement('span', { className:"rounded-full bg-white/5 px-3 py-1 text-[10px] font-bold text-slate-300" }, account.hasAds ? "Con comerciales" : "Sin comerciales"),
+                                account.disabled && React.createElement('span', { className:"rounded-full bg-red-500/15 px-3 py-1 text-[10px] font-bold text-red-300" }, "Deshabilitada")
+                            )
+                        )
+                    )),
+                !loading && nextPageToken && React.createElement('button', { type:"button", onClick:()=>loadAccounts(nextPageToken, true), disabled:loadingMore, className:"mt-4 w-full rounded-xl border border-white/10 py-3 text-sm font-bold disabled:opacity-50" }, loadingMore ? "Cargando…" : "Cargar más cuentas")
+            )
+        )
+    );
+}
+
+function AuthView({ APP_TITLE, APP_VERSION, superuserMode = false, onSuperuserAccess, onExitSuperuser }) {
     const [isReg, setIsReg] = useState(false);
     const [showPasswordRecovery, setShowPasswordRecovery] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
     const [pass, setPass] = useState('');
+    const [acceptedTerms, setAcceptedTerms] = useState(false);
     const [isClosed, setIsClosed] = useState(false);
     const [loadingAuth, setLoadingAuth] = useState(false); // Nuevo estado de carga
 
@@ -2119,14 +2493,39 @@ function AuthView({ APP_TITLE, APP_VERSION }) {
         e.preventDefault();
         setLoadingAuth(true); // Iniciar carga
         try {
-            if (isReg) await auth.createUserWithEmailAndPassword(email.trim(), pass);
-            else await auth.signInWithEmailAndPassword(email.trim(), pass);
+            if (isReg) {
+                if (!fullName.trim()) throw new Error('Escribe tu nombre completo para crear una cuenta.');
+                if (!acceptedTerms) throw new Error('Debes leer y aceptar los Términos y Condiciones para crear una cuenta.');
+                let releaseConsentWrite;
+                registrationConsentWrite = new Promise(resolve => { releaseConsentWrite = resolve; });
+                try {
+                    const credential = await auth.createUserWithEmailAndPassword(email.trim(), pass);
+                    await credential.user.updateProfile({ displayName: fullName.trim() });
+                    await db.collection('artifacts').doc(APP_ID).collection('users').doc(credential.user.uid)
+                        .collection('legal').doc('terms-v1').set({
+                            accepted: true,
+                            termsVersion: '1.0',
+                            privacyNoticeVersion: '1.0',
+                            privacyNoticeAccepted: true,
+                            acceptedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            termsDocument: 'terminos.html',
+                            privacyNoticeDocument: 'privacidad.html'
+                        });
+                } catch (recordError) {
+                    if (auth.currentUser) await auth.signOut();
+                    throw new Error('No se completó el registro. Si tu cuenta ya se creó, pulsa YA TENGO CUENTA e inicia sesión para completar los datos pendientes. ' + recordError.message);
+                } finally {
+                    releaseConsentWrite();
+                    registrationConsentWrite = null;
+                }
+            } else await auth.signInWithEmailAndPassword(email.trim(), pass);
         } catch(err) {
             alert("Error: " + err.message);
         } finally {
+            setPass('');
             setLoadingAuth(false); // Finalizar carga
         }
-    }, [isReg, email, pass]);
+    }, [isReg, email, pass, acceptedTerms, fullName]);
 
     const handlePasswordReset = useCallback(async (e) => {
         e.preventDefault();
@@ -2159,10 +2558,10 @@ function AuthView({ APP_TITLE, APP_VERSION }) {
         React.createElement('div', { className:"shrink-0" },
             React.createElement('img', { src:"assets/movement-health-logo.png", alt:"Mi Entrenador Saludable", className:"auth-logo brand-logo" }),
             React.createElement('h1', { className:"auth-title text-3xl font-black text-white" }, APP_TITLE),
-            React.createElement('p', { className:"auth-version uppercase mt-2 mb-5" }, "VERSIÓN ", APP_VERSION)
+            React.createElement('p', { className:"auth-version uppercase mt-2 mb-5", onDoubleClick:()=>{ setIsReg(false); setShowPasswordRecovery(false); onSuperuserAccess?.(); }, role:"button", tabIndex:0, title:"Doble clic para acceso de superusuario", onKeyDown:event=>{ if (event.key === 'Enter' || event.key === ' ') { setIsReg(false); setShowPasswordRecovery(false); onSuperuserAccess?.(); } } }, "VERSIÓN ", APP_VERSION)
         ),
         React.createElement('div', { className:"auth-actions flex-1 overflow-y-auto scrollbar-hide w-full max-w-sm px-4 py-1 min-h-0" },
-            showPasswordRecovery ? (
+            showPasswordRecovery && !superuserMode ? (
                 React.createElement('form', { onSubmit:handlePasswordReset, className:"space-y-4" },
                     React.createElement('input', { type:"email", placeholder:"EMAIL", className:"w-full p-6 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value:email, onChange:e=>setEmail(e.target.value), required:true, disabled:loadingAuth }),
                     React.createElement('button', { type:"submit", className:"w-full bg-orange-500 py-6 rounded-full font-black uppercase text-white active:scale-95 italic", disabled:loadingAuth }, loadingAuth ? 'ENVIANDO...' : "ENVIAR ENLACE DE RECUPERACIÓN"),
@@ -2170,11 +2569,26 @@ function AuthView({ APP_TITLE, APP_VERSION }) {
                 )
             ) : (
                 React.createElement('form', { onSubmit:handleAuth, className:"space-y-3" },
+                    superuserMode && React.createElement('p', { className:"text-sm font-black uppercase tracking-widest text-orange-400" }, "Acceso superusuario"),
+                    isReg && React.createElement('input', { type:"text", placeholder:"NOMBRE COMPLETO", className:"w-full p-4 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value:fullName, onChange:e=>setFullName(e.target.value), required:true, disabled:loadingAuth, autoComplete:"name" }),
                     React.createElement('input', { type:"email", placeholder:"EMAIL", className:"w-full p-4 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value:email, onChange:e=>setEmail(e.target.value), required:true, disabled:loadingAuth }),
-                    React.createElement('input', { type:"password", placeholder:"CLAVE", className:"w-full p-4 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value:pass, onChange:e=>setPass(e.target.value), required:true, disabled:loadingAuth }),
-                    React.createElement('button', { type:"submit", className:"w-full bg-orange-500 py-4 rounded-full font-black uppercase text-white active:scale-95 italic", disabled:loadingAuth }, isReg ? (loadingAuth ? 'REGISTRANDO...' : 'REGISTRARSE') : (loadingAuth ? 'ENTRANDO...' : 'ENTRAR')),
-                    React.createElement('button', { type:"button", onClick:()=>setIsReg(!isReg), className:"text-orange-400 text-[10px] uppercase font-black block w-full", disabled:loadingAuth }, isReg ? 'YA TENGO CUENTA' : 'CREAR CUENTA NUEVA'),
-                    React.createElement('button', { type:"button", onClick:()=>setShowPasswordRecovery(true), className:"auth-recovery text-slate-300 text-[10px] uppercase font-black block w-full", disabled:loadingAuth }, "¿Olvidaste tu contraseña?")
+                    React.createElement('div', { className:"relative" },
+                        React.createElement('input', { type:showPassword ? "text" : "password", placeholder:"CLAVE", className:"w-full p-4 pr-14 bg-slate-900 border border-white/5 rounded-[1.5rem] text-center text-white outline-none", value:pass, onChange:e=>setPass(e.target.value), required:true, disabled:loadingAuth, autoComplete:isReg ? "new-password" : "current-password" }),
+                        React.createElement('button', { type:"button", onClick:()=>setShowPassword(value=>!value), disabled:loadingAuth, "aria-label":showPassword ? "Ocultar contraseña" : "Mostrar contraseña", "aria-pressed":showPassword, title:showPassword ? "Ocultar contraseña" : "Mostrar contraseña", className:"absolute right-3 top-1/2 -translate-y-1/2 grid h-10 w-10 place-items-center rounded-full text-slate-300 hover:text-white focus:outline-none focus:ring-2 focus:ring-orange-400 disabled:opacity-50" },
+                            React.createElement('svg', { viewBox:"0 0 24 24", width:"22", height:"22", fill:"none", stroke:"currentColor", strokeWidth:"2", strokeLinecap:"round", strokeLinejoin:"round", "aria-hidden":"true" },
+                                React.createElement('path', { d:"M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" }),
+                                showPassword ? React.createElement('path', { d:"M3 3l18 18" }) : React.createElement('circle', { cx:"12", cy:"12", r:"3" })
+                            )
+                        )
+                    ),
+                    isReg && React.createElement('label', { className:"flex items-start gap-3 rounded-2xl border border-white/10 bg-slate-900/70 p-4 text-left text-xs leading-relaxed text-slate-300" },
+                        React.createElement('input', { type:"checkbox", className:"mt-1 h-5 w-5 shrink-0 accent-orange-500", checked:acceptedTerms, onChange:e=>setAcceptedTerms(e.target.checked), required:true, disabled:loadingAuth, "aria-label":"Acepto los Términos y Condiciones" }),
+                        React.createElement('span', null, "Leí y acepto los ", React.createElement('a', { href:"terminos.html", target:"_blank", rel:"noopener noreferrer", className:"font-bold text-orange-400 underline" }, "Términos y Condiciones"), " y el ", React.createElement('a', { href:"privacidad.html", target:"_blank", rel:"noopener noreferrer", className:"font-bold text-orange-400 underline" }, "Aviso de Privacidad"), ". Entiendo que mis rutinas, historial y, si activo el GPS, mis recorridos se guardarán en mi cuenta para ofrecer estas funciones.")
+                    ),
+                    React.createElement('button', { type:"submit", className:"w-full bg-orange-500 py-4 rounded-full font-black uppercase text-white active:scale-95 italic", disabled:loadingAuth || (isReg && (!acceptedTerms || !fullName.trim())) }, superuserMode ? (loadingAuth ? 'VALIDANDO...' : 'ENTRAR A SUPERUSUARIO') : isReg ? (loadingAuth ? 'REGISTRANDO...' : 'REGISTRARSE') : (loadingAuth ? 'ENTRANDO...' : 'ENTRAR')),
+                    !superuserMode && React.createElement('button', { type:"button", onClick:()=>{ setIsReg(!isReg); setAcceptedTerms(false); setPass(''); setShowPassword(false); }, className:"text-orange-400 text-[10px] uppercase font-black block w-full", disabled:loadingAuth }, isReg ? 'YA TENGO CUENTA' : 'CREAR CUENTA NUEVA'),
+                    !superuserMode && React.createElement('button', { type:"button", onClick:()=>{ setShowPasswordRecovery(true); setPass(''); setShowPassword(false); }, className:"auth-recovery text-slate-300 text-[10px] uppercase font-black block w-full", disabled:loadingAuth }, "¿Olvidaste tu contraseña?"),
+                    superuserMode && React.createElement('button', { type:"button", onClick:()=>{ setPass(''); setShowPassword(false); onExitSuperuser?.(); }, className:"w-full text-slate-300 text-[10px] uppercase font-black", disabled:loadingAuth }, "VOLVER")
                 )
             )
         )

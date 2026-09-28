@@ -29,7 +29,9 @@ public class NativeGpsService extends Service {
     private TextToSpeech speech;
     private boolean speechReady, requesting;
     private long lastAnnouncement, lastPersist;
+    private long announcementIntervalMs = 300_000;
     private double announcedDistance;
+    private double announcementDistanceMeters = 500;
     private String lastFeedback = "";
 
     private static void load(Context context) {
@@ -50,8 +52,12 @@ public class NativeGpsService extends Service {
         context.getSharedPreferences(STORE, MODE_PRIVATE).edit().putString("state", state.toString()).apply();
     }
 
-    static void prepare(Context context, long startTime, double distance, JSONArray coordinates) {
+    static void prepare(Context context, long startTime, double distance, JSONArray coordinates,
+            long requestedIntervalMs, double requestedDistanceMeters) {
         load(context);
+        long intervalMs = Math.max(300_000, Math.min(1_800_000, requestedIntervalMs));
+        double distanceMeters = Double.isFinite(requestedDistanceMeters)
+            ? Math.max(100, Math.min(5000, requestedDistanceMeters)) : 500;
         if (state.optLong("startTime") != startTime) {
             state = new JSONObject(); route = coordinates == null ? new JSONArray() : coordinates;
             put("startTime", startTime);
@@ -63,7 +69,39 @@ public class NativeGpsService extends Service {
                 instance.lastFeedback = "";
             }
         }
+        put("announcementIntervalMs", intervalMs);
+        put("announcementDistanceMeters", distanceMeters);
+        if (instance != null) {
+            instance.announcementIntervalMs = intervalMs;
+            instance.announcementDistanceMeters = distanceMeters;
+            instance.lastAnnouncement = System.currentTimeMillis();
+            instance.announcedDistance = state.optDouble("distance", 0);
+        }
         put("active", true); put("error", ""); put("stoppedAt", 0);
+        persist(context);
+    }
+
+    static void setAnnouncementInterval(Context context, long requestedIntervalMs) {
+        load(context);
+        long intervalMs = Math.max(300_000, Math.min(1_800_000, requestedIntervalMs));
+        put("announcementIntervalMs", intervalMs);
+        if (instance != null) {
+            instance.announcementIntervalMs = intervalMs;
+            instance.lastAnnouncement = System.currentTimeMillis();
+            instance.announcedDistance = state.optDouble("distance", 0);
+        }
+        persist(context);
+    }
+
+    static void setAnnouncementDistance(Context context, double requestedDistanceMeters) {
+        load(context);
+        double distanceMeters = Double.isFinite(requestedDistanceMeters)
+            ? Math.max(100, Math.min(5000, requestedDistanceMeters)) : 500;
+        put("announcementDistanceMeters", distanceMeters);
+        if (instance != null) {
+            instance.announcementDistanceMeters = distanceMeters;
+            instance.announcedDistance = state.optDouble("distance", 0);
+        }
         persist(context);
     }
 
@@ -99,6 +137,8 @@ public class NativeGpsService extends Service {
 
     @Override public void onCreate() {
         super.onCreate(); instance = this; load(this);
+        announcementIntervalMs = Math.max(300_000, Math.min(1_800_000, state.optLong("announcementIntervalMs", 300_000)));
+        announcementDistanceMeters = Math.max(100, Math.min(5000, state.optDouble("announcementDistanceMeters", 500)));
         client = LocationServices.getFusedLocationProviderClient(this);
         if (Build.VERSION.SDK_INT >= 26) getSystemService(NotificationManager.class).createNotificationChannel(
             new NotificationChannel(CHANNEL, "Seguimiento de caminata y carrera", NotificationManager.IMPORTANCE_LOW));
@@ -174,7 +214,7 @@ public class NativeGpsService extends Service {
             long now = System.currentTimeMillis();
             double distance = state.optDouble("distance", 0), progress = Math.max(0, distance - announcedDistance);
             long interval = now - lastAnnouncement;
-            if (interval >= 60000 || (progress >= 100 && interval >= 30000)) {
+            if (interval >= announcementIntervalMs || progress >= announcementDistanceMeters) {
                 String key, text;
                 if (now - state.optLong("lastFixTime") > 15000) {
                     key = "signal"; text = "La señal GPS es insuficiente. No puedo confirmar tu avance; busca un lugar con cielo despejado.";

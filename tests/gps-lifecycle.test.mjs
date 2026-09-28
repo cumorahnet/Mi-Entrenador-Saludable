@@ -53,8 +53,9 @@ it('guarda todas las etapas aunque la ultima no tenga señal y separa sus trazos
 it('dibuja la ruta historica cuando el contenedor obtiene tamaño despues del primer render', async () => {
     const slots = [], effects = [], timers = [];
     let cursor = 0;
-    const line = { addTo:vi.fn(function () { return this; }), getBounds:vi.fn(), setLatLngs:vi.fn() };
-    const map = { on:vi.fn(), invalidateSize:vi.fn(), fitBounds:vi.fn(), remove:vi.fn(), setView:vi.fn() };
+    const line = { addTo:vi.fn(function () { return this; }), getBounds:vi.fn(), setLatLngs:vi.fn(), bringToFront:vi.fn() };
+    const map = { on:vi.fn(), invalidateSize:vi.fn(), fitBounds:vi.fn(), remove:vi.fn(), setView:vi.fn(),
+        createPane:vi.fn(() => ({ style:{} })) };
     const L = { control:{ zoom:() => ({ addTo:vi.fn() }) }, map:vi.fn(() => map), tileLayer:() => ({ addTo:vi.fn() }), polyline:vi.fn(() => line),
         divIcon:vi.fn(), marker:() => ({ addTo() { return this; }, setLatLng:vi.fn() }) };
     const container = { offsetWidth:0, offsetHeight:0 };

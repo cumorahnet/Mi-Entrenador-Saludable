@@ -4,6 +4,11 @@ import { runInNewContext } from 'node:vm';
 import appLogic from '../www/assets/app-logic.js';
 
 const source = readFileSync('www/assets/app.js', 'utf8');
+const gpsSettings = runInNewContext(
+    source.slice(source.indexOf('const GPS_ANNOUNCEMENT_INTERVAL_KEY'), source.indexOf('const readGpsAnnouncementInterval')) +
+    '; ({ readGpsDistanceAnnouncement, formatGpsDistanceAnnouncement, GPS_ANNOUNCEMENT_INTERVAL_OPTIONS, GPS_DISTANCE_ANNOUNCEMENT_MIN_METERS, GPS_DISTANCE_ANNOUNCEMENT_MAX_METERS, GPS_DISTANCE_ANNOUNCEMENT_STEP_METERS })',
+    { APP_ID:'test', localStorage:{ getItem:()=>null } }
+);
 const generate = runInNewContext(source.slice(source.indexOf('const generateWorkoutSteps ='), source.indexOf('// ─── Componente para placeholder')) + '; generateWorkoutSteps', { GPS_PHASE_KEY:'gps-tracking', getWorkoutExerciseDifficulty:()=> 'Fácil', SELECTABLE_PHASES:[],
     ALL_SEGMENT_GENERATORS:Object.fromEntries(['warmup','walk','run','stretch'].map(key=>[key, { generator:()=>[{ label:key, seconds:10, phase:key }] }])) });
 
@@ -97,7 +102,7 @@ function customForm(workoutToEdit, overrides = {}, workouts = []) {
     let calls = 0;
     chain.collection = key=>key === 'workouts' ? collection : chain;
     const onSaved = vi.fn();
-    const context = { ...appLogic, React:{ createElement:(type, props, ...children)=>({ type, props, children }) },
+    const context = { ...appLogic, ...gpsSettings, React:{ createElement:(type, props, ...children)=>({ type, props, children }) },
         useState:value=>[calls++ === 1 ? { ...value, ...overrides } : value, vi.fn()],
         useRef:value=>({ current:value }), db:chain, APP_ID:'test', InputField:()=>null };
     const start = source.indexOf('function CustomActivityView(');
@@ -144,8 +149,8 @@ it('combina varias actividades guardadas con las predefinidas y calienta una sol
 it('muestra las actividades recuperadas de Firebase en la misma selección y prioridad', () => {
     const saved = { id:'swim', name:'Nadar', customActivity:{ mode:'time', seconds:90 } };
     const onPhasesSelected = vi.fn();
-    const context = { ...appLogic, React:{ createElement:(type, props, ...children)=>({ type, props, children }) },
-        useState:value=>[value, vi.fn()], SELECTABLE_PHASES:[{ key:'walk', label:'Caminata' }],
+    const context = { ...appLogic, ...gpsSettings, React:{ createElement:(type, props, ...children)=>({ type, props, children }) },
+        useState:value=>[typeof value === 'function' ? value() : value, vi.fn()], readGpsAnnouncementInterval:()=>300000, SELECTABLE_PHASES:[{ key:'walk', label:'Caminata' }],
         APP_VERSION:'test', getWorkoutDurationText:()=> '90 s', AdBannerPlaceholder:()=>null };
     const start = source.indexOf('function PhaseSelectionScreen(');
     const end = source.indexOf('// ─── MapDisplay', start);
@@ -154,7 +159,7 @@ it('muestra las actividades recuperadas de Firebase en la misma selección y pri
     const nodes = [];
     function visit(node) { if (Array.isArray(node)) return node.forEach(visit); if (!node || typeof node !== 'object') return; nodes.push(node); visit(node.children); }
     visit(tree);
-    expect(nodes.filter(n=>n.type === 'select').map(n=>n.props.value)).toEqual([0,1]);
+    expect(nodes.filter(n=>n.type === 'select' && n.props['aria-label']?.startsWith('Orden de ')).map(n=>n.props.value)).toEqual([0,1]);
     nodes.find(n=>n.type === 'button' && n.children.includes('COMENZAR')).props.onClick();
     expect(onPhasesSelected).toHaveBeenCalledWith(['custom:swim','walk']);
     expect(JSON.stringify(tree)).toContain('Calentamiento obligatorio');
@@ -182,9 +187,11 @@ it('crear la misma actividad dos veces usa el mismo identificador de Firebase', 
 
 it('reordena tarjetas únicas y comienza con el orden elegido de todas las actividades', () => {
     const saved = { id:'swim', name:'Nadar', customActivity:{ mode:'time', seconds:90 } };
-    let state;
-    const context = { ...appLogic, React:{ createElement:(type, props, ...children)=>({ type, props, children }) },
-        useState:value=>{ state ??= value; return [state, update=>{ state = typeof update === 'function' ? update(state) : update; }]; },
+    const state = [];
+    let hookIndex = 0;
+    const context = { ...appLogic, ...gpsSettings, React:{ createElement:(type, props, ...children)=>({ type, props, children }) },
+        useState:value=>{ const index = hookIndex++; state[index] ??= typeof value === 'function' ? value() : value; return [state[index], update=>{ state[index] = typeof update === 'function' ? update(state[index]) : update; }]; },
+        readGpsAnnouncementInterval:()=>300000,
         SELECTABLE_PHASES:[{ key:'walk', label:'Caminata' }, { key:'run', label:'Carrera' }, { key:'training', label:'Entrenamiento principal' }],
         APP_VERSION:'test', getWorkoutDurationText:()=> '90 s', AdBannerPlaceholder:()=>null };
     const start = source.indexOf('function PhaseSelectionScreen(');
@@ -198,11 +205,13 @@ it('reordena tarjetas únicas y comienza con el orden elegido de todas las activ
     };
     let elements = nodes(render(props));
     expect(elements.filter(n=>n.props?.className?.includes('phase-card'))).toHaveLength(4);
-    expect(elements.filter(n=>n.type === 'select')).toHaveLength(4);
+    expect(elements.filter(n=>n.type === 'select' && n.props['aria-label']?.startsWith('Orden de '))).toHaveLength(4);
     elements.find(n=>n.props?.['aria-label'] === 'Orden de Nadar').props.onChange({ target:{ value:'0' } });
+    hookIndex = 0;
     elements = nodes(render(props));
     expect(elements.filter(n=>n.props?.className?.includes('phase-card')).map(n=>n.props.key)).toEqual(['custom:swim','walk','run','training']);
     elements.find(n=>n.props?.['aria-label'] === 'Orden de Entrenamiento principal').props.onChange({ target:{ value:'1' } });
+    hookIndex = 0;
     elements = nodes(render(props));
     elements.find(n=>n.type === 'button' && n.children.includes('COMENZAR')).props.onClick();
     expect(onPhasesSelected).toHaveBeenCalledWith(['custom:swim','training','walk','run']);

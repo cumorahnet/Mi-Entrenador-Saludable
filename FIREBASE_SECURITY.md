@@ -18,7 +18,7 @@ Revisar primero `firestore.rules` y después ejecutar, con Firebase CLI
 autenticado en el proyecto correcto:
 
 ```bash
-firebase use entrenadorpersonal-4e69d
+firebase use mi-entrenador-saludable
 firebase deploy --only firestore:rules
 ```
 

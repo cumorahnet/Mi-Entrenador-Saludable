@@ -42,13 +42,34 @@ public class NativeGpsPlugin extends Plugin {
                     call.reject("Inicio de seguimiento inválido.");
                     return;
                 }
-                NativeGpsService.prepare(getContext(), startTime, call.getDouble("distance", 0.0), call.getArray("coordinates"));
+                NativeGpsService.prepare(getContext(), startTime, call.getDouble("distance", 0.0), call.getArray("coordinates"),
+                    call.getLong("announcementIntervalMs", 300_000L), call.getDouble("announcementDistanceMeters", 500.0));
                 ContextCompat.startForegroundService(getContext(), new Intent(getContext(), NativeGpsService.class));
                 call.resolve();
             } catch (Exception e) {
                 NativeGpsService.finish(getContext());
                 call.reject("No se pudo iniciar el GPS. Abre la app e inténtalo de nuevo.", e);
             }
+        });
+    }
+
+    @PluginMethod
+    public void setAnnouncementInterval(PluginCall call) {
+        getActivity().runOnUiThread(() -> {
+            try {
+                NativeGpsService.setAnnouncementInterval(getContext(), call.getLong("intervalMs", 300_000L));
+                call.resolve();
+            } catch (Exception e) { call.reject("No se pudo actualizar el intervalo de avisos.", e); }
+        });
+    }
+
+    @PluginMethod
+    public void setAnnouncementDistance(PluginCall call) {
+        getActivity().runOnUiThread(() -> {
+            try {
+                NativeGpsService.setAnnouncementDistance(getContext(), call.getDouble("distanceMeters", 500.0));
+                call.resolve();
+            } catch (Exception e) { call.reject("No se pudo actualizar el intervalo de distancia.", e); }
         });
     }
 
