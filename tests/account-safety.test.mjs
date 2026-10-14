@@ -95,3 +95,13 @@ it('acepta registros completos y no permite entrar si no se pudo verificar', asy
     expect(offline.onComplete).not.toHaveBeenCalled();
     expect(nodes(offline.render()).some(n=>n.props?.role==='alert')).toBe(true);
 });
+it('oculta el formulario mientras carga y para cuentas completas; lo muestra si falta el registro', async()=>{
+    const complete=setupHarness({accepted:true,privacyNoticeAccepted:true,termsVersion:'1.0',privacyNoticeVersion:'1.0'});
+    expect(nodes(complete.render()).some(n=>n.type==='form')).toBe(false);
+    await complete.flush();
+    expect(nodes(complete.render()).some(n=>n.type==='form')).toBe(false);
+    const fresh=setupHarness(null);
+    expect(nodes(fresh.render()).some(n=>n.type==='form')).toBe(false);
+    await fresh.flush();
+    expect(nodes(fresh.render()).some(n=>n.type==='form')).toBe(true);
+});

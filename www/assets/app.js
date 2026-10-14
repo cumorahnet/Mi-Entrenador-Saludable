@@ -2348,6 +2348,10 @@ function AccountSetup({ user, onComplete }) {
             setError('No se pudo completar el registro. Tus datos se conservan; vuelve a intentarlo.');
         } finally { setSaving(false); }
     };
+    if (checking || (consent && user.displayName)) return React.createElement('div', {
+        role:'status', 'aria-label':'Cargando aplicación',
+        className:'h-full w-full flex items-center justify-center bg-slate-950'
+    }, React.createElement('div', { className:'animate-spin w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full' }));
     return React.createElement('div', { className:'h-full overflow-y-auto bg-slate-950 p-6 text-white flex flex-col items-center justify-center' },
         React.createElement('form', { onSubmit:submit, className:'w-full max-w-sm space-y-4' },
             React.createElement('h1', { className:'text-xl font-black' }, 'Completa tu registro'),
