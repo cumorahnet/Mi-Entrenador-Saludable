@@ -469,6 +469,11 @@ const generateWorkoutSteps = (workout, defaultParams, selectedPhasesKeys) => {
         const config = activity.customActivity;
         const count = config.mode === 'cycles' ? config.cycles : 1;
         const customSteps = [];
+        if (steps.at(-1)?.sessionSection === 'stretch') customSteps.push({
+            label:'Preparación · ' + activity.name, seconds:30, phase:'custom-transition',
+            sessionSection:'preparation', pauseOnEnter:true, color:'bg-yellow-700',
+            voiceInitial:'En 30 segundos comenzamos ' + activity.name, voiceCountdown:true
+        });
         if (config.preparation > 0) customSteps.push({ label:'Preparación · ' + activity.name, seconds:Number(config.preparation), phase:'custom-preparation', sessionSection:section, color:'bg-yellow-700', voiceInitial:'Prepárate para ' + activity.name, voiceCountdown:true });
         for (let cycle = 1; cycle <= count; cycle++) {
             customSteps.push({ label:activity.name + (count > 1 ? ' · Ciclo ' + cycle + '/' + count : ''),
@@ -1231,8 +1236,14 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
         idxRef.current = nextIdx; stepDurRef.current = s[nextIdx].seconds; timeLeftRef.current = s[nextIdx].seconds;
         stepStartRef.current = Date.now(); lastSpokenKey.current = ''; spokenInit.current = {};
         setUiIdx(nextIdx); setTime(s[nextIdx].seconds);
+        if (s[nextIdx].pauseOnEnter) {
+            pausedAtRef.current = stepStartRef.current;
+            setStatus('paused');
+            speak('Estiramientos finalizados. Toca continuar cuando estés listo. Tendrás 30 segundos para prepararte.', true);
+            setTimeout(() => persistSession('paused'), 0);
+        }
         return true;
-    }, [endWorkout, setTime]);
+    }, [endWorkout, setTime, setStatus, persistSession]);
 
     const stopGpsTracking = useCallback(async (isSkip=false, targetIndex=null) => {
         if (gpsStoppingRef.current) return;

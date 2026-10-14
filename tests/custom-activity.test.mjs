@@ -12,6 +12,15 @@ const gpsSettings = runInNewContext(
 const generate = runInNewContext(source.slice(source.indexOf('const generateWorkoutSteps ='), source.indexOf('// ─── Componente para placeholder')) + '; generateWorkoutSteps', { GPS_PHASE_KEY:'gps-tracking', getWorkoutExerciseDifficulty:()=> 'Fácil', SELECTABLE_PHASES:[],
     ALL_SEGMENT_GENERATORS:Object.fromEntries(['warmup','walk','run','stretch'].map(key=>[key, { generator:()=>[{ label:key, seconds:10, phase:key }] }])) });
 
+it('pausa después de estirar y prepara 30 segundos antes de una actividad personalizada', () => {
+    const activity = { id:'swim', name:'Nadar', customActivity:{ mode:'time', seconds:90 } };
+    const steps = generate({ name:'Sesión', sessionActivities:[activity] }, {}, ['stretch','custom:swim']);
+    expect(steps[2]).toMatchObject({ seconds:30, phase:'custom-transition', pauseOnEnter:true });
+    expect(steps[3]).toMatchObject({ label:'Nadar', seconds:90 });
+    const standalone = generate(activity, {}, ['training']);
+    expect(standalone.some(step => step.pauseOnEnter)).toBe(false);
+});
+
 it('genera una actividad cronometrada con su nombre y sin ejercicios ajenos', () => {
     const steps = generate({ name:'Nadar', customActivity:{ mode:'time', seconds:120, cycles:3, rest:20 } }, {}, ['training']);
     expect(steps).toHaveLength(2);
