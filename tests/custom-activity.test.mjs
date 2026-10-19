@@ -13,12 +13,29 @@ const generate = runInNewContext(source.slice(source.indexOf('const generateWork
     ALL_SEGMENT_GENERATORS:Object.fromEntries(['warmup','walk','run','stretch'].map(key=>[key, { generator:()=>[{ label:key, seconds:10, phase:key }] }])) });
 
 it('pausa después de estirar y prepara 30 segundos antes de una actividad personalizada', () => {
-    const activity = { id:'swim', name:'Nadar', customActivity:{ mode:'time', seconds:90 } };
-    const steps = generate({ name:'Sesión', sessionActivities:[activity] }, {}, ['stretch','custom:swim']);
+    const activity = { id:'weights', name:'Pesas', customActivity:{ mode:'time', seconds:90 } };
+    const steps = generate({ name:'Sesión', sessionActivities:[activity] }, {}, ['stretch','custom:weights']);
     expect(steps[2]).toMatchObject({ seconds:30, phase:'custom-transition', pauseOnEnter:true });
-    expect(steps[3]).toMatchObject({ label:'Nadar', seconds:90 });
+    expect(steps[3]).toMatchObject({ label:'Pesas', seconds:90 });
     const standalone = generate(activity, {}, ['training']);
     expect(standalone.some(step => step.pauseOnEnter)).toBe(false);
+});
+
+it.each(['Nadar', ' Natación '])('prepara %s durante 30 segundos después de continuar sin duplicar preparación', name => {
+    const activity = { id:'swim', name, customActivity:{ mode:'cycles', seconds:90, cycles:2, rest:10, preparation:25 } };
+    const steps = generate({ name:'Sesión', sessionActivities:[activity] }, {}, ['stretch','custom:swim']);
+    expect(steps.slice(0,-1).map(step => step.seconds)).toEqual([10,10,30,90,10,90]);
+    expect(steps[2]).toMatchObject({ phase:'custom-transition', pauseOnEnter:true });
+    expect(steps[3].pauseOnEnter).toBeUndefined();
+    const standalone = generate(activity, {}, ['training']);
+    expect(standalone.map(step => step.seconds)).toEqual([10,25,90,10,90]);
+    expect(standalone.some(step => step.pauseOnEnter)).toBe(false);
+});
+
+it.each(['walk','run'])('pausa y cuenta 30 segundos antes de %s después de estirar', key => {
+    const steps = generate({ name:'Sesión' }, {}, ['stretch', key]);
+    expect(steps[2]).toMatchObject({ seconds:30, pauseOnEnter:true, sessionSection:'preparation' });
+    expect(steps[3]).toMatchObject({ sessionSection:key });
 });
 
 it('genera una actividad cronometrada con su nombre y sin ejercicios ajenos', () => {
@@ -92,7 +109,7 @@ it('añade preparación una sola vez y respeta el orden elegido con una activida
 
 it('respeta el orden también en rutinas estándar y mantiene la preparación primero', () => {
     const steps = generate({ name:'Rutina' }, {}, ['stretch','run','walk']);
-    expect(steps.slice(0,-1).map(s=>s.sessionSection)).toEqual(['preparation','stretch','run','walk']);
+    expect(steps.slice(0,-1).map(s=>s.sessionSection)).toEqual(['preparation','stretch','preparation','run','walk']);
 });
 
 it('separa el tiempo de preparación del seguimiento GPS personalizado', async () => {

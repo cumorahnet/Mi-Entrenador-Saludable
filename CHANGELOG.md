@@ -1,5 +1,245 @@
 # CHANGELOG
 
+<!-- cdc-session:session-20261015165147-c6f92c -->
+## Sesión 15/10/2026, 11:36 a.m.
+
+### Resumen
+
+La sesión se enfocó en: Revisar y resolver los riesgos detectados en este cierre.. Se detectaron 25 cambio(s): 1 creado(s), 24 modificado(s) y 0 eliminado(s).
+
+### Cambios
+
+- android/.gradle/9.6.0/checksums/checksums.lock
+- android/.gradle/9.6.0/executionHistory/executionHistory.bin
+- android/.gradle/9.6.0/executionHistory/executionHistory.lock
+- android/.gradle/9.6.0/fileChanges/last-build.bin
+- android/.gradle/9.6.0/fileHashes/fileHashes.bin
+- android/.gradle/9.6.0/fileHashes/fileHashes.lock
+- android/.gradle/buildOutputCleanup/buildOutputCleanup.lock
+- android/.gradle/buildOutputCleanup/outputFiles.bin
+- android/.gradle/file-system.probe
+- android/app/capacitor.build.gradle
+- android/app/src/main/assets/capacitor.config.json
+- android/app/src/main/assets/capacitor.plugins.json
+- android/app/src/main/assets/public/assets/app.js
+- android/app/src/main/assets/public/cordova.js
+- android/app/src/main/assets/public/cordova_plugins.js
+- android/app/src/main/res/xml/config.xml
+- android/capacitor-cordova-android-plugins/build.gradle
+- android/capacitor-cordova-android-plugins/cordova.variables.gradle
+- android/capacitor-cordova-android-plugins/src/main/AndroidManifest.xml
+- android/capacitor.settings.gradle
+- outputs/MI-ENTRENADOR-SALUDABLE-ULTIMA-2.41.apk
+- outputs/MI-ENTRENADOR-SALUDABLE-ULTIMA-2.41.apk.json
+- tests/custom-activity.test.mjs
+- tests/screen-wake.test.mjs
+- www/assets/app.js
+
+### Riesgos
+
+- Se modificaron archivos de configuración o infraestructura (android/.gradle/9.6.0/checksums/checksums.lock, android/.gradle/9.6.0/executionHistory/executionHistory.bin, android/.gradle/9.6.0/executionHistory/executionHistory.lock, android/.gradle/9.6.0/fileChanges/last-build.bin, android/.gradle/9.6.0/fileHashes/fileHashes.bin). Valida compatibilidad y despliegue.
+- El análisis incluye archivos que ya tenían cambios al iniciar la sesión.
+
+### Próximo paso
+
+- Revisar y resolver los riesgos detectados en este cierre.
+- Ejecutar las pruebas automatizadas y validar el comportamiento afectado.
+- Revisar el diff y preparar un commit descriptivo.
+
+<!-- cdc-session:session-20261014184734-8df02e -->
+## Sesión 14/10/2026, 01:02 p.m.
+
+### Resumen
+
+Se cerró una sesión de trabajo del proyecto Mi-Entrenador-Saludable. Se detectaron 51 cambio(s): 13 creado(s), 28 modificado(s) y 10 eliminado(s).
+
+### Cambios
+
+- android/.gradle/8.13/checksums/checksums.lock
+- android/.gradle/8.13/checksums/md5-checksums.bin
+- android/.gradle/8.13/checksums/sha1-checksums.bin
+- android/.gradle/8.13/executionHistory/executionHistory.bin
+- android/.gradle/8.13/executionHistory/executionHistory.lock
+- android/.gradle/8.13/fileChanges/last-build.bin
+- android/.gradle/8.13/fileHashes/fileHashes.bin
+- android/.gradle/8.13/fileHashes/fileHashes.lock
+- android/.gradle/8.13/fileHashes/resourceHashesCache.bin
+- android/.gradle/8.13/gc.properties
+- android/.gradle/9.6.0/checksums/checksums.lock
+- android/.gradle/9.6.0/executionHistory/executionHistory.bin
+- android/.gradle/9.6.0/executionHistory/executionHistory.lock
+- android/.gradle/9.6.0/fileChanges/last-build.bin
+- android/.gradle/9.6.0/fileHashes/fileHashes.bin
+- android/.gradle/9.6.0/fileHashes/fileHashes.lock
+- android/.gradle/9.6.0/gc.properties
+- android/.gradle/buildOutputCleanup/buildOutputCleanup.lock
+- android/.gradle/buildOutputCleanup/outputFiles.bin
+- android/.gradle/file-system.probe
+- android/.gradle/vcs-1/gc.properties
+- android/app/capacitor.build.gradle
+- android/app/src/main/assets/capacitor.config.json
+- android/app/src/main/assets/capacitor.plugins.json
+- android/app/src/main/assets/public/assets/app.js
+- android/app/src/main/assets/public/cordova.js
+- android/app/src/main/assets/public/cordova_plugins.js
+- android/app/src/main/res/xml/config.xml
+- android/capacitor-cordova-android-plugins/build.gradle
+- android/capacitor-cordova-android-plugins/cordova.variables.gradle
+- android/capacitor-cordova-android-plugins/src/main/AndroidManifest.xml
+- android/capacitor.settings.gradle
+- firebase-debug.log
+- outputs/MI-ENTRENADOR-SALUDABLE-ULTIMA-2.41.apk
+- outputs/MI-ENTRENADOR-SALUDABLE-ULTIMA-2.41.apk.json
+- outputs/account-loading.patch
+- outputs/custom-transition-deploy/.firebase/hosting.d3d3.cache
+- outputs/custom-transition-deploy/firebase.json
+- outputs/custom-transition-deploy/www/assets/app-logic.js
+- outputs/custom-transition-deploy/www/assets/app.js
+- outputs/custom-transition-deploy/www/assets/exercise-catalog.js
+- outputs/custom-transition-deploy/www/assets/movement-health-logo.png
+- outputs/custom-transition-deploy/www/assets/native-gps.js
+- outputs/custom-transition-deploy/www/assets/styles.css
+- outputs/custom-transition-deploy/www/index.html
+- outputs/custom-transition-deploy/www/privacidad.html
+- outputs/custom-transition-deploy/www/terminos.html
+- outputs/custom-transition.patch
+- tests/account-safety.test.mjs
+- tests/custom-activity.test.mjs
+- www/assets/app.js
+
+### Riesgos
+
+- Se eliminaron 10 archivo(s). Confirma que las eliminaciones sean intencionales antes de integrar los cambios.
+- Se modificaron archivos de configuración o infraestructura (android/.gradle/8.13/checksums/checksums.lock, android/.gradle/8.13/checksums/md5-checksums.bin, android/.gradle/8.13/checksums/sha1-checksums.bin, android/.gradle/8.13/executionHistory/executionHistory.bin, android/.gradle/8.13/executionHistory/executionHistory.lock). Valida compatibilidad y despliegue.
+- La sesión contiene 51 cambios. Considera dividir la revisión o el commit para reducir el riesgo de integración.
+- El análisis incluye archivos que ya tenían cambios al iniciar la sesión.
+
+### Próximo paso
+
+- Revisar y resolver los riesgos detectados en este cierre.
+- Ejecutar las pruebas automatizadas y validar el comportamiento afectado.
+- Revisar el diff y preparar un commit descriptivo.
+
+<!-- cdc-session:session-20260929201313-912c54 -->
+## Sesión 29/09/2026, 02:16 p.m.
+
+### Resumen
+
+Se cerró una sesión de trabajo del proyecto Mi-Entrenador-Saludable. Se detectaron 13 cambio(s): 0 creado(s), 13 modificado(s) y 0 eliminado(s).
+
+### Cambios
+
+- android/.gradle/9.6.0/checksums/checksums.lock
+- android/.gradle/9.6.0/executionHistory/executionHistory.bin
+- android/.gradle/9.6.0/executionHistory/executionHistory.lock
+- android/.gradle/9.6.0/fileChanges/last-build.bin
+- android/.gradle/9.6.0/fileHashes/fileHashes.bin
+- android/.gradle/9.6.0/fileHashes/fileHashes.lock
+- android/.gradle/9.6.0/fileHashes/resourceHashesCache.bin
+- android/.gradle/9.6.0/gc.properties
+- android/.gradle/buildOutputCleanup/buildOutputCleanup.lock
+- android/.gradle/buildOutputCleanup/outputFiles.bin
+- android/.gradle/vcs-1/gc.properties
+- outputs/MI-ENTRENADOR-SALUDABLE-ULTIMA-2.41.apk
+- outputs/MI-ENTRENADOR-SALUDABLE-ULTIMA-2.41.apk.json
+
+### Riesgos
+
+- Se modificaron archivos de configuración o infraestructura (android/.gradle/9.6.0/checksums/checksums.lock, android/.gradle/9.6.0/executionHistory/executionHistory.bin, android/.gradle/9.6.0/executionHistory/executionHistory.lock, android/.gradle/9.6.0/fileChanges/last-build.bin, android/.gradle/9.6.0/fileHashes/fileHashes.bin). Valida compatibilidad y despliegue.
+- El análisis incluye archivos que ya tenían cambios al iniciar la sesión.
+
+### Próximo paso
+
+- Revisar y resolver los riesgos detectados en este cierre.
+- Revisar el diff y preparar un commit descriptivo.
+
+<!-- cdc-session:session-20260928183154-0a0651 -->
+## Sesión 28/09/2026, 01:19 p.m.
+
+### Resumen
+
+Se cerró una sesión de trabajo del proyecto Mi-Entrenador-Saludable. Se detectaron 64 cambio(s): 23 creado(s), 41 modificado(s) y 0 eliminado(s).
+
+### Cambios
+
+- .gitignore
+- CHANGELOG.md
+- android/.gradle/9.6.0/checksums/checksums.lock
+- android/.gradle/9.6.0/executionHistory/executionHistory.bin
+- android/.gradle/9.6.0/executionHistory/executionHistory.lock
+- android/.gradle/9.6.0/fileChanges/last-build.bin
+- android/.gradle/9.6.0/fileHashes/fileHashes.bin
+- android/.gradle/9.6.0/fileHashes/fileHashes.lock
+- android/.gradle/buildOutputCleanup/buildOutputCleanup.lock
+- android/.gradle/buildOutputCleanup/outputFiles.bin
+- android/.gradle/file-system.probe
+- android/app/build.gradle
+- android/app/capacitor.build.gradle
+- android/app/src/main/assets/capacitor.config.json
+- android/app/src/main/assets/capacitor.plugins.json
+- android/app/src/main/assets/public/assets/app.js
+- android/app/src/main/assets/public/cordova.js
+- android/app/src/main/assets/public/cordova_plugins.js
+- android/app/src/main/assets/public/index.html
+- android/app/src/main/res/xml/config.xml
+- android/capacitor-cordova-android-plugins/build.gradle
+- android/capacitor-cordova-android-plugins/cordova.variables.gradle
+- android/capacitor-cordova-android-plugins/src/main/AndroidManifest.xml
+- android/capacitor.settings.gradle
+- docs/ENTREGA-2.40.md
+- docs/ENTREGA-2.41.md
+- firebase-debug.log
+- outputs/MI-ENTRENADOR-SALUDABLE-ULTIMA-2.40.apk
+- outputs/MI-ENTRENADOR-SALUDABLE-ULTIMA-2.40.apk.json
+- outputs/MI-ENTRENADOR-SALUDABLE-ULTIMA-2.41.apk
+- outputs/MI-ENTRENADOR-SALUDABLE-ULTIMA-2.41.apk.json
+- package-lock.json
+- package.json
+- tests/android-integration.test.mjs
+- tests/custom-activity.test.mjs
+- tests/superuser-panel.test.mjs
+- version.json
+- work/.firebase/hosting.aG9zdGluZy0yLjQw.cache
+- work/.firebase/hosting.aG9zdGluZy0yLjQx.cache
+- work/check-admin-role.cjs
+- work/deploy-2.41.log
+- work/device-check.png
+- work/device-panel.png
+- work/device-window.xml
+- work/firebase-hosting-2.41.json
+- work/firestore-f7f16ccc-2f9b-4ae5-9257-fe4f746d9f20.rules
+- work/firestore-rules-test-local.json
+- work/firestore-rules-test-published.json
+- work/hosting-2.40/assets/app.js
+- work/hosting-2.40/downloads/mi-entrenador-saludable-2.40.apk
+- work/hosting-2.41/assets/app-logic.js
+- work/hosting-2.41/assets/app.js
+- work/hosting-2.41/assets/exercise-catalog.js
+- work/hosting-2.41/assets/movement-health-logo.png
+- work/hosting-2.41/assets/native-gps.js
+- work/hosting-2.41/assets/styles.css
+- work/hosting-2.41/downloads/mi-entrenador-saludable-2.40.apk
+- work/hosting-2.41/downloads/mi-entrenador-saludable-2.41.apk
+- work/hosting-2.41/index.html
+- work/hosting-2.41/privacidad.html
+- work/hosting-2.41/terminos.html
+- work/verify-compat.cjs
+- www/assets/app.js
+- www/index.html
+
+### Riesgos
+
+- Se modificaron archivos de configuración o infraestructura (android/.gradle/9.6.0/checksums/checksums.lock, android/.gradle/9.6.0/executionHistory/executionHistory.bin, android/.gradle/9.6.0/executionHistory/executionHistory.lock, android/.gradle/9.6.0/fileChanges/last-build.bin, android/.gradle/9.6.0/fileHashes/fileHashes.bin). Valida compatibilidad y despliegue.
+- La sesión contiene 64 cambios. Considera dividir la revisión o el commit para reducir el riesgo de integración.
+- El análisis incluye archivos que ya tenían cambios al iniciar la sesión.
+- Cambió la definición de dependencias; valida instalación y seguridad.
+
+### Próximo paso
+
+- Revisar y resolver los riesgos detectados en este cierre.
+- Ejecutar las pruebas automatizadas y validar el comportamiento afectado.
+- Revisar el diff y preparar un commit descriptivo.
+
 ## 2.41 — 2026-09-28
 
 - Corregida la inicialización de Firebase Functions compat del panel de superusuario para consultar y eliminar cuentas.

@@ -40,7 +40,7 @@ it('anuncia la distancia acumulada después de varios informes', () => {
         distance:1250, previousDistance:1100, time:180, previousTime:120 });
     expect(feedback.text).toContain('Distancia acumulada: 1,25 kilómetros.');
     expect(feedback.text).not.toContain('150 metros');
-    expect(feedback.text).toContain('9,0 kilómetros por hora');
+    expect(feedback.text).toContain('Tiempo transcurrido: 3:00.');
 });
 
 it('expresa la velocidad y el ritmo finales con unidades habladas', () => {

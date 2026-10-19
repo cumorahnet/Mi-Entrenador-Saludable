@@ -85,7 +85,10 @@ const APP_TITLE = "Mi Entrenador Saludable";
 const APP_VERSION = "2.41";
 const ACTIVE_SESSION_STORAGE_KEY = `${APP_ID}:active-session:v1`;
 const GPS_ANNOUNCEMENT_INTERVAL_KEY = `${APP_ID}:gps-announcement-interval:v1`;
-const GPS_ANNOUNCEMENT_INTERVAL_OPTIONS = [300, 600, 900, 1200, 1800];
+const GPS_ANNOUNCEMENT_TIME_MIN_SECONDS = 300;
+const GPS_ANNOUNCEMENT_TIME_MAX_SECONDS = 1800;
+const GPS_ANNOUNCEMENT_TIME_STEP_SECONDS = 300;
+const GPS_ANNOUNCEMENT_INTERVAL_OPTIONS = [300, 600, 900, 1200, 1500, 1800];
 const GPS_DISTANCE_ANNOUNCEMENT_KEY = `${APP_ID}:gps-distance-announcement:v1`;
 const GPS_DISTANCE_ANNOUNCEMENT_MIN_METERS = 100;
 const GPS_DISTANCE_ANNOUNCEMENT_MAX_METERS = 5000;
@@ -104,7 +107,9 @@ const formatGpsDistanceAnnouncement = meters => meters >= 1000
 const readGpsAnnouncementInterval = () => {
     try {
         const seconds = Number(localStorage.getItem(GPS_ANNOUNCEMENT_INTERVAL_KEY));
-        return GPS_ANNOUNCEMENT_INTERVAL_OPTIONS.includes(seconds) ? seconds * 1000 : 300 * 1000;
+        return Number.isFinite(seconds) && seconds >= GPS_ANNOUNCEMENT_TIME_MIN_SECONDS
+            && seconds <= GPS_ANNOUNCEMENT_TIME_MAX_SECONDS && seconds % GPS_ANNOUNCEMENT_TIME_STEP_SECONDS === 0
+            ? seconds * 1000 : 300 * 1000;
     } catch (error) { return 300 * 1000; }
 };
 
@@ -173,7 +178,9 @@ const {
     calculateSessionBreakdown,
     getNextSessionSectionIndex,
     evaluateGpsPosition,
-    getGpsFeedback
+    getGpsFeedback,
+    getDistanceMilestoneSpeech,
+    getDistanceMilestones
 } = window.AppLogic;
 const DEFAULT_WORKOUTS = createDefaultWorkouts(DEFAULT_PARAMS);
 const getWorkoutDurationText = workout => workout?.customActivity ? (workout.customActivity.mode === 'gps' ? 'Hasta finalizar' : formatTime(Number(workout.customActivity.preparation || 0) + workout.customActivity.seconds * (workout.customActivity.mode === 'cycles' ? workout.customActivity.cycles : 1) + (workout.customActivity.mode === 'cycles' ? workout.customActivity.rest * (workout.customActivity.cycles - 1) : 0))) : formatDurationEstimate(
@@ -469,12 +476,7 @@ const generateWorkoutSteps = (workout, defaultParams, selectedPhasesKeys) => {
         const config = activity.customActivity;
         const count = config.mode === 'cycles' ? config.cycles : 1;
         const customSteps = [];
-        if (steps.at(-1)?.sessionSection === 'stretch') customSteps.push({
-            label:'Preparación · ' + activity.name, seconds:30, phase:'custom-transition',
-            sessionSection:'preparation', pauseOnEnter:true, color:'bg-yellow-700',
-            voiceInitial:'En 30 segundos comenzamos ' + activity.name, voiceCountdown:true
-        });
-        if (config.preparation > 0) customSteps.push({ label:'Preparación · ' + activity.name, seconds:Number(config.preparation), phase:'custom-preparation', sessionSection:section, color:'bg-yellow-700', voiceInitial:'Prepárate para ' + activity.name, voiceCountdown:true });
+        if (steps.at(-1)?.phase !== 'custom-transition' && config.preparation > 0) customSteps.push({ label:'Preparación · ' + activity.name, seconds:Number(config.preparation), phase:'custom-preparation', sessionSection:section, color:'bg-yellow-700', voiceInitial:'Prepárate para ' + activity.name, voiceCountdown:true });
         for (let cycle = 1; cycle <= count; cycle++) {
             customSteps.push({ label:activity.name + (count > 1 ? ' · Ciclo ' + cycle + '/' + count : ''),
                 seconds:config.mode === 'gps' ? 4 : config.seconds,
@@ -498,6 +500,12 @@ const generateWorkoutSteps = (workout, defaultParams, selectedPhasesKeys) => {
     for (let i = 0; i < phasesToRun.length; i++) {
         const key = phasesToRun[i];
         const custom = workout.sessionActivities?.find(activity => 'custom:' + activity.id === key);
+        if (steps.at(-1)?.sessionSection === 'stretch' && (custom || ALL_SEGMENT_GENERATORS[key] || (key === 'training' && workout.customActivity))) {
+            const nextName = custom?.name || (key === 'training' && workout.customActivity ? workout.name : SELECTABLE_PHASES.find(phase => phase.key === key)?.label || key);
+            steps.push({ label:'Preparación · ' + nextName, seconds:30, phase:'custom-transition',
+                sessionSection:'preparation', pauseOnEnter:true, color:'bg-yellow-700',
+                voiceInitial:'En 30 segundos comenzamos ' + nextName, voiceCountdown:true });
+        }
         if (custom) { steps = steps.concat(generateCustomSteps(custom, key)); continue; }
         if (key === 'training' && workout.customActivity) {
             steps = steps.concat(generateCustomSteps());
@@ -1096,6 +1104,7 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
     const completedGpsRef = useRef([]);
     const lastPosition = useRef(null);
     const gpsLastFixTime = useRef(0);
+    const gpsDistanceAnnouncedRef = useRef(0);
     const gpsFeedbackRef = useRef({ distance:0, time:0, key:null });
     const [gpsSignalText, setGpsSignalText] = useState('Buscando señal GPS…');
     const [gpsAnnouncementIntervalMs, setGpsAnnouncementIntervalMs] = useState(readGpsAnnouncementInterval);
@@ -1239,7 +1248,9 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
         if (s[nextIdx].pauseOnEnter) {
             pausedAtRef.current = stepStartRef.current;
             setStatus('paused');
-            speak('Estiramientos finalizados. Toca continuar cuando estés listo. Tendrás 30 segundos para prepararte.', true);
+            speak(s[nextIdx].phase === 'custom-transition'
+                ? 'Estiramientos finalizados. Toca continuar cuando estés listo. Tendrás 30 segundos para prepararte.'
+                : 'Estiramientos finalizados. Toca continuar cuando estés listo para comenzar ' + s[nextIdx].label + '.', true);
             setTimeout(() => persistSession('paused'), 0);
         }
         return true;
@@ -1387,6 +1398,7 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
         gpsAnnounceLastTime.current = isRestore ? restoredGps.lastAnnouncementTime || gpsStartTime.current : Date.now();
         gpsTotalDistance.current = isRestore ? Number(restoredGps.totalDistance) || 0 : 0;
         gpsTotalTime.current = isRestore ? Number(restoredGps.totalTime) || 0 : 0;
+        gpsDistanceAnnouncedRef.current = Math.floor(gpsTotalDistance.current / gpsAnnouncementDistanceRef.current) * gpsAnnouncementDistanceRef.current;
         gpsLastFixTime.current = 0;
         gpsFeedbackRef.current = { distance:gpsTotalDistance.current, time:gpsTotalTime.current, key:null };
         setGpsSignalText('Buscando señal GPS…');
@@ -1412,10 +1424,17 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
             setGpsSignalText(hasSignal ? 'GPS con señal reciente' : 'Señal GPS insuficiente; no se puede confirmar el avance');
             const previous = gpsFeedbackRef.current;
             const distance = gpsTotalDistance.current;
-            const distanceIntervalReached = distance - previous.distance >= gpsAnnouncementDistanceRef.current;
-            if (distanceIntervalReached || now - gpsAnnounceLastTime.current >= gpsAnnouncementIntervalRef.current) {
-                const feedback = getGpsFeedback({ now, lastFixTime:gpsLastFixTime.current, distance,
-                    previousDistance:previous.distance, time:currentGpsTotalTime, previousTime:previous.time });
+            const milestones = getDistanceMilestones(distance, gpsDistanceAnnouncedRef.current, gpsAnnouncementDistanceRef.current);
+            for (const milestone of milestones) {
+                speak(getDistanceMilestoneSpeech(milestone, currentGpsTotalTime), false);
+                gpsDistanceAnnouncedRef.current = milestone;
+            }
+            const timeIntervalReached = now - gpsAnnounceLastTime.current >= gpsAnnouncementIntervalRef.current;
+            if (timeIntervalReached && milestones.length === 0) {
+                const feedback = timeIntervalReached
+                    ? { key:'time-progress', text:getGpsSummarySpeech(distance, currentGpsTotalTime) }
+                    : getGpsFeedback({ now, lastFixTime:gpsLastFixTime.current, distance,
+                        previousDistance:previous.distance, time:currentGpsTotalTime, previousTime:previous.time });
                 if (feedback.key === 'progress' || feedback.key !== previous.key) speak(feedback.text, false);
                 gpsFeedbackRef.current = { distance, time:currentGpsTotalTime, key:feedback.key };
                 gpsAnnounceLastTime.current = now;
@@ -1502,17 +1521,26 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
     }, [workout, persistSession, setStatus]);
 
     const releaseWake = useCallback(() => {
-        if (wakeLockRef.current) { wakeLockRef.current.release().then(()=>wakeLockRef.current=null).catch(()=>{}); }
+        const lock = wakeLockRef.current;
+        wakeLockRef.current = null;
+        if (lock) lock.release().catch(()=>{});
     }, []);
     const requestWake = useCallback(async () => {
         try {
-            if ((statusRef.current === 'running' || statusRef.current === 'gps-running') && 'wakeLock' in navigator && !wakeLockRef.current)
-                wakeLockRef.current = await navigator.wakeLock.request('screen');
+            if ((statusRef.current === 'running' || statusRef.current === 'gps-running') && 'wakeLock' in navigator && (!wakeLockRef.current || wakeLockRef.current.released)) {
+                const lock = await navigator.wakeLock.request('screen');
+                if (statusRef.current !== 'running' && statusRef.current !== 'gps-running') { await lock.release(); return; }
+                wakeLockRef.current = lock;
+                lock.addEventListener('release', () => {
+                    if (wakeLockRef.current === lock) wakeLockRef.current = null;
+                });
+            }
             else if (statusRef.current !== 'running' && statusRef.current !== 'gps-running' && wakeLockRef.current) releaseWake();
         } catch(e) {}
     }, [releaseWake]);
 
-    useEffect(() => { if (uiStatus === 'running' || uiStatus === 'gps-running') requestWake(); else releaseWake(); return releaseWake; }, [uiStatus, requestWake, releaseWake]);
+    const screenMustStayOn = uiStatus === 'running' || uiStatus === 'gps-running';
+    useEffect(() => { if (screenMustStayOn) requestWake(); else releaseWake(); return releaseWake; }, [screenMustStayOn, requestWake, releaseWake]);
 
     useEffect(() => {
         const handleVisibility = () => {
@@ -1523,7 +1551,7 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
                 resumeVoice();
                 window.dispatchEvent(new Event('mientrenador-resume'));
                 setTimeout(() => window.dispatchEvent(new Event('mientrenador-resume')), 300);
-                if (statusRef.current === 'gps-running') requestWake();
+                if (statusRef.current === 'running' || statusRef.current === 'gps-running') requestWake();
                 if (statusRef.current === 'paused' && pausedAtRef.current !== null) {
                     const hiddenMs = Date.now() - pausedAtRef.current;
                     workoutStartRef.current = (workoutStartRef.current!=null&&!isNaN(workoutStartRef.current)) ? workoutStartRef.current+hiddenMs : Date.now();
@@ -1725,13 +1753,18 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
             )
         ),
         React.createElement('p', { role:'status', className:"text-center text-xs text-slate-300 mb-3" }, gpsSignalText),
-        React.createElement('label', { className:"flex items-center justify-between gap-3 rounded-xl bg-white/5 px-4 py-3 mb-3 text-sm" },
-            React.createElement('span', null, 'Aviso de velocidad y distancia'),
-            React.createElement('select', {
-                value:gpsAnnouncementIntervalMs / 1000,
+        React.createElement('label', { className:"flex flex-col gap-2 rounded-xl bg-white/5 px-4 py-3 mb-3 text-sm" },
+            React.createElement('span', { className:'flex items-center justify-between gap-3' },
+                React.createElement('span', null, 'Aviso por tiempo'),
+                React.createElement('strong', { className:'text-orange-300' }, `${gpsAnnouncementIntervalMs / 60000} min`)
+            ),
+            React.createElement('input', {
+                type:'range', min:GPS_ANNOUNCEMENT_TIME_MIN_SECONDS, max:GPS_ANNOUNCEMENT_TIME_MAX_SECONDS,
+                step:GPS_ANNOUNCEMENT_TIME_STEP_SECONDS, value:gpsAnnouncementIntervalMs / 1000,
+                'aria-label':'Intervalo de avisos por tiempo', className:'w-full accent-orange-500',
                 onChange:event => {
                     const seconds = Number(event.target.value);
-                    const interval = GPS_ANNOUNCEMENT_INTERVAL_OPTIONS.includes(seconds) ? seconds : 300;
+                    const interval = Math.max(GPS_ANNOUNCEMENT_TIME_MIN_SECONDS, Math.min(GPS_ANNOUNCEMENT_TIME_MAX_SECONDS, seconds));
                     const milliseconds = interval * 1000;
                     gpsAnnouncementIntervalRef.current = milliseconds;
                     setGpsAnnouncementIntervalMs(milliseconds);
@@ -1739,9 +1772,9 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
                     gpsAnnounceLastTime.current = Date.now();
                     gpsFeedbackRef.current = { distance:gpsTotalDistance.current, time:gpsTotalTime.current, key:gpsFeedbackRef.current.key };
                     if (isNativeRuntime()) getCapacitorPlugins().NativeGps?.setAnnouncementInterval?.({ intervalMs:milliseconds });
-                },
-                className:"rounded-lg bg-slate-800 px-3 py-2 text-white"
-            }, GPS_ANNOUNCEMENT_INTERVAL_OPTIONS.map(seconds => React.createElement('option', { key:seconds, value:seconds }, seconds < 60 ? `${seconds} segundos` : `${seconds / 60} min`)))
+                }
+            }),
+            React.createElement('span', { className:'flex justify-between text-[10px] text-slate-400' }, React.createElement('span', null, '5 min'), React.createElement('span', null, '30 min'))
         ),
         React.createElement('label', { className:"flex flex-col gap-2 rounded-xl bg-white/5 px-4 py-3 mb-3 text-sm" },
             React.createElement('span', { className:'flex items-center justify-between gap-3' },
@@ -1756,6 +1789,7 @@ function PlayerView({ workout, selectedPhases, userId, restoredSession, onExit, 
                     const meters = Math.max(GPS_DISTANCE_ANNOUNCEMENT_MIN_METERS,
                         Math.min(GPS_DISTANCE_ANNOUNCEMENT_MAX_METERS, Number(event.target.value)));
                     gpsAnnouncementDistanceRef.current = meters;
+                    gpsDistanceAnnouncedRef.current = Math.floor(gpsTotalDistance.current / meters) * meters;
                     setGpsAnnouncementDistanceMeters(meters);
                     try { localStorage.setItem(GPS_DISTANCE_ANNOUNCEMENT_KEY, String(meters)); } catch (error) {}
                     gpsFeedbackRef.current = { distance:gpsTotalDistance.current, time:gpsTotalTime.current, key:gpsFeedbackRef.current.key };

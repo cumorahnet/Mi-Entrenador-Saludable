@@ -65,7 +65,7 @@ public class NativeGpsService extends Service {
             if (instance != null) {
                 instance.filter = new GpsDistanceFilter();
                 instance.lastAnnouncement = System.currentTimeMillis();
-                instance.announcedDistance = state.optDouble("distance", 0);
+                instance.announcedDistance = Math.floor(state.optDouble("distance", 0) / instance.announcementDistanceMeters) * instance.announcementDistanceMeters;
                 instance.lastFeedback = "";
             }
         }
@@ -75,7 +75,7 @@ public class NativeGpsService extends Service {
             instance.announcementIntervalMs = intervalMs;
             instance.announcementDistanceMeters = distanceMeters;
             instance.lastAnnouncement = System.currentTimeMillis();
-            instance.announcedDistance = state.optDouble("distance", 0);
+            instance.announcedDistance = Math.floor(state.optDouble("distance", 0) / instance.announcementDistanceMeters) * instance.announcementDistanceMeters;
         }
         put("active", true); put("error", ""); put("stoppedAt", 0);
         persist(context);
@@ -88,7 +88,6 @@ public class NativeGpsService extends Service {
         if (instance != null) {
             instance.announcementIntervalMs = intervalMs;
             instance.lastAnnouncement = System.currentTimeMillis();
-            instance.announcedDistance = state.optDouble("distance", 0);
         }
         persist(context);
     }
@@ -100,7 +99,7 @@ public class NativeGpsService extends Service {
         put("announcementDistanceMeters", distanceMeters);
         if (instance != null) {
             instance.announcementDistanceMeters = distanceMeters;
-            instance.announcedDistance = state.optDouble("distance", 0);
+            instance.announcedDistance = Math.floor(state.optDouble("distance", 0) / instance.announcementDistanceMeters) * instance.announcementDistanceMeters;
         }
         persist(context);
     }
@@ -170,7 +169,7 @@ public class NativeGpsService extends Service {
             if (!requesting) {
                 requesting = true;
                 lastAnnouncement = System.currentTimeMillis();
-                announcedDistance = state.optDouble("distance", 0);
+                announcedDistance = Math.floor(state.optDouble("distance", 0) / announcementDistanceMeters) * announcementDistanceMeters;
                 LocationRequest request = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 2000)
                     .setMinUpdateIntervalMillis(1000).setMaxUpdateDelayMillis(0).setWaitForAccurateLocation(true).build();
                 client.requestLocationUpdates(request, callback, Looper.getMainLooper())
@@ -214,7 +213,24 @@ public class NativeGpsService extends Service {
             long now = System.currentTimeMillis();
             double distance = state.optDouble("distance", 0), progress = Math.max(0, distance - announcedDistance);
             long interval = now - lastAnnouncement;
-            if (interval >= announcementIntervalMs || progress >= announcementDistanceMeters) {
+            boolean timeReached = interval >= announcementIntervalMs;
+            boolean distanceReached = distance - announcedDistance >= announcementDistanceMeters;
+            if (speechReady && distanceReached) {
+                long minutes = Math.max(0, now - state.optLong("startTime")) / 60000;
+                long hours = minutes / 60, remainder = minutes % 60;
+                String duration = hours > 0
+                    ? hours + (hours == 1 ? " hora" : " horas") + " con " + remainder + (remainder == 1 ? " minuto" : " minutos")
+                    : minutes + (minutes == 1 ? " minuto" : " minutos");
+                while (distance - announcedDistance >= announcementDistanceMeters) {
+                    double milestone = announcedDistance + announcementDistanceMeters;
+                    String kilometers = java.math.BigDecimal.valueOf(milestone / 1000).stripTrailingZeros().toPlainString().replace('.', ',');
+                    int result = speech.speak("Kilómetro " + kilometers + ", en " + duration + ".",
+                        TextToSpeech.QUEUE_ADD, null, "gps-distance-" + kilometers);
+                    if (result == TextToSpeech.ERROR) break;
+                    announcedDistance = milestone;
+                }
+            }
+            if (speechReady && timeReached && !distanceReached) {
                 String key, text;
                 if (now - state.optLong("lastFixTime") > 15000) {
                     key = "signal"; text = "La señal GPS es insuficiente. No puedo confirmar tu avance; busca un lugar con cielo despejado.";
@@ -226,9 +242,21 @@ public class NativeGpsService extends Service {
                         "Distancia acumulada: %.0f metros. Velocidad del tramo: %.1f kilómetros por hora.",
                         distance, progress * 3600 / interval);
                 }
-                if (speechReady && (key.equals("progress") || !key.equals(lastFeedback)))
-                    speech.speak(text, TextToSpeech.QUEUE_FLUSH, null, "gps-feedback");
-                lastFeedback = key; announcedDistance = distance; lastAnnouncement = now;
+                if (timeReached && !key.equals("signal")) {
+                    double seconds = Math.max(1, (now - state.optLong("startTime")) / 1000.0);
+                    double speed = distance * 3.6 / seconds;
+                    double pace = distance > 0 ? seconds / (distance / 1000.0) : 0;
+                    text = String.format(new Locale("es", "MX"),
+                        "Distancia acumulada: %.0f metros. Velocidad promedio: %.1f kilometros por hora. Ritmo promedio: %d minutos y %d segundos por kilometro.",
+                        distance, speed, (int) pace / 60, (int) Math.round(pace) % 60);
+                    key = "time-progress";
+                } else if (key.equals("progress")) {
+                    text = String.format(new Locale("es", "MX"), "Distancia acumulada: %.0f metros. Tiempo transcurrido: %d minutos y %d segundos.",
+                        distance, (now - state.optLong("startTime")) / 60000, ((now - state.optLong("startTime")) / 1000) % 60);
+                }
+                if (speechReady && (key.equals("progress") || key.equals("time-progress") || !key.equals(lastFeedback)))
+                    speech.speak(text, TextToSpeech.QUEUE_ADD, null, "gps-feedback");
+                lastFeedback = key; lastAnnouncement = now;
             }
             handler.postDelayed(this, 1000);
         }

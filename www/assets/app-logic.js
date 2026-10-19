@@ -58,6 +58,22 @@
         return `Distancia acumulada: ${spokenDistance(distance)}. Velocidad promedio: ${spokenSpeed(distance, time)}. Ritmo promedio: ${minutes} minutos y ${seconds} segundos por kilómetro.`;
     };
 
+    const getDistanceMilestoneSpeech = (meters, seconds) => {
+        const minutes = Math.floor(Math.max(0, seconds) / 60);
+        const hours = Math.floor(minutes / 60);
+        const remainder = minutes % 60;
+        const duration = hours > 0
+            ? `${hours} ${hours === 1 ? 'hora' : 'horas'} con ${remainder} ${remainder === 1 ? 'minuto' : 'minutos'}`
+            : `${minutes} ${minutes === 1 ? 'minuto' : 'minutos'}`;
+        return `Kilómetro ${Number((meters / 1000).toFixed(3)).toString().replace('.', ',')}, en ${duration}.`;
+    };
+    const getDistanceMilestones = (distance, announcedDistance, interval) => {
+        if (![distance, announcedDistance, interval].every(isFiniteNumber) || interval <= 0) return [];
+        const milestones = [];
+        for (let next = announcedDistance + interval; next <= distance; next += interval) milestones.push(next);
+        return milestones;
+    };
+
     const getDistance = (lat1, lon1, lat2, lon2) => {
         if (![lat1, lon1, lat2, lon2].every(isFiniteNumber)) return 0;
 
@@ -315,7 +331,7 @@
         }
         const progress = Math.max(0, distance - previousDistance);
         if (progress < 5) return { key:'no-progress', text:'El GPS no registra avance suficiente. Si estás caminando, revisa la señal y el permiso de ubicación precisa.' };
-        return { key:'progress', text:`Distancia acumulada: ${spokenDistance(distance)}. Velocidad del tramo: ${spokenSpeed(progress, time - previousTime)}.` };
+        return { key:'progress', text:`Distancia acumulada: ${spokenDistance(distance)}. Tiempo transcurrido: ${formatTime(time)}.` };
     };
 
     const calculateSessionBreakdown = ({
@@ -359,6 +375,8 @@
         formatDistance,
         formatSpeed,
         getGpsSummarySpeech,
+        getDistanceMilestoneSpeech,
+        getDistanceMilestones,
         getDistance,
         togglePhaseSelection,
         getPhaseSelectionChange,
