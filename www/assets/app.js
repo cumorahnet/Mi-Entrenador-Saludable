@@ -140,8 +140,8 @@ const WARMUP_STEPS = [
     { label: 'RODILLAS IZQUIERDA', voice: 'Rodillas a la izquierda' },
     { label: 'CINTURA DERECHA', voice: 'Cintura a la derecha' },
     { label: 'CINTURA IZQUIERDA', voice: 'Cintura a la izquierda' },
-    { label: 'BRAZO DERECHO', voice: 'Brazo derecho' },
-    { label: 'BRAZO IZQUIERDO', voice: 'Brazo izquierdo' },
+    { label: 'BRAZO DERECHO', voice: 'Giro de brazos al frente' },
+    { label: 'BRAZO IZQUIERDO', voice: 'Giro de brazos hacia atrás' },
     { label: 'CUELLO ADELANTE Y ATRÁS', voice: 'Cuello adelante y atrás' },
     { label: 'CUELLO DERECHA E IZQUIERDA', voice: 'Cuello derecha e izquierda' },
 ];
